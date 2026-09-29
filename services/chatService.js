@@ -6,6 +6,25 @@ const notificationEventEmitter = require("./notificationEventEmitter");
 const User = require("../models/user.model");
 
 class ChatService {
+
+  async resolveGuestSession(guestSessionId) {
+    if (!guestSessionId) return null;
+
+    const value = String(guestSessionId).trim();
+    if (!value) return null;
+
+    // Public browser identity is GuestSession.sessionId. Never pass an arbitrary
+    // public value to findById(), because Mongoose will throw a CastError.
+    let guestSession = await GuestSession.findOne({ sessionId: value });
+
+    // Backward compatibility for browsers that stored the Mongo _id previously.
+    if (!guestSession && /^[a-fA-F0-9]{24}$/.test(value)) {
+      guestSession = await GuestSession.findById(value);
+    }
+
+    return guestSession;
+  }
+
   async createChat(customerId, data = {}) {
     const { subject, metadata } = data;
 
@@ -83,14 +102,15 @@ class ChatService {
   async createGuestChat(guestSessionId, data = {}) {
     const { subject, metadata } = data;
 
-    // Verify guest session exists
-    const guestSession = await GuestSession.findById(guestSessionId);
+    // Resolve the public guest session key (guest_...) to the Mongo document.
+    // Legacy clients may still hold the Mongo ObjectId, so support both formats.
+    const guestSession = await this.resolveGuestSession(guestSessionId);
     if (!guestSession) {
       throw new AppError("Invalid guest session", 400);
     }
 
     const chat = await Chat.create({
-      guestSession: guestSessionId,
+      guestSession: guestSession._id,
       subject,
       metadata: {
         ...(metadata || {}),
@@ -203,9 +223,13 @@ class ChatService {
       return true;
     }
 
-    // Guest accessing their own chat via session ID
-    if (guestSessionId && chat.guestSession && chat.guestSession.toString() === guestSessionId.toString()) {
-      return true;
+    // Guest accessing their own chat via the public session key. Resolve it to
+    // the internal Mongo ObjectId before comparing ownership.
+    if (guestSessionId && chat.guestSession) {
+      const guestSession = await this.resolveGuestSession(guestSessionId);
+      if (guestSession && chat.guestSession.toString() === guestSession._id.toString()) {
+        return true;
+      }
     }
 
     return false;

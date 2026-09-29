@@ -1,5 +1,6 @@
 const socketIo = require("socket.io");
 const jwt = require("jsonwebtoken");
+const ChatService = require("./chatService");
 
 class NotificationGateway {
   constructor(server) {
@@ -25,9 +26,12 @@ class NotificationGateway {
           socket.role = decoded.role;
           socket.isGuest = false;
         } else if (guestSessionId) {
-          // Guest user
-          socket.guestSessionId = guestSessionId;
-          socket.userId = null; // No user ID for guests
+          // Guest sockets must present a real public GuestSession key.
+          const guestSession = await ChatService.resolveGuestSession(guestSessionId);
+          if (!guestSession) return next(new Error("Authentication error"));
+          socket.guestSessionId = guestSession.sessionId;
+          socket.guestSessionObjectId = guestSession._id.toString();
+          socket.userId = null;
           socket.role = "customer";
           socket.isGuest = true;
         } else {
@@ -52,10 +56,21 @@ class NotificationGateway {
         socket.join("admin:notifications");
       }
 
-      socket.on("chat:join", ({ chatId }) => {
-        const room = `chat:${chatId}`;
-        socket.join(room);
-        console.log(`Socket ${socket.id} (${socket.isGuest ? 'Guest' : 'User'}: ${socket.userId || socket.guestSessionId}) joined room ${room}`);
+      socket.on("chat:join", async ({ chatId } = {}) => {
+        try {
+          if (!chatId) return;
+          const authorized = await ChatService.authorizeChat(
+            chatId, socket.userId, socket.role, socket.guestSessionId
+          );
+          if (!authorized) {
+            socket.emit("chat:error", { chatId, message: "Not authorized to join this chat" });
+            return;
+          }
+          const room = `chat:${chatId}`;
+          socket.join(room);
+        } catch (error) {
+          socket.emit("chat:error", { chatId, message: "Unable to join chat" });
+        }
       });
 
       socket.on("chat:leave", ({ chatId }) => {
@@ -79,6 +94,10 @@ class NotificationGateway {
           readerId: socket.userId,
           readerRole: socket.role,
         });
+      });
+
+      socket.on("heartbeat", () => {
+        socket.emit("heartbeat:ack", { timestamp: new Date() });
       });
 
       socket.on("disconnect", () => { });

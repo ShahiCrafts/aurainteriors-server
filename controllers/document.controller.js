@@ -1,5 +1,5 @@
 const Document = require("../models/document.model");
-const { queueDocumentIngestion } = require("../services/notificationQueue");
+const { runDocumentIngestion } = require("../services/backgroundTasks");
 const { deleteFile } = require("../middleware/upload.middleware");
 const { QdrantClient } = require("@qdrant/js-client-rest");
 const AppError = require("../utils/AppError");
@@ -27,8 +27,8 @@ exports.uploadDocument = async (req, res, next) => {
       uploadedBy: req.user.id,
     });
 
-    // Enqueue background processing job
-    await queueDocumentIngestion(doc._id.toString());
+    // Start asynchronous document ingestion
+    runDocumentIngestion(doc._id.toString());
 
     res.status(201).json({
       status: "success",
@@ -132,8 +132,8 @@ exports.retryDocumentIngestion = async (req, res, next) => {
     doc.error = null;
     await doc.save();
 
-    // Re-enqueue background processing job
-    await queueDocumentIngestion(doc._id.toString());
+    // Restart asynchronous document ingestion
+    runDocumentIngestion(doc._id.toString());
 
     res.status(200).json({
       status: "success",

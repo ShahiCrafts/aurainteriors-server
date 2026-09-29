@@ -1,7 +1,6 @@
 const Promotion = require("../models/promotion.model");
 const User = require("../models/user.model");
 const NotificationService = require("./notificationService");
-const { queuePushNotification } = require("./notificationQueue");
 const AppError = require("../utils/AppError");
 
 class PromotionService {
@@ -238,20 +237,10 @@ class PromotionService {
               },
               userNotification._id.toString()
             );
-          } else {
-            await queuePushNotification({
-              userId: userId.toString(),
-              notificationData: {
-                title: notificationData.title,
-                body: notificationData.description,
-                data: {
-                  ...notificationData.data,
-                  actionUrl: notificationData.actionUrl,
-                  type: "promotional",
-                },
-              },
-            });
           }
+          // The notification is persisted regardless of realtime connectivity.
+          // Offline users receive it from the notifications API when they reconnect;
+          // Firebase push is optional infrastructure and must not be a startup/runtime dependency.
 
           sentCount++;
         } catch (error) {

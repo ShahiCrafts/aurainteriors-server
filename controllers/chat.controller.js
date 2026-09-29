@@ -45,19 +45,25 @@ exports.startChat = catchAsync(async (req, res, next) => {
       data: { chat },
     });
   } else {
-    // Guest user - create a new guest session or use existing
-    let guestSessionId = getGuestSessionId(req);
+    // Guest user - the browser stores a public session key (guest_...), while
+    // Chat.guestSession stores the GuestSession Mongo ObjectId. Resolve/create
+    // the session here and always return the public key to the browser.
+    const suppliedGuestSessionId = getGuestSessionId(req);
+    let guestSession = suppliedGuestSessionId
+      ? await ChatService.resolveGuestSession(suppliedGuestSessionId)
+      : null;
 
-    if (!guestSessionId) {
-      // Create new guest session
-      const guestSession = await GuestSession.create({
-        sessionId: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    if (!guestSession) {
+      guestSession = await GuestSession.create({
+        sessionId: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
         email: guestEmail || null,
       });
-      guestSessionId = guestSession._id;
+    } else if (guestEmail && !guestSession.email) {
+      guestSession.email = guestEmail;
+      await guestSession.save();
     }
 
-    const chat = await ChatService.createGuestChat(guestSessionId, {
+    const chat = await ChatService.createGuestChat(guestSession.sessionId, {
       subject,
       metadata,
     });
@@ -67,7 +73,7 @@ exports.startChat = catchAsync(async (req, res, next) => {
       message: "Chat started successfully",
       data: { 
         chat,
-        guestSessionId: guestSessionId.toString(), // Return session ID so client can store it
+        guestSessionId: guestSession.sessionId, // Public key; never expose/reuse Mongo _id as browser identity
       },
     });
   }
@@ -339,7 +345,7 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
   const chat = message.chat;
   const isCustomer = req.user && chat.customer?.toString() === req.user._id.toString();
   const isAdmin = req.user && req.user.role === 'admin';
-  const isGuest = guestSessionId && chat.guestSession?.toString() === guestSessionId.toString();
+  const isGuest = guestSessionId ? await ChatService.authorizeChat(chat._id, null, 'customer', guestSessionId) : false;
 
   if (!isCustomer && !isAdmin && !isGuest) {
     return next(new AppError("You don't have permission to update this message", 403));

@@ -16,9 +16,9 @@ const globalErrorHandler = require("./middleware/error.middleware");
 const AppError = require("./utils/AppError");
 const NotificationGateway = require("./services/notificationGateway");
 const {
-  initializeQueues,
-  closeQueues,
-} = require("./services/notificationQueue");
+  startBackgroundTasks,
+  stopBackgroundTasks,
+} = require("./services/backgroundTasks");
 
 const notificationEventEmitter = require("./services/notificationEventEmitter");
 const {
@@ -219,8 +219,7 @@ const startServer = async () => {
     // Initialize database if empty
     await initializeDatabaseIfEmpty();
     
-    await initializeQueues();
-    console.log("✓ Queues initialized");
+    startBackgroundTasks();
 
     console.log("Initializing notification gateway...");
     notificationGateway = new NotificationGateway(httpServer);
@@ -287,7 +286,7 @@ const startServer = async () => {
       clearInterval(rssFeedInterval);
       keepAliveService.stop();
       await notificationGateway.close();
-      await closeQueues();
+      stopBackgroundTasks();
       process.exit(0);
     };
 
