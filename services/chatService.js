@@ -381,6 +381,42 @@ class ChatService {
     // Wait: if it reopened, the bot is active now, so it should trigger!
     const updatedBotActive = didReopen ? true : (!chat.metadata || chat.metadata.botActive !== false);
     if (senderRole === "customer" && updatedBotActive) {
+      if (process.env.CHAT_PIPELINE === "v2") {
+        const { queue, pipeline } = require("./chatV2");
+        const retrievalService = require("./retrievalService");
+        const roomId = chatId.toString();
+        queue.resume(roomId);
+        queue.enqueue(roomId, async () => {
+          const latest = await Chat.findById(chatId).select("status metadata customer").lean();
+          if (!latest || latest.status === "agent_handling" || latest.status === "closed") return;
+          const emit = (event, payload = {}) => global.notificationGateway?.io.to(`chat:${roomId}`).emit(event, { chatId: roomId, ...payload });
+          emit("ai:thinking_start");
+          try {
+            const result = await pipeline.run({
+              chatId, text: content,
+              context: {
+                userId: latest.customer?.toString() || null,
+                handoff: async (reason) => {
+                  await Chat.updateOne({ _id: chatId, status: "ai_handling" }, { $set: { status: "escalated", "metadata.botActive": false, "metadata.handoffReason": String(reason).slice(0,500) } });
+                  queue.cancel(roomId);
+                  emit("chat:status:changed", { status: "escalated", botActive: false });
+                  return { ok: true, status: "escalated" };
+                },
+                retrieve: async (query) => Promise.race([retrievalService.retrieveContext(query), new Promise((_, reject) => setTimeout(() => reject(new Error("retrieval timeout")), 900))]),
+              },
+              onToken: token => emit("ai:token", { token }),
+            });
+            const stillAi = await Chat.exists({ _id: chatId, status: "ai_handling" });
+            if (!stillAi) return;
+            const botMessage = await ChatMessage.create({ chat: chatId, senderRole: "bot", messageType: "text", isAiGenerated: true, content: result.text, deliveredAt: new Date() });
+            emit("chat:message:new", { message: botMessage.toObject() });
+            emit("ai:complete", { messageId: botMessage._id, degraded: !!result.degraded });
+          } catch (error) {
+            emit("ai:error", { message: "Assistant temporarily unavailable" });
+          } finally { emit("ai:thinking_stop"); }
+        }).catch(error => console.error("chat_v2_turn_failed", { chatId: roomId, error: error.message }));
+        return message.populate("sender", "firstName lastName email role avatar");
+      }
       (async () => {
         try {
           // Get admin/bot user record (system agent)

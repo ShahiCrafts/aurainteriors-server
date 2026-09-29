@@ -1,0 +1,1 @@
+class TurnTrace{constructor(id){this.id=id;this.started=Date.now();this.stages={}}mark(name){this.stages[name]=Date.now()-this.started}finish(extra={}){return{traceId:this.id,totalMs:Date.now()-this.started,stages:this.stages,...extra}}}module.exports=TurnTrace;

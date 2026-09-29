@@ -13,7 +13,7 @@ const chatMessageSchema = new mongoose.Schema(
       ref: "User",
       required: [
         function () {
-          return this.senderRole !== "system";
+          return ["customer", "admin"].includes(this.senderRole);
         },
         "Message must have a sender unless it is a system message",
       ],

@@ -1,0 +1,6 @@
+const test=require('node:test');const assert=require('node:assert/strict');const {definitions,schemas,byName}=require('../../services/chatV2/tools/registry');const {route}=require('../../services/chatV2/core/router');const {guard}=require('../../services/chatV2/core/outputGuard');const KeyedTurnQueue=require('../../services/chatV2/queue/keyedTurnQueue');
+test('every declared tool has exactly one handler',()=>{const names=schemas().map(x=>x.function.name);assert.equal(new Set(names).size,names.length);for(const n of names)assert.equal(typeof byName.get(n)?.handler,'function')});
+test('identity is not model-controlled',()=>{for(const s of schemas())assert.equal(Object.hasOwn(s.function.parameters.properties,'userId'),false)});
+test('trivial router is anchored',()=>{assert.equal(route('hello').kind,'static');assert.equal(route('I said hello to the agent yesterday').kind,'llm')});
+test('guard removes foreign URLs',()=>assert.equal(guard('see https://evil.test/x and https://aurainteriors.live/shop'),'see [link removed] and https://aurainteriors.live/shop'));
+test('queue serializes a conversation',async()=>{const q=new KeyedTurnQueue();const order=[];await Promise.all([q.enqueue('a',async()=>{await new Promise(r=>setTimeout(r,15));order.push(1)}),q.enqueue('a',async()=>order.push(2))]);assert.deepEqual(order,[1,2])});
