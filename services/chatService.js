@@ -381,7 +381,7 @@ class ChatService {
     // Wait: if it reopened, the bot is active now, so it should trigger!
     const updatedBotActive = didReopen ? true : (!chat.metadata || chat.metadata.botActive !== false);
     if (senderRole === "customer" && updatedBotActive) {
-      if (process.env.CHAT_PIPELINE === "v2") {
+      if (process.env.CHAT_PIPELINE !== "legacy") {
         const { queue, pipeline } = require("./chatV2");
         const retrievalService = require("./retrievalService");
         const roomId = chatId.toString();
@@ -402,7 +402,7 @@ class ChatService {
                   emit("chat:status:changed", { status: "escalated", botActive: false });
                   return { ok: true, status: "escalated" };
                 },
-                retrieve: async (query) => Promise.race([retrievalService.retrieveContext(query), new Promise((_, reject) => setTimeout(() => reject(new Error("retrieval timeout")), 900))]),
+                retrieve: async (query) => retrievalService.retrieveContext(query, { timeoutMs: 250 }),
               },
               onToken: token => emit("ai:token", { token }),
             });

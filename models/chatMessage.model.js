@@ -101,30 +101,6 @@ chatMessageSchema.pre("validate", function () {
   }
 });
 
-chatMessageSchema.post("save", async function () {
-  try {
-    await this.model("Chat").findByIdAndUpdate(this.chat, {
-      lastMessageAt: this.createdAt,
-    });
-  } catch (error) {
-    console.error("Failed to update chat lastMessageAt:", error);
-  }
-});
-
-chatMessageSchema.post("save", async function () {
-  try {
-    if (this.senderRole === "admin") {
-      const chat = await this.model("Chat").findById(this.chat);
-      if (chat && chat.status === "waiting") {
-        chat.status = "active";
-        await chat.save();
-      }
-    }
-  } catch (error) {
-    console.error("Failed to update chat status:", error);
-  }
-});
-
 chatMessageSchema.statics.getChatMessages = async function (
   chatId,
   options = {}
@@ -139,13 +115,15 @@ chatMessageSchema.statics.getChatMessages = async function (
 
   const [messages, total] = await Promise.all([
     this.find(query)
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("sender", "firstName lastName email role avatar")
       .lean(),
     this.countDocuments(query),
   ]);
+
+  messages.reverse();
 
   return {
     messages,

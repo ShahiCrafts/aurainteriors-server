@@ -67,6 +67,12 @@ const chatSchema = new mongoose.Schema(
       referrer: String,
       sentiment: String,
       confidence: Number,
+      botActive: { type: Boolean, default: true },
+      handoffReason: String,
+      escalationReason: String,
+      escalatedAt: Date,
+      aiSummary: String,
+      lastProductOptions: mongoose.Schema.Types.Mixed,
     },
     adminNotes: [
       {

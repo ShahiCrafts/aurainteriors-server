@@ -16,7 +16,7 @@ class RetrievalService {
   /**
    * Helper to retrieve embedding vector for a given query string
    */
-  async getEmbedding(text, inputType = "query") {
+  async getEmbedding(text, inputType = "query", { timeoutMs = 300 } = {}) {
     const apiKey = process.env.NVIDIA_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("Missing API Key for embedding model in environment variables.");
@@ -25,9 +25,12 @@ class RetrievalService {
     const url = process.env.EMBEDDING_API_URL || "https://integrate.api.nvidia.com/v1/embeddings";
     const model = process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(url, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
@@ -54,16 +57,18 @@ class RetrievalService {
     } catch (error) {
       console.error("Embedding generation failed:", error.message);
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
   /**
    * Perform vector similarity search against Qdrant index
    */
-  async search(query, limit = 5, minScore = 0.5) {
+  async search(query, limit = 5, minScore = 0.5, { timeoutMs = 300 } = {}) {
     try {
       console.log(`[RAG] Generating embedding for query: "${query}"`);
-      const queryEmbedding = await this.getEmbedding(query, "query");
+      const queryEmbedding = await this.getEmbedding(query, "query", { timeoutMs });
 
       console.log(`[RAG] Searching Qdrant collection: "${this.collectionName}"`);
       const searchResult = await this.qdrant.search(this.collectionName, {
@@ -90,6 +95,11 @@ class RetrievalService {
       return [];
     }
   }
+  async retrieveContext(query, { timeoutMs = 300 } = {}) {
+    const matches = await this.search(query, 5, 0.5, { timeoutMs });
+    return matches.map(({ text, fileName, documentId, score }) => ({ text, fileName, documentId, score }));
+  }
+
 }
 
 module.exports = new RetrievalService();

@@ -4,3 +4,11 @@ test('identity is not model-controlled',()=>{for(const s of schemas())assert.equ
 test('trivial router is anchored',()=>{assert.equal(route('hello').kind,'static');assert.equal(route('I said hello to the agent yesterday').kind,'llm')});
 test('guard removes foreign URLs',()=>assert.equal(guard('see https://evil.test/x and https://aurainteriors.live/shop'),'see [link removed] and https://aurainteriors.live/shop'));
 test('queue serializes a conversation',async()=>{const q=new KeyedTurnQueue();const order=[];await Promise.all([q.enqueue('a',async()=>{await new Promise(r=>setTimeout(r,15));order.push(1)}),q.enqueue('a',async()=>order.push(2))]);assert.deepEqual(order,[1,2])});
+
+test('queue releases completed conversation tails', async () => {
+  const KeyedTurnQueue = require('../../services/chatV2/queue/keyedTurnQueue');
+  const q = new KeyedTurnQueue();
+  await q.enqueue('cleanup-chat', async () => 'ok');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(q.tails.size, 0);
+});
