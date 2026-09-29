@@ -40,9 +40,10 @@ class ChatService {
 
     const populatedChat = await chat.populate("customer", "firstName lastName email");
 
-    // Asynchronously dispatch admin notification and auto-welcome message in background
-    setImmediate(async () => {
-      // Emit admin notification for new chat
+    // Notify admins that a chat exists, but do not persist an automatic welcome
+    // message. The assistant owns conversational replies; having both chat creation
+    // and the orchestrator generate greetings causes duplicate production bubbles.
+    setImmediate(() => {
       try {
         notificationEventEmitter.emit("admin:chat:started", {
           chatId: chat._id,
@@ -52,43 +53,6 @@ class ChatService {
         });
       } catch (error) {
         console.error("Failed to emit admin:chat:started event:", error.message);
-      }
-
-      // Auto-create Welcome Message from AI bot
-      try {
-        const admin = await User.findOne({ role: 'admin' }).select('_id');
-
-        if (admin) {
-          const welcomeMessage = await ChatMessage.create({
-            chat: chat._id,
-            sender: admin._id,
-            senderRole: 'bot',          // FIX 8: tagged as bot, not human admin
-            isAiGenerated: true,
-            messageType: 'text',
-            content: 'Hello! Welcome to Aura Interiors. How can I help you find the perfect piece for your home?',
-            deliveredAt: new Date(),
-            isRead: true
-          });
-
-          // Update chat unread/lastMessage
-          await Chat.findByIdAndUpdate(chat._id, {
-            lastMessageAt: new Date(),
-            $inc: { unreadCountCustomer: 1 }
-          });
-
-          // Broadcast welcome message via socket if gateway is available
-          if (global.notificationGateway) {
-            const populatedMessage = await welcomeMessage.populate("sender", "firstName lastName email role avatar");
-            const roomId = chat._id.toString();
-            global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:message:new", {
-              chatId: roomId,
-              message: populatedMessage.toObject(),
-              timestamp: new Date(),
-            });
-          }
-        }
-      } catch (msgError) {
-        console.error("Failed to create automated welcome message:", msgError.message);
       }
     });
 
@@ -119,40 +83,16 @@ class ChatService {
       status: "ai_handling",
     });
 
-    // The chat itself is sufficient for authorization. Do secondary bookkeeping and
-    // the welcome message after the HTTP response path so opening chat stays fast.
+    // Keep guest bookkeeping off the HTTP critical path. Do not create a second
+    // automatic greeting here; the orchestrator is the single source of bot replies.
     setImmediate(async () => {
       try {
         await GuestSession.updateOne(
           { _id: guestSession._id },
           { $addToSet: { chats: chat._id }, $set: { lastActivityAt: new Date() } }
         );
-
-        const admin = await User.findOne({ role: 'admin' }).select('_id').lean();
-        if (!admin) return;
-
-        const welcomeMessage = await ChatMessage.create({
-          chat: chat._id,
-          sender: admin._id,
-          senderRole: 'bot',
-          isAiGenerated: true,
-          messageType: 'text',
-          content: 'Hello! Welcome to Aura Interiors. How can I help you find the perfect piece for your home?',
-          deliveredAt: new Date(),
-          isRead: true
-        });
-        await Chat.updateOne({ _id: chat._id }, { $set: { lastMessageAt: new Date() } });
-
-        if (global.notificationGateway) {
-          const populated = await welcomeMessage.populate("sender", "firstName lastName email role avatar");
-          global.notificationGateway.io.to(`chat:${chat._id}`).emit("chat:message:new", {
-            chatId: chat._id.toString(),
-            message: populated.toObject(),
-            timestamp: new Date(),
-          });
-        }
-      } catch (msgError) {
-        console.error("Guest chat background initialization failed:", msgError.message);
+      } catch (error) {
+        console.error("Guest chat background bookkeeping failed:", error.message);
       }
     });
 
