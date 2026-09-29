@@ -1,0 +1,2 @@
+const test=require('node:test');const assert=require('node:assert/strict');const {_parseSse}=require('../../services/chatV2/providers/llmGateway');
+test('SSE parser assembles provider events without leaking framing',()=>{const got=[];let rest=_parseSse('data: {"choices":[{"delta":{"content":"Hel"}}]}\n\ndata: {"choices":[{"delta":{"content":"lo"}}]}\n\n',x=>got.push(x));assert.equal(rest,'');assert.equal(got.length,2);assert.equal(got[0].choices[0].delta.content,'Hel')});

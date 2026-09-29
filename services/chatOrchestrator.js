@@ -420,7 +420,7 @@ Rules:
         
         // Timeout protection to ensure sub-2-second target (6s fallback safety)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
+        const timeoutId = setTimeout(() => controller.abort(), 700);
 
         // Clean messages to remove any extra custom fields (like refusal, reasoning) that cause validation errors (e.g. on Mistral)
         const cleanedMessages = apiMessages.map((msg) => {
