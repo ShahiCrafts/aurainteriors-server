@@ -1,0 +1,41 @@
+TAP version 13
+# Subtest: every declared tool has exactly one handler
+ok 1 - every declared tool has exactly one handler
+  ---
+  duration_ms: 0.800629
+  type: 'test'
+  ...
+# Subtest: identity is not model-controlled
+ok 2 - identity is not model-controlled
+  ---
+  duration_ms: 0.166169
+  type: 'test'
+  ...
+# Subtest: trivial router is anchored
+ok 3 - trivial router is anchored
+  ---
+  duration_ms: 0.304426
+  type: 'test'
+  ...
+# Subtest: guard removes foreign URLs
+ok 4 - guard removes foreign URLs
+  ---
+  duration_ms: 0.309794
+  type: 'test'
+  ...
+# Subtest: queue serializes a conversation
+ok 5 - queue serializes a conversation
+  ---
+  duration_ms: 16.832483
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 62.110176
+{"suite":"deterministic-router-40","count":41,"meanMs":0.007,"maxMs":0.151,"note":"local deterministic router only; provider/tool SLOs NEEDS VERIFICATION"}

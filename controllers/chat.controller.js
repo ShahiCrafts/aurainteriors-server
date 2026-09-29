@@ -175,9 +175,9 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
     guestSessionId
   );
 
-  res.status(201).json({
+  res.status(process.env.CHAT_PIPELINE === "v2" ? 202 : 201).json({
     status: "success",
-    message: "Message sent successfully",
+    message: process.env.CHAT_PIPELINE === "v2" ? "Message accepted" : "Message sent successfully",
     data: { message },
   });
 });

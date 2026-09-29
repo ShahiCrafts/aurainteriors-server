@@ -7,7 +7,10 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed": "node scripts/seed.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:chat": "node --test tests/chatV2/*.test.js",
+    "chat:gate": "bash scripts/run-chat-gate.sh",
+    "chat:benchmark": "node scripts/chat-benchmark.js"
   },
   "keywords": [
     "notifications",
