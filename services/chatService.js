@@ -119,17 +119,19 @@ class ChatService {
       status: "ai_handling",
     });
 
-    // Add chat to guest session's chats array
-    guestSession.chats.push(chat._id);
-    guestSession.lastActivityAt = new Date();
-    await guestSession.save();
+    // The chat itself is sufficient for authorization. Do secondary bookkeeping and
+    // the welcome message after the HTTP response path so opening chat stays fast.
+    setImmediate(async () => {
+      try {
+        await GuestSession.updateOne(
+          { _id: guestSession._id },
+          { $addToSet: { chats: chat._id }, $set: { lastActivityAt: new Date() } }
+        );
 
-    // Auto-create Welcome Message from AI bot
-    try {
-      const admin = await User.findOne({ role: 'admin' }).select('_id');
+        const admin = await User.findOne({ role: 'admin' }).select('_id').lean();
+        if (!admin) return;
 
-      if (admin) {
-        await ChatMessage.create({
+        const welcomeMessage = await ChatMessage.create({
           chat: chat._id,
           sender: admin._id,
           senderRole: 'bot',
@@ -139,16 +141,20 @@ class ChatService {
           deliveredAt: new Date(),
           isRead: true
         });
+        await Chat.updateOne({ _id: chat._id }, { $set: { lastMessageAt: new Date() } });
 
-        // Update chat unread/lastMessage
-        await Chat.findByIdAndUpdate(chat._id, {
-          lastMessageAt: new Date(),
-          $inc: { unreadCountCustomer: 1 }
-        });
+        if (global.notificationGateway) {
+          const populated = await welcomeMessage.populate("sender", "firstName lastName email role avatar");
+          global.notificationGateway.io.to(`chat:${chat._id}`).emit("chat:message:new", {
+            chatId: chat._id.toString(),
+            message: populated.toObject(),
+            timestamp: new Date(),
+          });
+        }
+      } catch (msgError) {
+        console.error("Guest chat background initialization failed:", msgError.message);
       }
-    } catch (msgError) {
-      console.error("Failed to create automated welcome message:", msgError.message);
-    }
+    });
 
     return chat;
   }
@@ -203,8 +209,8 @@ class ChatService {
    * Verify if a user (authenticated or guest) can access a chat
    * Returns true if authorized, false otherwise
    */
-  async authorizeChat(chatId, userId, userRole, guestSessionId) {
-    const chat = await Chat.findOne({
+  async authorizeChat(chatId, userId, userRole, guestSessionId, loadedChat = null) {
+    const chat = loadedChat || await Chat.findOne({
       _id: chatId,
       deletedAt: null,
     });
@@ -290,7 +296,7 @@ class ChatService {
     }
 
     // Authorization check for message sender
-    const isAuthorized = await this.authorizeChat(chatId, senderId, senderRole, guestSessionId);
+    const isAuthorized = await this.authorizeChat(chatId, senderId, senderRole, guestSessionId, chat);
     if (!isAuthorized) {
       throw new AppError("You are not authorized to message this chat", 403);
     }

@@ -8,16 +8,16 @@ class ChatOrchestrator {
     // Register failover providers with Mistral as default primary (Fix 3)
     this.providers = [
       {
+        name: "Groq",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        model: process.env.GROQ_CHAT_MODEL || "llama-3.1-70b-versatile",
+        apiKey: process.env.GROQ_API_KEY,
+      },
+      {
         name: "Mistral",
         url: "https://api.mistral.ai/v1/chat/completions",
         model: "mistral-small-latest",
         apiKey: process.env.MISTRAL_API_KEY,
-      },
-      {
-        name: "Groq",
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        model: "llama-3.1-70b-versatile",
-        apiKey: process.env.GROQ_API_KEY,
       },
       {
         name: "OpenRouter",
@@ -225,6 +225,14 @@ class ChatOrchestrator {
     return null;
   }
 
+  /** Only pay the remote embedding + vector-search cost when policy/knowledge context can help. */
+  shouldUseRag(text) {
+    const q = String(text || "").toLowerCase();
+    const directDataIntent = /\b(order|track|tracking|sku|stock|inventory|price|product|catalog|address|profile|account|my orders?)\b/;
+    if (directDataIntent.test(q)) return false;
+    return /\b(return|refund|shipping|delivery|warranty|policy|material|care|clean|assembly|custom|customization|interior|design|room|style|furniture|payment|cancel|exchange)\b/.test(q);
+  }
+
   // ---------------------------------------------------------------------------
   // Main entry point
   // ---------------------------------------------------------------------------
@@ -287,11 +295,17 @@ class ChatOrchestrator {
         return "You can reach a live support agent anytime by clicking the 'Talk to a human' button above the chat input field.";
       }
 
-      console.log(`[ORCHESTRATOR] Starting parallel RAG + history fetch`);
-      const [recentMessages, ragChunks] = await Promise.all([
-        ChatMessage.find({ chat: chatId }).sort({ createdAt: -1 }).limit(6).lean(), // trimmed history context size (Fix 2)
-        retrievalService.search(userMessageContent, 3, 0.45).catch(() => []),
-      ]);
+      const useRag = this.shouldUseRag(userMessageContent);
+      console.log(`[ORCHESTRATOR] Starting parallel context fetch (RAG=${useRag})`);
+      const historyPromise = ChatMessage.find({ chat: chatId })
+        .sort({ createdAt: -1 })
+        .limit(4)
+        .select("senderRole content createdAt")
+        .lean();
+      const ragPromise = useRag
+        ? retrievalService.search(userMessageContent, 2, 0.52).catch(() => [])
+        : Promise.resolve([]);
+      const [recentMessages, ragChunks] = await Promise.all([historyPromise, ragPromise]);
 
       const parallelTime = Date.now() - startTime;
       console.log(`[ORCHESTRATOR] Parallel fetch done in ${parallelTime}ms`);
@@ -406,7 +420,7 @@ Rules:
         
         // Timeout protection to ensure sub-2-second target (6s fallback safety)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
 
         // Clean messages to remove any extra custom fields (like refusal, reasoning) that cause validation errors (e.g. on Mistral)
         const cleanedMessages = apiMessages.map((msg) => {
