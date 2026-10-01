@@ -150,7 +150,7 @@ exports.getChatMessages = catchAsync(async (req, res, next) => {
  * Send message in chat (Customer/Guest/Admin)
  */
 exports.sendMessage = catchAsync(async (req, res, next) => {
-  const { content, attachments } = req.body;
+  const { content, attachments, clientMessageId } = req.body;
   const guestSessionId = getGuestSessionId(req);
 
   // Attachments now come pre-processed from the frontend (Cloudinary URLs)
@@ -171,13 +171,14 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
     {
       content,
       attachments: processedAttachments,
+      clientMessageId,
     },
     guestSessionId
   );
 
-  res.status(process.env.CHAT_PIPELINE === "v2" ? 202 : 201).json({
+  res.status(202).json({
     status: "success",
-    message: process.env.CHAT_PIPELINE === "v2" ? "Message accepted" : "Message sent successfully",
+    message: "Message accepted",
     data: { message },
   });
 });

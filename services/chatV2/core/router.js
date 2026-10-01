@@ -1,3 +1,9 @@
-const TRIVIAL=[[/^(hi|hello|hey|good (morning|afternoon|evening))[!. ]*$/i,"Hello! Welcome to Aura Interiors. How can I help with your home or order today?"],[/^(thanks|thank you|thx)[!. ]*$/i,"You're welcome! Is there anything else I can help with?"]];
-function route(text){const s=String(text||'').trim();for(const [re,reply] of TRIVIAL)if(re.test(s))return{kind:'static',reply};return{kind:'llm'};}
-module.exports={route};
+// The LLM is the semantic authority. Keep this router deliberately minimal:
+// infrastructure/safety shortcuts may live here, but natural-language intent,
+// references and tool selection belong to the model with structured context.
+function route(text) {
+  const value = String(text || '').trim();
+  if (!value) return { kind: 'empty', reply: 'Please send a message and I’ll help.' };
+  return { kind: 'llm' };
+}
+module.exports = { route };

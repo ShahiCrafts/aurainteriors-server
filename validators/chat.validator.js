@@ -17,6 +17,7 @@ exports.startChatSchema = Joi.object({
 });
 
 exports.sendMessageSchema = Joi.object({
+  clientMessageId: Joi.string().max(100).trim().optional(),
   content: Joi.string().max(5000).allow("", null).optional().messages({
     "string.max": "Message content cannot exceed 5000 characters",
   }),

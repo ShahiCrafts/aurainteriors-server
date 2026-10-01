@@ -246,41 +246,32 @@ class ChatOrchestrator {
 
     // 1. Fast Path - Greetings
     if (/^\s*(hi|hello|hey|howdy|greetings|good\s+(?:morning|afternoon|evening|day)|welcome)\s*$/i.test(cleanMessage)) {
-      this._emitToRoom(chatRoomId, "ai:thinking_start", { chatId: chatRoomId });
       const reply = "Hello! Welcome to Aura Interiors. I'm Aura Assistant, your home design and support assistant. How can I help you find the perfect piece or assist you with your orders today?";
-      this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
       console.log(`[ORCHESTRATOR] Fast-path Greeting matched. Completed in ${Date.now() - startTime}ms.`);
       return reply;
     }
 
     // 2. Fast Path - Name
     if (/who\s+are\s+you|what\s+is\s+your\s+name|whats\s+your\s+name|your\s+name/i.test(cleanMessage)) {
-      this._emitToRoom(chatRoomId, "ai:thinking_start", { chatId: chatRoomId });
       const reply = "I'm Aura Assistant, your dedicated home-interiors and support assistant at Aura Interiors. I'm here to help you browse our catalog, check orders, and manage your account details. What can I do for you today?";
-      this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
       console.log(`[ORCHESTRATOR] Fast-path Name matched. Completed in ${Date.now() - startTime}ms.`);
       return reply;
     }
 
     // 3. Fast Path - Capabilities
     if (/what\s+can\s+you\s+do|what\s+can\s+you\s+help|how\s+can\s+you\s+help|capabilities/i.test(cleanMessage)) {
-      this._emitToRoom(chatRoomId, "ai:thinking_start", { chatId: chatRoomId });
       const reply = "I can help you browse our product catalog, get detailed specifications and stock levels, look up your order history and tracking status, check your default or saved addresses, or view your profile information. If you ever need complex assistance, you can click the 'Talk to a human' button above the chat input field to connect with a representative.";
-      this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
       console.log(`[ORCHESTRATOR] Fast-path Capabilities matched. Completed in ${Date.now() - startTime}ms.`);
       return reply;
     }
 
     // 4. Fast Path - Bot / Identity
     if (/are\s+you\s+a\s+bot|are\s+you\s+ai|are\s+you\s+a\s+robot|are\s+you\s+human|real\s+person/i.test(cleanMessage)) {
-      this._emitToRoom(chatRoomId, "ai:thinking_start", { chatId: chatRoomId });
       const reply = "I am Aura Assistant, the AI support chatbot for Aura Interiors. I can instantly look up products, orders, and addresses. If you'd prefer to speak with a human support agent, you can click the 'Talk to a human' button above the chat input field at any time!";
-      this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
       console.log(`[ORCHESTRATOR] Fast-path Bot Identity matched. Completed in ${Date.now() - startTime}ms.`);
       return reply;
     }
 
-    this._emitToRoom(chatRoomId, "ai:thinking_start", { chatId: chatRoomId });
 
     try {
       const chat = await Chat.findById(chatId);
@@ -291,7 +282,6 @@ class ChatOrchestrator {
       const seeksHuman = humanKeywords.some(kw => new RegExp(`\\b${kw}\\b`, "i").test(cleanMessage));
 
       if (seeksHuman) {
-        this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
         return "You can reach a live support agent anytime by clicking the 'Talk to a human' button above the chat input field.";
       }
 
@@ -398,7 +388,6 @@ Rules:
       const totalTime = Date.now() - startTime;
       console.log(`[ORCHESTRATOR] ✓ Total: ${totalTime}ms | RAG+history: ${parallelTime}ms | LLM: ${llmTime}ms`);
 
-      this._emitToRoom(chatRoomId, "ai:thinking_stop", { chatId: chatRoomId });
       return cleanResponse;
     } catch (error) {
       console.error("[ORCHESTRATOR] Error in handleUserMessage:", error.message);

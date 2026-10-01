@@ -8,6 +8,8 @@ const User = require("../models/user.model");
  */
 
 class GuestUserService {
+  static guestUserId = null;
+  static guestUserPromise = null;
   /**
    * Get or create the system guest user placeholder
    * Returns the same guest user ID for all guest sessions
@@ -16,9 +18,7 @@ class GuestUserService {
     const guestEmail = "guest@aura-interiors.local";
 
     // Try to find existing guest user
-    let guestUser = await User.findOne({
-      email: guestEmail,
-    });
+    let guestUser = await User.findOne({ email: guestEmail }).select("_id").lean();
 
     // If doesn't exist, create it
     if (!guestUser) {
@@ -37,7 +37,7 @@ class GuestUserService {
       } catch (error) {
         // Handle unique constraint error - user might have been created by another request
         if (error.code === 11000) {
-          guestUser = await User.findOne({ email: guestEmail });
+          guestUser = await User.findOne({ email: guestEmail }).select("_id").lean();
         } else {
           throw error;
         }
@@ -51,8 +51,18 @@ class GuestUserService {
    * Get guest user ID (cached or fresh)
    */
   static async getGuestUserId() {
-    const guestUser = await this.getOrCreateGuestUser();
-    return guestUser._id;
+    if (this.guestUserId) return this.guestUserId;
+    // Collapse concurrent cold-start lookups into one DB operation. Subsequent guest
+    // messages pay zero Mongo round trips for the shared placeholder identity.
+    if (!this.guestUserPromise) {
+      this.guestUserPromise = this.getOrCreateGuestUser()
+        .then((guestUser) => {
+          this.guestUserId = guestUser._id;
+          return this.guestUserId;
+        })
+        .finally(() => { this.guestUserPromise = null; });
+    }
+    return this.guestUserPromise;
   }
 
   /**

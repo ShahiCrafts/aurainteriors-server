@@ -15,11 +15,11 @@ class ChatService {
 
     // Public browser identity is GuestSession.sessionId. Never pass an arbitrary
     // public value to findById(), because Mongoose will throw a CastError.
-    let guestSession = await GuestSession.findOne({ sessionId: value });
+    let guestSession = await GuestSession.findOne({ sessionId: value }).select("_id sessionId").lean();
 
     // Backward compatibility for browsers that stored the Mongo _id previously.
     if (!guestSession && /^[a-fA-F0-9]{24}$/.test(value)) {
-      guestSession = await GuestSession.findById(value);
+      guestSession = await GuestSession.findById(value).select("_id sessionId").lean();
     }
 
     return guestSession;
@@ -38,17 +38,15 @@ class ChatService {
       status: "ai_handling",
     });
 
-    const populatedChat = await chat.populate("customer", "firstName lastName email");
-
-    // Notify admins that a chat exists, but do not persist an automatic welcome
-    // message. The assistant owns conversational replies; having both chat creation
-    // and the orchestrator generate greetings causes duplicate production bubbles.
-    setImmediate(() => {
+    // Initialization ACK stays on the single INSERT path. Admin enrichment and
+    // notifications are deliberately off the customer critical path.
+    setImmediate(async () => {
       try {
+        const customer = await User.findById(customerId).select("firstName lastName email").lean();
         notificationEventEmitter.emit("admin:chat:started", {
           chatId: chat._id,
-          customerName: populatedChat.customer ? `${populatedChat.customer.firstName} ${populatedChat.customer.lastName}` : null,
-          customerEmail: populatedChat.customer?.email,
+          customerName: customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : null,
+          customerEmail: customer?.email,
           subject,
         });
       } catch (error) {
@@ -56,7 +54,7 @@ class ChatService {
       }
     });
 
-    return populatedChat;
+    return chat.toObject();
   }
 
   /**
@@ -99,50 +97,66 @@ class ChatService {
     return chat;
   }
 
-  async enrichChatWithUnreadCounts(chatJson) {
-    if (!chatJson) return chatJson;
+  async enrichChatsBatch(chats) {
+    if (!Array.isArray(chats) || chats.length === 0) return chats || [];
+    const ids = chats.map((chat) => chat._id);
+    const customerCutoffBranches = chats.map((chat) => ({
+      case: { $eq: ["$chat", chat._id] },
+      then: new Date(chat.lastReadCustomerAt || 0),
+    }));
+    const adminCutoffBranches = chats.map((chat) => ({
+      case: { $eq: ["$chat", chat._id] },
+      then: new Date(chat.lastReadAdminAt || 0),
+    }));
 
-    const customerUnread = await ChatMessage.countDocuments({
-      chat: chatJson._id,
-      senderRole: { $in: ["admin", "bot"] },
-      createdAt: { $gt: chatJson.lastReadCustomerAt || new Date(0) },
-      deletedAt: null,
-    });
-
-    const adminUnread = await ChatMessage.countDocuments({
-      chat: chatJson._id,
-      senderRole: "customer",
-      createdAt: { $gt: chatJson.lastReadAdminAt || new Date(0) },
-      deletedAt: null,
-    });
-
-    const lastMessage = await ChatMessage.findOne({
-      chat: chatJson._id,
-      deletedAt: null,
-    })
-      .sort({ createdAt: -1 })
-      .select("content messageType attachments")
-      .lean();
-
-    let lastMessageText = "";
-    if (lastMessage) {
-      if (lastMessage.messageType === "text") {
-        lastMessageText = lastMessage.content;
-      } else if (lastMessage.messageType === "image") {
-        lastMessageText = "📷 Image";
-      } else if (lastMessage.messageType === "file") {
-        lastMessageText = "📁 File";
-      } else if (lastMessage.messageType === "system") {
-        lastMessageText = lastMessage.content;
+    // Single bounded aggregation: compute last message + both unread counts without
+    // $push-ing every historical message into RAM (the previous implementation did).
+    const rows = await ChatMessage.aggregate([
+      { $match: { chat: { $in: ids }, deletedAt: null } },
+      { $sort: { chat: 1, createdAt: -1 } },
+      { $set: {
+        _customerCutoff: { $switch: { branches: customerCutoffBranches, default: new Date(0) } },
+        _adminCutoff: { $switch: { branches: adminCutoffBranches, default: new Date(0) } },
+      } },
+      { $group: {
+        _id: "$chat",
+        lastMessage: { $first: { content: "$content", messageType: "$messageType" } },
+        unreadCountCustomer: { $sum: { $cond: [
+          { $and: [
+            { $in: ["$senderRole", ["admin", "bot"]] },
+            { $gt: ["$createdAt", "$_customerCutoff"] },
+          ] }, 1, 0
+        ] } },
+        unreadCountAdmin: { $sum: { $cond: [
+          { $and: [
+            { $eq: ["$senderRole", "customer"] },
+            { $gt: ["$createdAt", "$_adminCutoff"] },
+          ] }, 1, 0
+        ] } },
+      } },
+    ]);
+    const byChat = new Map(rows.map((row) => [String(row._id), row]));
+    return chats.map((chat) => {
+      const row = byChat.get(String(chat._id));
+      const last = row?.lastMessage;
+      let lastMessageText = chat.subject || "General Inquiry";
+      if (last) {
+        if (last.messageType === "image") lastMessageText = "📷 Image";
+        else if (last.messageType === "file") lastMessageText = "📁 File";
+        else lastMessageText = last.content || lastMessageText;
       }
-    }
+      return {
+        ...chat,
+        unreadCountCustomer: row?.unreadCountCustomer || 0,
+        unreadCountAdmin: row?.unreadCountAdmin || 0,
+        lastMessageText,
+      };
+    });
+  }
 
-    return {
-      ...chatJson,
-      unreadCountCustomer: customerUnread,
-      unreadCountAdmin: adminUnread,
-      lastMessageText: lastMessageText || chatJson.subject || "General Inquiry",
-    };
+  async enrichChatWithUnreadCounts(chatJson) {
+    const [enriched] = await this.enrichChatsBatch(chatJson ? [chatJson] : []);
+    return enriched || chatJson;
   }
 
   /**
@@ -185,51 +199,46 @@ class ChatService {
     const chat = await Chat.findOne({
       _id: chatId,
       deletedAt: null,
-    }).populate("customer", "firstName lastName email avatar");
+    }).populate("customer", "firstName lastName email avatar").lean();
 
     if (!chat) {
       throw new AppError("Chat not found", 404);
     }
 
     // Authorization check
-    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId);
+    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
       throw new AppError("You are not authorized to view this chat", 403);
     }
 
-    const chatJson = chat.toJSON();
-    return this.enrichChatWithUnreadCounts(chatJson);
+    return this.enrichChatWithUnreadCounts(chat);
   }
 
   async getCustomerChats(customerId, options = {}) {
     const result = await Chat.getCustomerChats(customerId, options);
-    result.chats = await Promise.all(
-      result.chats.map((chat) => this.enrichChatWithUnreadCounts(chat))
-    );
+    result.chats = await this.enrichChatsBatch(result.chats);
     return result;
   }
 
   async getAllChats(options = {}) {
     const result = await Chat.getAllChats(options);
-    result.chats = await Promise.all(
-      result.chats.map((chat) => this.enrichChatWithUnreadCounts(chat))
-    );
+    result.chats = await this.enrichChatsBatch(result.chats);
     return result;
   }
 
   async getWaitingQueue() {
     const chats = await Chat.getWaitingQueue();
-    return Promise.all(chats.map((chat) => this.enrichChatWithUnreadCounts(chat)));
+    return this.enrichChatsBatch(chats);
   }
 
   async sendMessage(chatId, senderId, senderRole, data = {}, guestSessionId = null) {
-    const { content, attachments, isInternalNote } = data;
+    const { content, attachments, isInternalNote, clientMessageId } = data;
     const GuestUserService = require("./guestUserService");
 
     const chat = await Chat.findOne({
       _id: chatId,
       deletedAt: null,
-    });
+    }).select("_id customer guestSession status metadata").lean();
 
     if (!chat) {
       throw new AppError("Chat not found", 404);
@@ -253,16 +262,28 @@ class ChatService {
       messageType = hasImages ? "image" : "file";
     }
 
-    const message = await ChatMessage.create({
-      chat: chatId,
-      sender: actualSenderId,
-      senderRole,
-      messageType,
-      isInternalNote: isInternalNote || false,
-      content,
-      attachments,
-      deliveredAt: new Date(),
-    });
+    let message;
+    try {
+      message = await ChatMessage.create({
+        chat: chatId,
+        clientMessageId: clientMessageId || undefined,
+        sender: actualSenderId,
+        senderRole,
+        messageType,
+        isInternalNote: isInternalNote || false,
+        content,
+        attachments,
+        deliveredAt: new Date(),
+      });
+    } catch (error) {
+      // Normal sends pay no idempotency read. Only a retry that races/duplicates
+      // performs the lookup after MongoDB's unique index rejects it.
+      if (clientMessageId && error?.code === 11000) {
+        const existing = await ChatMessage.findOne({ chat: chatId, clientMessageId }).lean();
+        if (existing) return existing;
+      }
+      throw error;
+    }
 
     // Update chat based on sender role.
     // CHAT-FIXES-8 Fix 1: Use timestamp-based read tracking instead of static counters.
@@ -317,10 +338,13 @@ class ChatService {
       }
     }
 
-    await Chat.findByIdAndUpdate(chatId, updateData);
+    const chatUpdatePromise = Chat.updateOne({ _id: chatId }, { $set: updateData }).catch((error) => {
+      console.error("Chat metadata update failed:", error.message);
+    });
 
     // If customer message reopened the chat, post a system message about AI reactivated
     if (didReopen) {
+      setImmediate(async () => {
       try {
         const botUser = await User.findOne({ role: "admin" }).select("_id");
         if (botUser) {
@@ -345,12 +369,12 @@ class ChatService {
       } catch (err) {
         console.error("[CHAT-FIXES-9] Failed to send reopen system message:", err.message);
       }
+      });
     }
 
     // Broadcast message via socket if gateway is available
     if (global.notificationGateway) {
-      const populatedMessage = await message.populate("sender", "firstName lastName email role avatar");
-      const messageData = populatedMessage.toObject();
+      const messageData = message.toObject();
       const roomId = chatId.toString();
 
       console.log(`Broadcasting message to room chat:${roomId}`);
@@ -390,10 +414,12 @@ class ChatService {
           const latest = await Chat.findById(chatId).select("status metadata customer").lean();
           if (!latest || latest.status === "agent_handling" || latest.status === "closed") return;
           const emit = (event, payload = {}) => global.notificationGateway?.io.to(`chat:${roomId}`).emit(event, { chatId: roomId, ...payload });
-          emit("ai:thinking_start");
+          let thinkingStarted = false;
           try {
+            emit("ai:thinking_start");
+            thinkingStarted = true;
             const result = await pipeline.run({
-              chatId, text: content,
+              chatId, text: content, productOptions: latest.metadata?.lastProductOptions || [],
               context: {
                 userId: latest.customer?.toString() || null,
                 handoff: async (reason) => {
@@ -404,8 +430,11 @@ class ChatService {
                 },
                 retrieve: async (query) => retrievalService.retrieveContext(query, { timeoutMs: 250 }),
               },
-              onToken: token => emit("ai:token", { token }),
+              onToken: null,
             });
+            if (Array.isArray(result.productOptions) && result.productOptions.length) {
+              await Chat.updateOne({ _id: chatId }, { $set: { 'metadata.lastProductOptions': result.productOptions.slice(0, 5) } });
+            }
             const stillAi = await Chat.exists({ _id: chatId, status: "ai_handling" });
             if (!stillAi) return;
             const botMessage = await ChatMessage.create({ chat: chatId, senderRole: "bot", messageType: "text", isAiGenerated: true, content: result.text, deliveredAt: new Date() });
@@ -413,9 +442,11 @@ class ChatService {
             emit("ai:complete", { messageId: botMessage._id, degraded: !!result.degraded });
           } catch (error) {
             emit("ai:error", { message: "Assistant temporarily unavailable" });
-          } finally { emit("ai:thinking_stop"); }
+          } finally {
+            if (thinkingStarted) emit("ai:thinking_stop");
+          }
         }).catch(error => console.error("chat_v2_turn_failed", { chatId: roomId, error: error.message }));
-        return message.populate("sender", "firstName lastName email role avatar");
+        return message.toObject();
       }
       (async () => {
         try {
@@ -456,61 +487,42 @@ class ChatService {
       })();
     }
 
-    return message.populate("sender", "firstName lastName email role avatar");
+    return message.toObject();
   }
 
   async getChatMessages(chatId, userId, userRole, guestSessionId, options = {}) {
-    const chat = await Chat.findOne({
-      _id: chatId,
-      deletedAt: null,
-    });
+    // One projected lean ownership read. The previous implementation loaded the chat
+    // and then authorizeChat() loaded it a second time on every history request.
+    const chat = await Chat.findOne({ _id: chatId, deletedAt: null })
+      .select("_id customer guestSession")
+      .lean();
+    if (!chat) throw new AppError("Chat not found", 404);
 
-    if (!chat) {
-      throw new AppError("Chat not found", 404);
-    }
-
-    // Authorization check
-    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId);
-    if (!isAuthorized) {
-      throw new AppError("You are not authorized to view these messages", 403);
-    }
-
+    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
+    if (!isAuthorized) throw new AppError("You are not authorized to view these messages", 403);
     return ChatMessage.getChatMessages(chatId, options);
   }
 
   async markMessagesAsRead(chatId, userId, userRole, guestSessionId) {
-    const chat = await Chat.findOne({
-      _id: chatId,
-      deletedAt: null,
-    });
+    const chat = await Chat.findOne({ _id: chatId, deletedAt: null })
+      .select("_id customer guestSession")
+      .lean();
+    if (!chat) throw new AppError("Chat not found", 404);
 
-    if (!chat) {
-      throw new AppError("Chat not found", 404);
-    }
-
-    // Authorization check
-    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId);
+    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
       throw new AppError("You are not authorized to mark these messages", 403);
     }
 
-    // Mark individual messages read in ChatMessage documents
-    const modifiedCount = await ChatMessage.markAsRead(chatId, userRole);
-
-    // CHAT-FIXES-8 Fix 1: Update lastReadAt timestamp — this is the single source of truth.
-    // Derived unread counts: count(messages.createdAt > lastReadAt) will now return 0.
     const now = new Date();
-    if (userRole === "customer") {
-      await Chat.findByIdAndUpdate(chatId, {
-        lastReadCustomerAt: now,
-        unreadCountCustomer: 0,
-      });
-    } else {
-      await Chat.findByIdAndUpdate(chatId, {
-        lastReadAdminAt: now,
-        unreadCountAdmin: 0,
-      });
-    }
+    const readUpdate = userRole === "customer"
+      ? { lastReadCustomerAt: now, unreadCountCustomer: 0 }
+      : { lastReadAdminAt: now, unreadCountAdmin: 0 };
+    // Independent writes run concurrently instead of adding two sequential DB RTTs.
+    const [modifiedCount] = await Promise.all([
+      ChatMessage.markAsRead(chatId, userRole),
+      Chat.updateOne({ _id: chatId }, { $set: readUpdate }),
+    ]);
 
     // Broadcast read status via socket
     if (global.notificationGateway) {
@@ -542,13 +554,8 @@ class ChatService {
       throw new AppError("You are not authorized to update this chat", 403);
     }
 
-    const updateField =
-      userRole === "customer" ? "customerTyping" : "adminTyping";
-
-    await Chat.findByIdAndUpdate(chatId, {
-      [updateField]: isTyping,
-    });
-
+    // Typing is ephemeral presence, not durable business state. Persisting every
+    // keystroke to Mongo adds write latency/load and provides no recovery value.
     // Broadcast typing status via socket
     if (global.notificationGateway) {
       const roomId = chatId.toString();
@@ -573,7 +580,7 @@ class ChatService {
     }
 
     // Authorization check
-    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId);
+    const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
       throw new AppError("You are not authorized to close this chat", 403);
     }
@@ -599,15 +606,18 @@ class ChatService {
     const chat = await Chat.findOne({
       _id: chatId,
       deletedAt: null,
-    });
+    }).select("_id customer guestSession").lean();
 
     if (!chat) {
       throw new AppError("Chat not found", 404);
     }
 
-    chat.status = "resolved";
-    chat.closedBy = userId;
-    await chat.save();
+    const resolvedAt = new Date();
+    const resolved = await Chat.findByIdAndUpdate(
+      chatId,
+      { $set: { status: "resolved", closedBy: userId, closedAt: resolvedAt } },
+      { new: true }
+    ).lean();
 
     // Broadcast resolve event via socket
     if (global.notificationGateway) {
@@ -619,7 +629,7 @@ class ChatService {
       });
     }
 
-    return chat;
+    return resolved;
   }
 
   async getChatStats() {
@@ -695,8 +705,10 @@ class ChatService {
 
     return {
       totalChats,
-      waitingChats,
-      activeChats,
+      waitingChats: escalatedChats,
+      activeChats: aiHandlingChats + agentHandlingChats,
+      aiHandlingChats,
+      agentHandlingChats,
       resolvedChats,
       closedChats,
       avgResponseTimeMinutes,

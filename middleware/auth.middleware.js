@@ -51,7 +51,7 @@ exports.protectOptional = catchAsync(async (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id);
+      const user = await User.findById(decoded.id).select("_id role isActive deletedAt email firstName lastName avatar").lean();
 
       if (user && user.isActive && !user.deletedAt) {
         req.user = user;

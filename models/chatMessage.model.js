@@ -8,6 +8,12 @@ const chatMessageSchema = new mongoose.Schema(
       required: [true, "Message must belong to a chat"],
       index: true,
     },
+    clientMessageId: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: null,
+    },
     sender: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -88,6 +94,10 @@ const chatMessageSchema = new mongoose.Schema(
 );
 
 chatMessageSchema.index({ chat: 1, createdAt: -1 });
+chatMessageSchema.index(
+  { chat: 1, clientMessageId: 1 },
+  { unique: true, partialFilterExpression: { clientMessageId: { $type: "string" } } }
+);
 chatMessageSchema.index({ sender: 1 });
 chatMessageSchema.index({ isRead: 1 });
 chatMessageSchema.index({ chat: 1, senderRole: 1, isRead: 1 });

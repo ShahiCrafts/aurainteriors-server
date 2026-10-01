@@ -14,24 +14,23 @@ class DbTools {
       const dbQuery = { status: "active" };
 
       if (categoryName) {
+        const escapedCategory = String(categoryName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const category = await Category.findOne({
-          name: { $regex: new RegExp(categoryName, "i") },
-        });
+          name: { $regex: new RegExp(`^${escapedCategory}$`, "i") },
+        }).select("_id").lean();
         if (category) {
           dbQuery.category = category._id;
         }
       }
 
       if (query) {
-        dbQuery.$or = [
-          { name: { $regex: new RegExp(query, "i") } },
-          { sku: { $regex: new RegExp(query, "i") } },
-          { description: { $regex: new RegExp(query, "i") } },
-        ];
+        // Product has a text index on name/description/tags. Use it instead of
+        // unanchored regex scans so deterministic commerce replies stay fast as the catalog grows.
+        dbQuery.$text = { $search: String(query).slice(0, 80) };
       }
 
       const products = await Product.find(dbQuery)
-        .limit(Number(limit))
+        .limit(Math.min(Math.max(Number(limit) || 5, 1), 10))
         .select("name price originalPrice stock sku status description slug")
         .populate("category", "name")
         .lean();
