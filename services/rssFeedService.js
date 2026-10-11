@@ -1,5 +1,6 @@
 const Parser = require("rss-parser");
 const Blog = require("../models/blog.model");
+const axios = require("axios");
 
 const parser = new Parser({
   timeout: 10000,
@@ -107,13 +108,16 @@ function extractImageUrl(item) {
  * Extract excerpt from content
  */
 function extractExcerpt(item, maxLength = 300) {
-  let text = item.contentSnippet || item.content || item.description || "";
+  let text = item.contentSnippet || item.description || item.content || "";
 
   // Remove HTML tags
   text = text.replace(/<[^>]*>/g, "");
 
-  // Remove extra whitespace
-  text = text.replace(/\s+/g, " ").trim();
+  // Decode common encoded entities before generating a readable excerpt.
+  text = text.replace(/&(?:nbsp|#160);/gi, " ")
+    .replace(/&amp;/gi, "&").replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
+  text = text.replace(/\s+/g, " ").replace(/\bREAD MORE(?:\.{2,}|…)?\s*$/i, "").trim();
 
   // Truncate to max length
   if (text.length > maxLength) {
@@ -178,6 +182,49 @@ function extractTags(item) {
   return [...new Set(tags)].slice(0, 8);
 }
 
+/** Extract readable article HTML when the publisher provides an accessible article body.
+ * The publisher remains the source of record; never bypass paywalls or access controls.
+ * This conservative extractor deliberately falls back to RSS for unsupported layouts.
+ */
+function cleanArticleHtml(html) {
+  return String(html || "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style|noscript|iframe|form|nav|aside|footer|header|button|svg)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<([a-z][\w:-]*)\b[^>]*\b(?:class|id)=["'][^"']*(?:newsletter|subscribe|advert|promo|social|related|recommend|signup|paywall)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/\s(on\w+|style|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(href|src)\s*=\s*(["'])\s*(?:javascript:|data:)[\s\S]*?\2/gi, "")
+    .trim();
+}
+function readableLength(html) {
+  return String(html || "").replace(/<[^>]*>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim().length;
+}
+async function fetchArticleBody(url, publisherUrl) {
+  const target = new URL(url);
+  const publisher = new URL(publisherUrl);
+  if (target.protocol !== "https:" || target.hostname !== publisher.hostname && !target.hostname.endsWith(`.${publisher.hostname}`)) return "";
+  const response = await axios.get(target.href, {
+    timeout: 8000, maxRedirects: 0, responseType: "text",
+    maxContentLength: 2 * 1024 * 1024,
+    headers: { "User-Agent": "AuraInteriorsRSSReader/1.0", Accept: "text/html" },
+    validateStatus: status => status === 200,
+  });
+  if (!String(response.headers["content-type"] || "").includes("text/html")) return "";
+  const page = String(response.data || "");
+  // Only extract an explicitly identified article body; avoid publishing full page chrome.
+  const candidates = [
+    /<div\b[^>]*data-testid=["']article-body["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i,
+    /<div\b[^>]*class=["'][^"']*(?:article-body|article-content|post-content|entry-content)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<article\b[^>]*>([\s\S]*?)<\/article>/i,
+  ];
+  for (const pattern of candidates) {
+    const match = page.match(pattern);
+    if (!match) continue;
+    const cleaned = cleanArticleHtml(match[1]);
+    if (readableLength(cleaned) >= 500 && /<p\b/i.test(cleaned)) return cleaned;
+  }
+  return "";
+}
+
 /**
  * Fetch and parse a single RSS feed
  */
@@ -192,14 +239,23 @@ async function fetchFeed(feedConfig) {
       // Skip if no title or link
       if (!item.title || !item.link) continue;
 
-      // Check if article already exists
-      const exists = await Blog.findOne({ originalUrl: item.link });
-      if (exists) continue;
-
+      const rssContent = cleanArticleHtml(item.contentEncoded || item["content:encoded"] || item.content || item.description || "");
+      let content = rssContent;
+      // Feed descriptions are often teasers. Prefer a verified longer publisher body.
+      if (readableLength(rssContent) < 1200) {
+        try {
+          const fullBody = await fetchArticleBody(item.link, feedConfig.url);
+          if (readableLength(fullBody) > readableLength(content) * 1.5) content = fullBody;
+        } catch (error) {
+          console.warn(`Article extraction skipped (${feedConfig.name}): ${error.message}`);
+        }
+      }
       const article = {
         title: item.title.trim(),
         excerpt: extractExcerpt(item),
-        content: item.contentEncoded || item.content || item.contentSnippet || "",
+        // content:encoded carries the full HTML when the publisher provides it.
+        // A summary-only feed must not be presented as a complete scraped article.
+        content,
         featuredImage: extractImageUrl(item),
         category: determineCategory(item, feedConfig.category),
         tags: extractTags(item),
@@ -239,17 +295,25 @@ async function fetchAllFeeds() {
     try {
       const articles = await fetchFeed(feedConfig);
 
-      for (const article of articles) {
-        try {
-          await Blog.create(article);
-          totalNew++;
-          console.log(`Added: ${article.title.substring(0, 50)}...`);
-        } catch (err) {
-          if (err.code === 11000) {
-            // Duplicate - skip silently
-          } else {
-            console.error(`Error saving article: ${err.message}`);
-            totalErrors++;
+      if (articles.length) {
+        const result = await Blog.bulkWrite(articles.map(article => ({
+          updateOne: {
+            filter: { originalUrl: article.originalUrl },
+            update: {
+              $setOnInsert: article,
+              // Refresh content on ingestion, including previously imported summary-only rows.
+              // Never replace a longer existing article with a shorter teaser.
+            },
+            upsert: true,
+          },
+        })), { ordered: false });
+        totalNew += result.upsertedCount || 0;
+        // Conditional upgrades avoid clobbering complete existing content.
+        for (const article of articles) {
+          if (readableLength(article.content) < 500) continue;
+          const current = await Blog.findOne({ originalUrl: article.originalUrl }, { content: 1 }).lean();
+          if (current && readableLength(article.content) > readableLength(current.content) * 1.5) {
+            await Blog.updateOne({ _id: current._id, content: current.content }, { $set: { content: article.content, excerpt: article.excerpt } });
           }
         }
       }
@@ -287,9 +351,10 @@ async function updateFeaturedArticles(count = 5) {
   await Blog.updateMany({}, { isFeatured: false });
 
   // Feature random recent articles
-  const recentArticles = await Blog.find()
+  const recentArticles = await Blog.find({}, { _id: 1 })
     .sort({ publishedAt: -1 })
-    .limit(50);
+    .limit(50)
+    .lean();
 
   if (recentArticles.length === 0) return;
 
@@ -297,10 +362,10 @@ async function updateFeaturedArticles(count = 5) {
   const shuffled = recentArticles.sort(() => 0.5 - Math.random());
   const featured = shuffled.slice(0, Math.min(count, shuffled.length));
 
-  for (const article of featured) {
-    article.isFeatured = true;
-    await article.save({ validateBeforeSave: false });
-  }
+  await Blog.updateMany(
+    { _id: { $in: featured.map((article) => article._id) } },
+    { $set: { isFeatured: true } },
+  );
 
   console.log(`Updated ${featured.length} featured articles`);
 }

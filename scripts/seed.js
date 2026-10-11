@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { getAdminCredentials } = require("../utils/adminCredentials");
 const mongoose = require("mongoose");
+const { connectDatabase } = require("../config/database");
 const User = require("../models/user.model");
 const Category = require("../models/category.model");
 const Product = require("../models/product.model");
@@ -8,13 +9,32 @@ const Order = require("../models/order.model");
 const { compressImageFromUrl } = require("../utils/imageCompression");
 
 const connectDB = async () => {
-  try {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/aura-interiors";
-    await mongoose.connect(mongoUri);
-    console.log("✓ Connected to MongoDB for seeding...");
-  } catch (error) {
-    console.error("MongoDB connection failed:", error);
-    process.exit(1);
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI must be set to seed the same database as the backend");
+  }
+  await connectDatabase();
+  console.log(`✓ Connected to MongoDB for seeding: ${mongoose.connection.db.databaseName}`);
+};
+
+// The demo seeder replaces the entire catalog and all orders. Never do that silently.
+const assertSafeSeedTarget = async () => {
+  const db = mongoose.connection.db;
+  const counts = {};
+  for (const name of ["categories", "products", "orders"]) {
+    counts[name] = await db.collection(name).countDocuments({});
+  }
+  console.log("Seed target:", {
+    database: db.databaseName,
+    host: mongoose.connection.host,
+    existingRecords: counts,
+  });
+  if (Object.values(counts).some((count) => count > 0) &&
+      process.env.ALLOW_DESTRUCTIVE_DEMO_SEED !== "true") {
+    throw new Error(
+      "Refusing to delete existing categories, products or orders. " +
+      "Back up and inspect the database first. Only for disposable demo data, " +
+      "set ALLOW_DESTRUCTIVE_DEMO_SEED=true."
+    );
   }
 };
 
@@ -55,6 +75,7 @@ const runSeeder = async () => {
     }
     const { email: adminEmail, password } = getAdminCredentials();
     await connectDB();
+    await assertSafeSeedTarget();
 
     // 1. Seed Admin User if not exists
     console.log("Checking Admin User...");

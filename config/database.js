@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const connectDatabase = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      dbName: "aura_interiors_db",
+      dbName: process.env.MONGO_DB_NAME || "aura_interiors_db",
     });
     console.log("MongoDb Connection Succeeded!");
   } catch (error) {
