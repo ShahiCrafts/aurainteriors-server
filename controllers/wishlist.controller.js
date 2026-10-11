@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+const { performance } = require("node:perf_hooks");
 const Wishlist = require("../models/wishlist.model");
 const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync");
@@ -46,20 +48,38 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
     return next(new AppError("Product ID is required", 400));
   }
 
-  // Verify product exists
-  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
-  if (!product) {
-    return next(new AppError("Product not found", 404));
+  if (typeof productId !== "string" || !/^[a-f0-9]{24}$/i.test(productId)) {
+    return next(new AppError("Invalid product ID", 400));
   }
+  const lookupStart = performance.now();
+  const product = await Product.exists({ _id: productId, deletedAt: null,
+    status: { $in: ["active", "out_of_stock"] } });
+  req.wishlistTimings?.push(`product;dur=${(performance.now() - lookupStart).toFixed(1)}`);
+  if (!product) return next(new AppError("Product not found", 404));
 
-  // Find or create wishlist
-  let wishlist = await Wishlist.findOne({ user: req.user._id });
-  if (!wishlist) {
-    wishlist = await Wishlist.create({ user: req.user._id, products: [] });
+  const writeStart = performance.now();
+  const productObjectId = new mongoose.Types.ObjectId(productId);
+  const userObjectId = new mongoose.Types.ObjectId(String(req.user._id));
+  const now = new Date();
+  const pipeline = [{ $set: {
+    user: userObjectId,
+    createdAt: { $ifNull: ["$createdAt", now] },
+    products: { $cond: [
+      { $in: [productObjectId, { $ifNull: ["$products.product", []] }] },
+      { $ifNull: ["$products", []] },
+      { $concatArrays: [{ $ifNull: ["$products", []] },
+        [{ _id: new mongoose.Types.ObjectId(), product: productObjectId, addedAt: now }]] },
+    ] },
+    updatedAt: now,
+  } }];
+  try {
+    await Wishlist.updateOne({ user: userObjectId }, pipeline, { upsert: true, updatePipeline: true });
+  } catch (error) {
+    // Concurrent first additions may race on the unique user index.
+    if (error.code !== 11000) throw error;
+    await Wishlist.updateOne({ user: userObjectId }, pipeline, { updatePipeline: true });
   }
-
-  // Add product using the model method
-  await wishlist.addProduct(productId);
+  req.wishlistTimings?.push(`write;dur=${(performance.now() - writeStart).toFixed(1)}`);
 
   res.status(200).json({
     status: "success",
@@ -74,12 +94,12 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
 exports.removeFromWishlist = catchAsync(async (req, res, next) => {
   const { productId } = req.params;
 
-  const wishlist = await Wishlist.findOne({ user: req.user._id });
-  if (!wishlist) {
-    return next(new AppError("Wishlist not found", 404));
+  if (typeof productId !== "string" || !/^[a-f0-9]{24}$/i.test(productId)) {
+    return next(new AppError("Invalid product ID", 400));
   }
-
-  await wishlist.removeProduct(productId);
+  const result = await Wishlist.updateOne({ user: req.user._id },
+    { $pull: { products: { product: new mongoose.Types.ObjectId(productId) } } });
+  if (!result.matchedCount) return next(new AppError("Wishlist not found", 404));
 
   res.status(200).json({
     status: "success",
