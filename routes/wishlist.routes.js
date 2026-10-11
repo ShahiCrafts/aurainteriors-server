@@ -9,10 +9,18 @@ router.use((req, res, next) => {
   req.wishlistTimings = [];
   const json = res.json;
   res.json = function (body) {
-    this.setHeader("Server-Timing", [...req.wishlistTimings,
-      `total;dur=${(performance.now() - start).toFixed(1)}`].join(", "));
+    const timings = [...req.wishlistTimings,
+      `total;dur=${(performance.now() - start).toFixed(1)}`].join(", ");
+    this.setHeader("Server-Timing", timings);
+    this.setHeader("X-Wishlist-Timing", timings);
+    this.setHeader("X-Wishlist-Version", "2");
     return json.call(this, body);
   };
+  res.once("finish", () => {
+    console.info(JSON.stringify({ event: "wishlist_request", method: req.method,
+      status: res.statusCode, timings: res.getHeader("X-Wishlist-Timing") ||
+        `total;dur=${(performance.now() - start).toFixed(1)}` }));
+  });
   req.wishlistAuthStart = start;
   next();
 });
