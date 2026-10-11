@@ -83,6 +83,14 @@ const allowedOrigins = [
   process.env.ADMIN_URL,
 ].filter(Boolean);
 
+app.use((req, res, next) => {
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && /(?:^|;\s*)jwt=/.test(req.headers.cookie || "") &&
+      !req.headers.authorization && !allowedOrigins.includes(req.headers.origin)) {
+    return res.status(403).json({ status: "fail", message: "Trusted origin required for cookie authentication." });
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -113,7 +121,9 @@ app.use(compression({ level: 6, threshold: 1024 }));
 
 app.use(cookieParser());
 app.use(express.json());
-app.use(morgan("dev"));
+// Log paths only: query strings can carry bearer credentials.
+morgan.token("safe-path", (req) => req.path);
+app.use(morgan(":method :safe-path :status :response-time ms"));
 app.use(passport.initialize());
 
 // --------------------------------------------------------------------------
@@ -216,8 +226,10 @@ const startServer = async () => {
   try {
     console.log("Starting server initialization...");
     
-    // Initialize database if empty
-    await initializeDatabaseIfEmpty();
+    // Demo data is opt-in and is never inserted during production startup.
+    if (process.env.NODE_ENV === "development" && process.env.SEED_DEMO_DATA === "true") {
+      await initializeDatabaseIfEmpty();
+    }
     
     startBackgroundTasks();
 
