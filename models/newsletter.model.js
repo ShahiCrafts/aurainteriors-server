@@ -19,8 +19,11 @@ const newsletterSchema = new mongoose.Schema({
     },
     isActive: {
         type: Boolean,
-        default: true
+        default: false
     },
+    confirmationTokenHash: { type: String, select: false },
+    confirmationExpiresAt: { type: Date, select: false },
+    unsubscribeNonce: { type: String },
     subscribedAt: {
         type: Date,
         default: Date.now

@@ -1,4 +1,7 @@
+const { escapeHtml, escapeEmailData } = require("./escapeHtml");
 const generateVerificationEmailWithCode = (name, verificationCode) => {
+  name = escapeHtml(name);
+  verificationCode = escapeHtml(verificationCode);
   return `
     <div style="font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f4; padding: 40px 20px; margin: 0;">
       <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,0.08); text-align: center; padding: 0 32px;">
@@ -44,6 +47,7 @@ const generateVerificationEmailWithCode = (name, verificationCode) => {
 };
 
 const generateOrderConfirmationEmail = (order) => {
+  order = escapeEmailData(order);
   const {
     orderId,
     guestInfo,

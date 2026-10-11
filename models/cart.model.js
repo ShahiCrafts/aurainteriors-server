@@ -11,6 +11,7 @@ const cartItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 1,
+      validate: { validator: Number.isSafeInteger, message: "Quantity must be a safe integer" },
       default: 1,
     },
     variant: {
@@ -50,10 +51,11 @@ cartSchema.methods.addItem = async function (
   quantity = 1,
   variant = {}
 ) {
+  if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error("Quantity must be a positive integer");
   const existingItem = this.items.find(
     (item) =>
       item.product.toString() === productId.toString() &&
-      JSON.stringify(item.variant) === JSON.stringify(variant)
+      ["color", "size", "material"].every(key => (item.variant?.[key] || "") === (variant?.[key] || ""))
   );
 
   if (existingItem) {
@@ -72,9 +74,9 @@ cartSchema.methods.removeItem = async function (itemId) {
   return this.save();
 };
 
-cartSchema.methods.clearCart = async function () {
+cartSchema.methods.clearCart = async function (options = {}) {
   this.items = [];
-  return this.save();
+  return this.save(options);
 };
 
 const Cart = mongoose.model("Cart", cartSchema);

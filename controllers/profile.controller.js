@@ -125,18 +125,18 @@ exports.updatePreferences = async (req, res) => {
       preferredCategories,
     } = req.body;
 
-    const updateData = { preferences: {} };
+    const updateData = {};
 
     if (newsletter !== undefined)
-      updateData.preferences.newsletter = newsletter;
+      updateData["preferences.newsletter"] = newsletter;
     if (smsNotifications !== undefined)
-      updateData.preferences.smsNotifications = smsNotifications;
+      updateData["preferences.smsNotifications"] = smsNotifications;
     if (orderUpdates !== undefined)
-      updateData.preferences.orderUpdates = orderUpdates;
+      updateData["preferences.orderUpdates"] = orderUpdates;
     if (promotionalEmails !== undefined)
-      updateData.preferences.promotionalEmails = promotionalEmails;
+      updateData["preferences.promotionalEmails"] = promotionalEmails;
     if (preferredCategories !== undefined)
-      updateData.preferences.preferredCategories = preferredCategories;
+      updateData["preferences.preferredCategories"] = preferredCategories;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,

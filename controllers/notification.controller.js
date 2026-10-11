@@ -8,13 +8,16 @@ exports.getUserNotifications = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, isRead, category } = req.query;
     const userId = req.user._id;
+    if (isRead !== undefined && !["true", "false"].includes(isRead)) throw new AppError("Invalid read filter", 400);
+    if (category !== undefined && !["order", "promotion", "design", "system"].includes(category)) throw new AppError("Invalid category filter", 400);
 
     console.log(`Getting notifications for user: ${userId}`);
 
     const result = await NotificationService.getUserNotifications(
       userId,
-      parseInt(page),
-      parseInt(limit)
+      page,
+      limit,
+      { isRead: isRead === undefined ? undefined : isRead === "true", category }
     );
 
     console.log(`Found ${result.total} notifications`);
@@ -96,11 +99,14 @@ exports.markAsRead = async (req, res, next) => {
 exports.markMultipleAsRead = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    await NotificationService.markAllAsRead(userId);
+    const { notificationIds } = req.body;
+    const result = await Notification.updateMany({ recipient: userId, _id: { $in: notificationIds }, isRead: false },
+      { $set: { isRead: true } });
 
     res.status(200).json({
       status: "success",
-      message: "All notifications marked as read"
+      message: "Selected notifications marked as read",
+      modifiedCount: result.modifiedCount
     });
   } catch (error) {
     next(error);
@@ -181,7 +187,11 @@ exports.getPreferences = async (req, res, next) => {
 exports.updatePreferences = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const user = await User.findByIdAndUpdate(userId, { preferences: req.body }, {
+    const preferenceUpdates = {};
+    for (const key of ["newsletter", "smsNotifications", "orderUpdates", "promotionalEmails", "preferredCategories"]) {
+      if (req.body[key] !== undefined) preferenceUpdates[`preferences.${key}`] = req.body[key];
+    }
+    const user = await User.findByIdAndUpdate(userId, { $set: preferenceUpdates }, {
       new: true,
       runValidators: true,
     }).select("preferences");
@@ -199,7 +209,8 @@ exports.archiveNotification = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    await Notification.findByIdAndDelete(id);
+    const result = await Notification.deleteOne({ _id: id, recipient: req.user._id });
+    if (!result.deletedCount) return next(new AppError("Notification not found", 404));
 
     res.status(200).json({
       status: "success",
@@ -213,11 +224,16 @@ exports.archiveNotification = async (req, res, next) => {
 exports.archiveMultiple = async (req, res, next) => {
   try {
     const { notificationIds } = req.body;
-    await Notification.deleteMany({ _id: { $in: notificationIds } });
+    if (!Array.isArray(notificationIds) || notificationIds.length > 100 ||
+        notificationIds.some((id) => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))) {
+      return next(new AppError("Provide up to 100 valid notification IDs", 400));
+    }
+    const result = await Notification.deleteMany({ _id: { $in: notificationIds }, recipient: req.user._id });
 
     res.status(200).json({
       status: "success",
-      message: "Notifications deleted"
+      message: "Notifications deleted",
+      deletedCount: result.deletedCount
     });
   } catch (error) {
     next(error);

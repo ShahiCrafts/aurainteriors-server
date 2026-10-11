@@ -1,12 +1,13 @@
 const socketIo = require("socket.io");
-const jwt = require("jsonwebtoken");
+const authToken = require("../utils/authToken");
+const User = require("../models/user.model");
 const ChatService = require("./chatService");
 
 class NotificationGateway {
   constructor(server) {
     this.io = socketIo(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:5173",
+        origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL, "http://localhost:5173", "http://localhost:5174", "https://aurainteriors.live", "https://admin.aurainteriors.live", "https://www.aurainteriors.live"].filter(Boolean),
         methods: ["GET", "POST"],
         credentials: true,
       },
@@ -16,14 +17,17 @@ class NotificationGateway {
 
     this.io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth.token;
+        const token = socket.handshake.auth.token || authToken.extract(socket.handshake);
+        socket.sessionToken = token;
         const guestSessionId = socket.handshake.auth.guestSessionId;
 
         if (token) {
           // Authenticated user
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          socket.userId = decoded.id;
-          socket.role = decoded.role;
+          const decoded = await authToken.verify(token);
+          const user = await User.findOne({ _id: decoded.id, isActive: true, deletedAt: null }).select("_id role").lean();
+          if (!user) return next(new Error("Authentication error"));
+          socket.userId = String(user._id);
+          socket.role = user.role;
           socket.isGuest = false;
         } else if (guestSessionId) {
           // Guest sockets must present a real public GuestSession key.
@@ -45,6 +49,11 @@ class NotificationGateway {
     });
 
     this.io.on("connection", (socket) => {
+      // Revalidate identity before every incoming event, not just at handshake.
+      socket.use(async (_packet, next) => {
+        try { await this.refreshIdentity(socket); next(); }
+        catch (_error) { next(new Error("Authentication error")); socket.disconnect(true); }
+      });
       // Join user to personal room
       if (socket.userId) {
         socket.join(socket.userId); // Authenticated users join by ID
@@ -68,32 +77,36 @@ class NotificationGateway {
           }
           const room = `chat:${chatId}`;
           socket.join(room);
+          if (socket.role === "admin") socket.join(`${room}:admins`);
         } catch (error) {
           socket.emit("chat:error", { chatId, message: "Unable to join chat" });
         }
       });
 
-      socket.on("chat:leave", ({ chatId }) => {
+      socket.on("chat:leave", ({ chatId } = {}) => {
         const room = `chat:${chatId}`;
         socket.leave(room);
+        socket.leave(`${room}:admins`);
         console.log(`Socket ${socket.id} (${socket.isGuest ? 'Guest' : 'User'}: ${socket.userId || socket.guestSessionId}) left room ${room}`);
       });
 
-      socket.on("chat:typing", ({ chatId, isTyping }) => {
-        socket.to(`chat:${chatId}`).emit("chat:typing:status", {
-          chatId,
-          isTyping,
-          userId: socket.userId,
-          userRole: socket.role,
-        });
+      const authorizeEvent = async (chatId) => {
+        if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId)) return false;
+        return ChatService.authorizeChat(chatId, socket.userId, socket.role, socket.guestSessionId);
+      };
+      socket.on("chat:typing", async ({ chatId, isTyping } = {}) => {
+        try {
+          if (typeof isTyping !== "boolean" || !await authorizeEvent(chatId)) return;
+          socket.to(`chat:${chatId}`).emit("chat:typing:status", {
+            chatId, isTyping, userId: socket.userId, userRole: socket.role,
+          });
+        } catch (_error) { socket.emit("chat:error", { message: "Unable to update typing status" }); }
       });
-
-      socket.on("chat:read", ({ chatId }) => {
-        socket.to(`chat:${chatId}`).emit("chat:messages:read", {
-          chatId,
-          readerId: socket.userId,
-          readerRole: socket.role,
-        });
+      socket.on("chat:read", async ({ chatId } = {}) => {
+        try {
+          if (!await authorizeEvent(chatId)) return;
+          await ChatService.markMessagesAsRead(chatId, socket.userId, socket.role, socket.guestSessionId);
+        } catch (_error) { socket.emit("chat:error", { message: "Unable to update read status" }); }
       });
 
       socket.on("heartbeat", () => {
@@ -112,7 +125,23 @@ class NotificationGateway {
     this.io.emit("heartbeat", { timestamp: new Date() });
   }
 
-  cleanupStaleConnections() {
+  async refreshIdentity(socket) {
+    if (socket.isGuest) {
+      if (!await ChatService.resolveGuestSession(socket.guestSessionId)) throw new Error("Expired guest session");
+      return;
+    }
+    const decoded = await authToken.verify(socket.sessionToken);
+    const user = await User.findOne({ _id: decoded.id, isActive: true, deletedAt: null }).select("_id role").lean();
+    if (!user || String(user._id) !== socket.userId) throw new Error("Inactive account");
+    // A role change invalidates existing room memberships and connection.
+    if (user.role !== socket.role) throw new Error("Account role changed");
+  }
+
+  async cleanupStaleConnections() {
+    for (const socket of this.io.sockets.sockets.values()) {
+      try { await this.refreshIdentity(socket); }
+      catch (_error) { socket.disconnect(true); }
+    }
   }
 
   async close() {

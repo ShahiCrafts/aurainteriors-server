@@ -21,6 +21,7 @@ const orderItemSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+    cartItemId: { type: mongoose.Schema.Types.ObjectId },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
@@ -75,6 +76,17 @@ const orderSchema = new mongoose.Schema(
       enum: ["cod", "esewa"],
       required: true,
     },
+    stockDeducted: Boolean,
+    inventoryReviewRequired: { type: Boolean, default: false },
+    discountUsageConsumed: { type: Boolean, default: false },
+    refundRequest: {
+      status: { type: String, enum: ["none", "pending", "completed"], default: "none" },
+      requestedAt: Date,
+      reason: String,
+      providerReference: String,
+      completedAt: Date,
+      processedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
@@ -124,6 +136,7 @@ const orderSchema = new mongoose.Schema(
     cancelledAt: Date,
     customerNote: String,
     adminNote: String,
+    requestHash: String,
     idempotencyKey: { type: String, unique: true, sparse: true },
   },
   {

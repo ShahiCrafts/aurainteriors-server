@@ -57,6 +57,9 @@ const contactSchema = new mongoose.Schema(
       maxlength: [2000, "Notes cannot exceed 2000 characters"],
     },
     response: {
+      deliveryStatus: { type: String, enum: ["pending", "accepted", "failed"], default: "pending" },
+      acceptedAt: Date,
+      providerMessageId: String,
       message: {
         type: String,
         trim: true,

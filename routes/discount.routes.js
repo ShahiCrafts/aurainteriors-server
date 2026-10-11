@@ -1,14 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const discountController = require("../controllers/discount.controller");
-const { protect, restrictTo } = require("../middleware/auth.middleware");
+const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
 const {
   createDiscountSchema,
   updateDiscountSchema,
   getDiscountsQuerySchema,
   applyDiscountSchema,
+  previewDiscountSchema,
 } = require("../validators/discount.validator");
+
+router.post("/preview", protectOptional, validate(previewDiscountSchema), discountController.previewDiscount);
 
 router.use(protect);
 

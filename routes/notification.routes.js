@@ -13,6 +13,7 @@ router.use(protect);
 
 router.get("/", notificationController.getUserNotifications);
 router.get("/unread-count", notificationController.getUnreadCount);
+router.get("/preferences", notificationController.getPreferences);
 router.get("/:id", notificationController.getNotificationDetail);
 router.put("/:id/read", notificationController.markAsRead);
 router.post(
@@ -32,7 +33,6 @@ router.delete(
   "/push-tokens/:deviceId",
   notificationController.unregisterDevice
 );
-router.get("/preferences", notificationController.getPreferences);
 router.put("/preferences", notificationController.updatePreferences);
 
 module.exports = router;

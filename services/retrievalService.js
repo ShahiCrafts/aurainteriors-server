@@ -1,3 +1,4 @@
+const Document = require("../models/document.model");
 const { QdrantClient } = require("@qdrant/js-client-rest");
 
 class RetrievalService {
@@ -72,14 +73,18 @@ class RetrievalService {
 
       console.log(`[RAG] Searching Qdrant collection: "${this.collectionName}"`);
       const searchResult = await this.qdrant.search(this.collectionName, {
+        filter: { must: [{ key: "visibility", match: { value: "public" } }] },
         vector: queryEmbedding,
-        limit: limit,
+        limit: Math.min(Math.max(Number(limit) || 5, 1), 10),
         with_payload: true,
       });
 
+      const ids = searchResult.map(hit => hit.payload?.documentId).filter(id => typeof id === "string" && /^[a-f0-9]{24}$/i.test(id));
+      const publicDocuments = await Document.find({ _id: { $in: ids }, visibility: "public", status: "indexed" }).select("_id").lean();
+      const allowed = new Set(publicDocuments.map(doc => String(doc._id)));
       // Filter and map results that meet the minimum confidence score
       const matches = searchResult
-        .filter((hit) => hit.score >= minScore)
+        .filter((hit) => hit.score >= minScore && hit.payload?.visibility === "public" && allowed.has(hit.payload.documentId))
         .map((hit) => ({
           text: hit.payload.text,
           fileName: hit.payload.fileName,

@@ -1,3 +1,4 @@
+const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
 const Blog = require("../models/blog.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
@@ -16,8 +17,8 @@ exports.getAllBlogs = catchAsync(async (req, res, next) => {
     sort = "-publishedAt",
   } = req.query;
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
   // Build filter
@@ -28,11 +29,11 @@ exports.getAllBlogs = catchAsync(async (req, res, next) => {
   }
 
   if (tag) {
-    filter.tags = { $in: [new RegExp(tag, "i")] };
+    filter.tags = { $in: [literalRegex(tag)] };
   }
 
   if (source) {
-    filter["source.name"] = new RegExp(source, "i");
+    filter["source.name"] = literalRegex(source);
   }
 
   if (featured === "true") {
@@ -41,9 +42,9 @@ exports.getAllBlogs = catchAsync(async (req, res, next) => {
 
   if (search) {
     filter.$or = [
-      { title: new RegExp(search, "i") },
-      { excerpt: new RegExp(search, "i") },
-      { tags: { $in: [new RegExp(search, "i")] } },
+      { title: literalRegex(search) },
+      { excerpt: literalRegex(search) },
+      { tags: { $in: [literalRegex(search)] } },
     ];
   }
 
@@ -100,7 +101,7 @@ exports.getBlog = catchAsync(async (req, res, next) => {
 exports.getPopularBlogs = catchAsync(async (req, res, next) => {
   const { limit = 5 } = req.query;
 
-  const blogs = await Blog.getPopular(parseInt(limit, 10));
+  const blogs = await Blog.getPopular(boundedLimit(limit));
 
   res.status(200).json({
     status: "success",
@@ -115,7 +116,7 @@ exports.getPopularBlogs = catchAsync(async (req, res, next) => {
 exports.getFeaturedBlogs = catchAsync(async (req, res, next) => {
   const { limit = 3 } = req.query;
 
-  const blogs = await Blog.getFeatured(parseInt(limit, 10));
+  const blogs = await Blog.getFeatured(boundedLimit(limit));
 
   res.status(200).json({
     status: "success",
@@ -223,7 +224,7 @@ exports.getRelatedBlogs = catchAsync(async (req, res, next) => {
     ],
   })
     .sort({ publishedAt: -1 })
-    .limit(parseInt(limit, 10))
+    .limit(boundedLimit(limit))
     .select("-content");
 
   res.status(200).json({

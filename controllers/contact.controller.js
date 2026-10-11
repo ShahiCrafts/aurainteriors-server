@@ -1,3 +1,5 @@
+const { sendContactResponseEmail } = require("../services/email.service");
+const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
 const Contact = require("../models/contact.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
@@ -56,8 +58,8 @@ exports.getAllContacts = catchAsync(async (req, res, next) => {
     sort = "-createdAt",
   } = req.query;
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
   // Build filter
@@ -81,10 +83,10 @@ exports.getAllContacts = catchAsync(async (req, res, next) => {
 
   if (search) {
     filter.$or = [
-      { name: new RegExp(search, "i") },
-      { email: new RegExp(search, "i") },
-      { subject: new RegExp(search, "i") },
-      { message: new RegExp(search, "i") },
+      { name: literalRegex(search) },
+      { email: literalRegex(search) },
+      { subject: literalRegex(search) },
+      { message: literalRegex(search) },
     ];
   }
 
@@ -153,7 +155,7 @@ exports.updateContact = catchAsync(async (req, res, next) => {
   if (adminNotes !== undefined) contact.adminNotes = adminNotes;
   if (assignedTo !== undefined) contact.assignedTo = assignedTo || null;
 
-  await contact.save({ validateBeforeSave: false });
+  await contact.save();
 
   const updatedContact = await Contact.findById(contact._id)
     .populate("assignedTo", "firstName lastName email")
@@ -185,13 +187,24 @@ exports.respondToContact = catchAsync(async (req, res, next) => {
     message,
     respondedAt: new Date(),
     respondedBy: req.user._id,
+    deliveryStatus: "pending",
   };
-  contact.status = "resolved";
 
   await contact.save({ validateBeforeSave: false });
 
-  // TODO: Send email to the user with the response
-  // You can integrate nodemailer here to send the response via email
+  try {
+    const delivery = await sendContactResponseEmail(contact.email, contact.name, message);
+    contact.response.deliveryStatus = "accepted";
+    contact.response.acceptedAt = new Date();
+    contact.response.providerMessageId = delivery?.messageId;
+    contact.status = "resolved";
+    await contact.save({ validateBeforeSave: false });
+  } catch (_error) {
+    contact.response.deliveryStatus = "failed";
+    if (contact.status === "resolved") contact.status = "in-progress";
+    await contact.save({ validateBeforeSave: false });
+    return next(new AppError("Response saved, but email delivery failed. Please retry.", 502));
+  }
 
   const updatedContact = await Contact.findById(contact._id)
     .populate("assignedTo", "firstName lastName email")
@@ -199,7 +212,7 @@ exports.respondToContact = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    message: "Response sent successfully",
+    message: "Response submitted to the email provider",
     data: {
       contact: updatedContact,
     },
@@ -229,6 +242,17 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
     return next(new AppError("Please provide contact IDs", 400));
   }
 
+  if (ids.length > 100 || ids.some(id => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))) {
+    return next(new AppError("Provide at most 100 valid contact IDs", 400));
+  }
+  if (status !== undefined && !["new", "in-progress", "resolved", "closed"].includes(status)) {
+    return next(new AppError("Invalid contact status", 400));
+  }
+  if (isRead !== undefined && typeof isRead !== "boolean") {
+    return next(new AppError("isRead must be a boolean", 400));
+  }
+  if (status === undefined && isRead === undefined) return next(new AppError("Provide an update", 400));
+  const uniqueIds = [...new Set(ids.map(id => id.toLowerCase()))];
   const updateData = {};
   if (status) updateData.status = status;
   if (isRead !== undefined) {
@@ -236,14 +260,15 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
     if (isRead) updateData.readAt = new Date();
   }
 
-  await Contact.updateMany(
-    { _id: { $in: ids } },
-    { $set: updateData }
+  const result = await Contact.updateMany(
+    { _id: { $in: uniqueIds } },
+    { $set: updateData, ...(isRead === false ? { $unset: { readAt: 1 } } : {}) },
+    { runValidators: true }
   );
 
   res.status(200).json({
     status: "success",
-    message: `${ids.length} contacts updated successfully`,
+    message: `${result.matchedCount} contacts updated successfully`,
   });
 });
 

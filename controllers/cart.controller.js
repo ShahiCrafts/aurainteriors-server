@@ -2,11 +2,18 @@ const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const variantKey = variant => JSON.stringify(["color", "size", "material"].map(key => variant?.[key] || ""));
+const validVariant = variant => variant && typeof variant === "object" && !Array.isArray(variant) &&
+  Object.keys(variant).every(key => ["color", "size", "material"].includes(key) &&
+    typeof variant[key] === "string" && variant[key].length <= 100);
+const visibleItems = cart => cart.items.filter(item => item.product);
+
 
 // Get user's cart
 exports.getCart = catchAsync(async (req, res, next) => {
   let cart = await Cart.findOne({ user: req.user._id }).populate({
     path: "items.product",
+    match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
     select: "name slug price originalPrice images category stock",
     populate: {
       path: "category",
@@ -40,8 +47,8 @@ exports.getCart = catchAsync(async (req, res, next) => {
     data: {
       cart: {
         _id: cart._id,
-        items: cart.items,
-        totalItems: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        items: visibleItems(cart),
+        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
         subtotal,
       },
     },
@@ -56,8 +63,14 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     return next(new AppError("Product ID is required", 400));
   }
 
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    return next(new AppError("Quantity must be a positive integer", 400));
+  }
+  if (!validVariant(variant)) return next(new AppError("Invalid product variant", 400));
+  if (!/^[a-f0-9]{24}$/i.test(productId)) return next(new AppError("Invalid product ID", 400));
+
   // Check if product exists
-  const product = await Product.findById(productId);
+  const product = await Product.findOne({ _id: productId, deletedAt: null, status: "active" });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
@@ -73,11 +86,17 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     cart = await Cart.create({ user: req.user._id, items: [] });
   }
 
+  const existingQuantity = cart.items.reduce((total, item) =>
+    total + (String(item.product) === String(product._id) ? item.quantity : 0), 0);
+  if (!Number.isSafeInteger(existingQuantity + quantity) || existingQuantity + quantity > product.stock) {
+    return next(new AppError("Insufficient combined product stock", 400));
+  }
+
   // Check if item already exists with same variant
   const existingItemIndex = cart.items.findIndex(
     (item) =>
-      item.product.toString() === productId &&
-      JSON.stringify(item.variant) === JSON.stringify(variant)
+      item.product.toString() === String(product._id) &&
+      variantKey(item.variant) === variantKey(variant)
   );
 
   if (existingItemIndex > -1) {
@@ -102,6 +121,7 @@ exports.addToCart = catchAsync(async (req, res, next) => {
   // Populate and return updated cart
   await cart.populate({
     path: "items.product",
+    match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
     select: "name slug price originalPrice images category stock",
     populate: {
       path: "category",
@@ -122,8 +142,8 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     data: {
       cart: {
         _id: cart._id,
-        items: cart.items,
-        totalItems: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        items: visibleItems(cart),
+        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
         subtotal,
       },
     },
@@ -135,8 +155,8 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
-  if (!quantity || quantity < 1) {
-    return next(new AppError("Quantity must be at least 1", 400));
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    return next(new AppError("Quantity must be a positive integer", 400));
   }
 
   const cart = await Cart.findOne({ user: req.user._id });
@@ -152,12 +172,15 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   }
 
   // Check stock
-  const product = await Product.findById(item.product);
+  const product = await Product.findOne({ _id: item.product, deletedAt: null, status: "active" });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
 
-  if (quantity > product.stock) {
+  const otherQuantity = cart.items.reduce((total, cartItem) => total +
+    (String(cartItem._id) !== String(item._id) && String(cartItem.product) === String(product._id)
+      ? cartItem.quantity : 0), 0);
+  if (!Number.isSafeInteger(otherQuantity + quantity) || otherQuantity + quantity > product.stock) {
     return next(new AppError("Insufficient stock", 400));
   }
 
@@ -167,6 +190,7 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   // Populate and return updated cart
   await cart.populate({
     path: "items.product",
+    match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
     select: "name slug price originalPrice images category stock",
     populate: {
       path: "category",
@@ -187,8 +211,8 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
     data: {
       cart: {
         _id: cart._id,
-        items: cart.items,
-        totalItems: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        items: visibleItems(cart),
+        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
         subtotal,
       },
     },
@@ -219,6 +243,7 @@ exports.removeFromCart = catchAsync(async (req, res, next) => {
   // Populate and return updated cart
   await cart.populate({
     path: "items.product",
+    match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
     select: "name slug price originalPrice images category stock",
     populate: {
       path: "category",
@@ -239,8 +264,8 @@ exports.removeFromCart = catchAsync(async (req, res, next) => {
     data: {
       cart: {
         _id: cart._id,
-        items: cart.items,
-        totalItems: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        items: visibleItems(cart),
+        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
         subtotal,
       },
     },

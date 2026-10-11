@@ -355,7 +355,7 @@ class AnnouncementService {
     try {
       // Get target users based on audience type
       const targetAudienceType = announcement.targetAudience?.type || "all";
-      let userQuery = { isActive: true };
+      let userQuery = { isActive: true, deletedAt: null };
 
       if (targetAudienceType === "customers") {
         userQuery.role = "customer";
@@ -370,15 +370,16 @@ class AnnouncementService {
 
       // NotificationService is exported as a singleton instance, use it directly
       // broadcastNotification requires userId in notificationData for the base notification record
-      await NotificationService.broadcastNotification(
+      const delivery = await NotificationService.broadcastNotification(
         {
-          userId: userIds[0], // Use first user as the base notification owner
           title: `📢 ${announcement.title}`,
           type: "announcement",
-          description: announcement.summary || announcement.content.substring(0, 200),
+          message: announcement.summary || announcement.content.substring(0, 200),
+          expiresAt: announcement.expiresAt,
+          idempotencyKey: `announcement:${announcement._id}`,
           category: "info",
           priority: announcement.priority,
-          actionUrl: `/announcements/${announcement._id}`,
+          actionUrl: "/announcements",
           data: {
             announcementId: announcement._id,
             announcementType: announcement.type,
@@ -386,6 +387,7 @@ class AnnouncementService {
         },
         userIds
       );
+      if (delivery.failedCount) throw new AppError("Some announcement notifications could not be persisted", 503);
     } catch (error) {
       console.error("Failed to notify users about announcement:", error);
       // Don't throw - notification failure shouldn't block publishing

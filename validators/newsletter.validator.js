@@ -19,18 +19,8 @@ exports.subscribeSchema = Joi.object({
         }),
 });
 
-exports.unsubscribeSchema = Joi.object({
-    email: Joi.string()
-        .email()
-        .required()
-        .trim()
-        .lowercase()
-        .messages({
-            'string.email': 'Please provide a valid email address',
-            'any.required': 'Email is required',
-            'string.empty': 'Email cannot be empty'
-        }),
-});
+exports.unsubscribeSchema = Joi.object({ token: Joi.string().max(2048).required() });
+exports.confirmSubscriptionSchema = exports.unsubscribeSchema;
 
 exports.sendTrendSchema = Joi.object({
     subject: Joi.string()

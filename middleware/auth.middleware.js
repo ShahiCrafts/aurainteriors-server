@@ -1,22 +1,16 @@
-const jwt = require("jsonwebtoken");
+const authToken = require("../utils/authToken");
 const User = require("../models/user.model");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
 exports.protect = catchAsync(async (req, res, next) => {
-  let token;
-
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1];
-  } else if (req.cookies.jwt) {
-    token = req.cookies.jwt;
-  }
+  const token = authToken.extract(req);
 
   if (!token) {
     return next(new AppError("You are not logged in. Please log in to get access.", 401));
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const decoded = await authToken.verify(token);
 
   const user = await User.findById(decoded.id);
   if (!user) {
@@ -38,19 +32,14 @@ exports.protect = catchAsync(async (req, res, next) => {
  * If no/invalid token: treats as guest, sets req.isAuthenticated = false, continues (does not 401)
  */
 exports.protectOptional = catchAsync(async (req, res, next) => {
-  let token;
+  const token = authToken.extract(req);
   req.isAuthenticated = false;
   req.user = null;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1];
-  } else if (req.cookies.jwt) {
-    token = req.cookies.jwt;
-  }
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = await authToken.verify(token);
       const user = await User.findById(decoded.id).select("_id role isActive deletedAt email firstName lastName avatar").lean();
 
       if (user && user.isActive && !user.deletedAt) {

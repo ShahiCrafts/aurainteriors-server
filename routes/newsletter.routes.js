@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const newsletterController = require('../controllers/newsletter.controller');
-const { subscribeSchema, unsubscribeSchema, sendTrendSchema } = require('../validators/newsletter.validator');
+const { subscribeSchema, unsubscribeSchema, confirmSubscriptionSchema, sendTrendSchema } = require('../validators/newsletter.validator');
+const { createAuthLimiter } = require('../middleware/authRateLimit.middleware');
 const validate = require('../middleware/validate.middleware');
 const { protect, restrictTo } = require('../middleware/auth.middleware');
 
@@ -12,6 +13,7 @@ const { protect, restrictTo } = require('../middleware/auth.middleware');
  */
 router.post(
     '/subscribe',
+    createAuthLimiter('newsletterSubscribe', 3, 20),
     validate(subscribeSchema),
     newsletterController.subscribe
 );
@@ -23,6 +25,7 @@ router.post(
  */
 router.post(
     '/unsubscribe',
+    createAuthLimiter('newsletterUnsubscribe', 20, 60),
     validate(unsubscribeSchema),
     newsletterController.unsubscribe
 );
@@ -32,6 +35,8 @@ router.post(
  * @desc    Get all subscribers (with pagination)
  * @access  Private/Admin
  */
+router.post('/confirm', createAuthLimiter('newsletterConfirm', 20, 60), validate(confirmSubscriptionSchema), newsletterController.confirmSubscription);
+
 router.get(
     '/subscribers',
     protect,

@@ -131,6 +131,7 @@ class PromotionService {
       throw new AppError("Cannot send a cancelled promotion", 400);
     }
 
+    const previousStatus = promotion.status;
     promotion.status = "sending";
     await promotion.save();
 
@@ -151,7 +152,8 @@ class PromotionService {
 
       const notificationData = {
         title: promotion.title,
-        description: promotion.shortDescription || promotion.description,
+        message: promotion.shortDescription || promotion.description,
+        expiresAt: promotion.expiresAt,
         type: "promotional",
         category: "promotion",
         priority: promotion.priority,
@@ -177,9 +179,11 @@ class PromotionService {
         promotion._id
       );
 
+      promotion.metrics.sentCount = result.sentCount;
+      promotion.metrics.failedCount = result.failedCount;
+      if (result.failedCount) throw new AppError("Some promotion notifications could not be persisted; retry required", 503);
       promotion.status = "sent";
       promotion.sentAt = new Date();
-      promotion.metrics.sentCount = result.sentCount;
       promotion.notification = result.notificationId;
       await promotion.save();
 
@@ -189,70 +193,14 @@ class PromotionService {
         metrics: promotion.metrics,
       };
     } catch (error) {
-      promotion.status = "draft";
+      promotion.status = previousStatus === "scheduled" ? "scheduled" : "draft";
       await promotion.save();
       throw error;
     }
   }
 
   async broadcastPromotionToUsers(notificationData, userIds, promotionId) {
-    const batchSize = 100; // Process in batches to avoid memory issues
-    let sentCount = 0;
-    let notificationId = null;
-
-    const notificationGateway = global.notificationGateway;
-
-    for (let i = 0; i < userIds.length; i += batchSize) {
-      const batch = userIds.slice(i, i + batchSize);
-
-      for (const userId of batch) {
-        try {
-          const notification = await NotificationService.createNotification({
-            ...notificationData,
-            userId,
-            idempotencyKey: `${notificationData.idempotencyKey}-${userId}`,
-          });
-
-          if (!notificationId) {
-            notificationId = notification._id;
-          }
-
-          const UserNotification = require("../models/userNotification.model");
-          const userNotification = await UserNotification.findOne({
-            notification: notification._id,
-            user: userId,
-          });
-
-          if (userNotification && notificationGateway) {
-            await notificationGateway.broadcastToUser(
-              userId.toString(),
-              {
-                title: notificationData.title,
-                description: notificationData.description,
-                type: notificationData.type,
-                category: notificationData.category,
-                priority: notificationData.priority,
-                actionUrl: notificationData.actionUrl,
-                data: notificationData.data,
-              },
-              userNotification._id.toString()
-            );
-          }
-          // The notification is persisted regardless of realtime connectivity.
-          // Offline users receive it from the notifications API when they reconnect;
-          // Firebase push is optional infrastructure and must not be a startup/runtime dependency.
-
-          sentCount++;
-        } catch (error) {
-          console.error(
-            `Failed to send promotion to user ${userId}:`,
-            error.message
-          );
-        }
-      }
-    }
-
-    return { sentCount, notificationId };
+    return NotificationService.broadcastNotification(notificationData, userIds);
   }
 
   async schedulePromotion(promotionId, scheduledAt) {

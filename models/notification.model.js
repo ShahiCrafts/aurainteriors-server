@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
+    idempotencyKey: { type: String },
+    expiresAt: { type: Date, default: null },
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -36,6 +38,7 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+notificationSchema.index({ expiresAt: 1 });
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Notification", notificationSchema);

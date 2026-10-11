@@ -1,3 +1,4 @@
+const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
@@ -64,15 +65,13 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     }
   }
 
-  if (status) {
-    if (status === "all") {
-      // Do not apply status filter to return all (active, out_of_stock, draft)
-    } else if (status.includes(",")) {
-      filter.status = { $in: status.split(",") };
-    } else {
-      filter.status = status;
-    }
-  } else {
+  if (req.user?.role !== "admin") {
+    const visible = ["active", "out_of_stock"];
+    const requested = typeof status === "string" && status !== "all" ? status.split(",") : visible;
+    filter.status = { $in: requested.filter(value => visible.includes(value)) };
+  } else if (status && status !== "all") {
+    filter.status = { $in: status.split(",") };
+  } else if (!status) {
     filter.status = { $in: ["active", "out_of_stock"] };
   }
 
@@ -91,7 +90,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   if (colors) {
     const colorList = colors.split(",").filter(Boolean);
     if (colorList.length > 0) {
-      filter.colors = { $in: colorList.map((c) => new RegExp(`^${c}$`, "i")) };
+      filter.colors = { $in: colorList.map((c) => new RegExp(`^${escapeRegex(c)}$`, "i")) };
     }
   }
 
@@ -99,7 +98,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   if (materials) {
     const materialList = materials.split(",").filter(Boolean);
     if (materialList.length > 0) {
-      filter.materials = { $in: materialList.map((m) => new RegExp(`^${m}$`, "i")) };
+      filter.materials = { $in: materialList.map((m) => new RegExp(`^${escapeRegex(m)}$`, "i")) };
     }
   }
 
@@ -125,8 +124,8 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     filter.$text = { $search: search };
   }
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
   const [products, total] = await Promise.all([
@@ -156,6 +155,7 @@ exports.getProduct = catchAsync(async (req, res, next) => {
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
   const query = isObjectId ? { _id: id, deletedAt: null } : { slug: id, deletedAt: null };
 
+  if (req.user?.role !== "admin") query.status = { $in: ["active", "out_of_stock"] };
   const product = await Product.findOne(query).populate("category", "name slug");
 
   if (!product) {
@@ -499,9 +499,9 @@ exports.setPrimaryImage = catchAsync(async (req, res, next) => {
 exports.getRelatedProducts = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { limit = 4 } = req.query;
-  const limitNum = parseInt(limit, 10);
+  const limitNum = boundedLimit(limit);
 
-  const product = await Product.findOne({ _id: id, deletedAt: null });
+  const product = await Product.findOne({ _id: id, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
 
   if (!product) {
     return next(new AppError("Product not found", 404));
@@ -575,7 +575,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
     deletedAt: null,
     status: "active",
   })
-    .limit(parseInt(limit, 10))
+    .limit(boundedLimit(limit))
     .select("name slug price originalPrice images rating category")
     .populate("category", "name slug");
 
@@ -597,7 +597,7 @@ exports.getNewArrivals = catchAsync(async (req, res, next) => {
     deletedAt: null,
     status: "active",
   })
-    .limit(parseInt(limit, 10))
+    .limit(boundedLimit(limit))
     .select("name slug price originalPrice images rating category")
     .populate("category", "name slug");
 

@@ -1,3 +1,5 @@
+const { issueNewsletterToken } = require("./newsletterToken.service");
+const { escapeHtml, safeUrl, escapeEmailData } = require("../utils/escapeHtml");
 const axios = require("axios");
 
 const BREVO_API_BASE = "https://api.brevo.com/v3";
@@ -130,7 +132,7 @@ const send = async (to, subject, html) => {
     console.log(`[email:send] ✓ Email sent successfully. Message ID:`, response.data.messageId);
     return response.data;
   } catch (err) {
-    console.error(`[email:send] ✗ Failed to send email. Error:`, err.response?.data || err.message);
+    console.error("[email:send] Email delivery failed");
     throw err;
   }
 };
@@ -156,7 +158,7 @@ exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 24px;">
         <tr>
           <td align="center" style="background-color: ${BRAND.orange}; border-radius: 8px; padding: 14px 20px; text-align: center;">
-            <a href="${magicLink}" style="display: block; width: 100%; color: #FFFFFF; font-size: 16px; font-weight: 600; text-decoration: none;">
+            <a href="${safeUrl(magicLink)}" style="display: block; width: 100%; color: #FFFFFF; font-size: 16px; font-weight: 600; text-decoration: none;">
               Sign in to my account
             </a>
           </td>
@@ -176,7 +178,7 @@ exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #F9FAFB; border: 1px solid ${BRAND.border}; border-radius: 8px; margin-bottom: 24px;">
   <tr>
     <td style="padding: 14px 16px; font-size: 12px; font-family: Menlo, Monaco, Consolas, 'Courier New', monospace; color: ${BRAND.muted}; word-break: break-all; line-height: 1.5;">
-      <a href="${magicLink}" style="text-decoration: none;">${magicLink}</a>
+      <a href="${safeUrl(magicLink)}" style="text-decoration: none;">${escapeHtml(magicLink)}</a>
     </td>
   </tr>
 </table>
@@ -221,7 +223,7 @@ exports.sendOtpEmail = (email, otp) =>
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 24px;">
         <tr>
           <td align="center" style="background-color: #F8FAFC; border: 1px dashed ${BRAND.orange}; border-radius: 8px; padding: 18px; text-align: center;">
-            <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: ${BRAND.dark};">${otp}</span>
+            <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: ${BRAND.dark};">${escapeHtml(otp)}</span>
           </td>
         </tr>
       </table>
@@ -250,7 +252,7 @@ exports.sendWelcomeEmail = (email, firstName) =>
     email,
     "Welcome to Aura Interiors",
     baseTemplate(`
-      <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: ${BRAND.dark}; letter-spacing: -0.3px;">Welcome${firstName ? `, ${firstName}` : ""}!</h1>
+      <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: ${BRAND.dark}; letter-spacing: -0.3px;">Welcome${firstName ? `, ${escapeHtml(firstName)}` : ""}!</h1>
       <p style="margin: 0 0 16px 0; font-size: 15px; color: ${BRAND.muted}; line-height: 1.6;">
         Your account is ready. Explore our curated collections of premium luxury furniture and use our AR visualizer to see pieces inside your space before you buy.
       </p>
@@ -263,7 +265,7 @@ exports.sendWelcomeEmail = (email, firstName) =>
     `),
   );
 
-exports.sendNewsletterWelcomeEmail = (email) =>
+exports.sendNewsletterWelcomeEmail = (email, nonce) =>
   send(
     email,
     "You're subscribed to Aura Interiors",
@@ -298,7 +300,7 @@ exports.sendNewsletterWelcomeEmail = (email) =>
 
       <p style="margin: 0; font-size: 12px; color: ${BRAND.muted}; text-align: center;">
         Didn't subscribe?
-        <a href="${FRONTEND}/newsletter/unsubscribe?email=${encodeURIComponent(email)}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe here</a>.
+        <a href="${FRONTEND}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", nonce, 90 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe here</a>.
       </p>
     `),
   );
@@ -309,13 +311,13 @@ exports.sendNewsletterBroadcast = async (subscribers, subject, htmlContent) => {
   let failed = 0;
 
   for (let i = 0; i < subscribers.length; i += BATCH) {
-    const batchEmails = subscribers.slice(i, i + BATCH).map(({ email }) => ({
+    const batchEmails = subscribers.slice(i, i + BATCH).map(({ email, unsubscribeNonce }) => ({
       email,
       htmlContent: baseTemplate(`
         ${htmlContent}
         <p style="margin-top: 32px; font-size: 12px; color: ${BRAND.muted}; text-align: center;">
           You received this because you subscribed to the Aura Interiors newsletter.
-          <a href="${FRONTEND}/newsletter/unsubscribe?email=${encodeURIComponent(email)}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe</a>
+          <a href="${FRONTEND}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", unsubscribeNonce, 90 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe</a>
         </p>
       `),
     }));
@@ -344,6 +346,8 @@ exports.sendNewsletterBroadcast = async (subscribers, subject, htmlContent) => {
 };
 
 exports.sendOrderConfirmationEmail = async (order) => {
+  const recipientEmail = order.guestInfo.email;
+  order = escapeEmailData(order);
   const {
     orderId,
     guestInfo,
@@ -354,7 +358,7 @@ exports.sendOrderConfirmationEmail = async (order) => {
     orderedAt,
   } = order;
 
-  const email = guestInfo.email;
+  const email = recipientEmail;
   const firstName = guestInfo.firstName || "Customer";
 
   // Format Date
@@ -476,7 +480,7 @@ exports.sendOrderConfirmationEmail = async (order) => {
     </p>
 
     <div style="text-align: center; margin: 24px 0 24px 0;">
-      <a href="${trackUrl}" style="display: inline-block; padding: 13px 28px; background-color: #F27318; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+      <a href="${safeUrl(trackUrl)}" style="display: inline-block; padding: 13px 28px; background-color: #F27318; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
         Track Your Order
       </a>
     </div>
@@ -504,3 +508,7 @@ exports.verifyEmailConfig = async () => {
     return false;
   }
 };
+exports.sendNewsletterConfirmationEmail = (email, token) => send(email, "Confirm your Aura Interiors newsletter subscription",
+  baseTemplate(`<p>Confirm your subscription to receive Aura Interiors news.</p>${ctaButton(safeUrl(`${FRONTEND}/newsletter/confirm?token=${encodeURIComponent(token)}`), "Confirm subscription")}`));
+exports.sendContactResponseEmail = (email, name, message) => send(email, "Aura Interiors response to your enquiry",
+  baseTemplate(`<p>Hello ${escapeHtml(name)},</p><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`));

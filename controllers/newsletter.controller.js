@@ -1,5 +1,8 @@
+const { boundedPage, boundedLimit } = require("../utils/listQuery");
 const Newsletter = require('../models/newsletter.model');
-const { sendWelcomeEmail, sendTrendEmail } = require('../services/email.service');
+const crypto = require('crypto');
+const { issueNewsletterToken, verifyNewsletterToken } = require('../services/newsletterToken.service');
+const { sendNewsletterConfirmationEmail, sendNewsletterWelcomeEmail, sendNewsletterBroadcast } = require('../services/email.service');
 
 /**
  * Subscribe to newsletter
@@ -9,71 +12,36 @@ const { sendWelcomeEmail, sendTrendEmail } = require('../services/email.service'
 exports.subscribe = async (req, res) => {
     try {
         const { email, source = 'footer' } = req.body;
-
-        // Check if email already exists
         let subscriber = await Newsletter.findOne({ email });
-
-        if (subscriber) {
-            if (subscriber.isActive) {
-                return res.status(200).json({
-                    success: true,
-                    message: 'This email is already subscribed to our newsletter',
-                });
-            } else {
-                // Reactivate subscription
-                subscriber.isActive = true;
-                subscriber.source = source;
-                subscriber.subscribedAt = Date.now();
-                subscriber.unsubscribedAt = undefined;
-                await subscriber.save();
-
-                // Send welcome email in background
-                sendWelcomeEmail(email).catch(err =>
-                    console.error('Failed to send welcome email (background):', err)
-                );
-
-                return res.status(200).json({
-                    success: true,
-                    message: 'Welcome back! Your subscription has been reactivated',
-                });
-            }
+        if (!subscriber?.isActive) {
+            const nonce = crypto.randomBytes(24).toString('hex');
+            const token = issueNewsletterToken(email, 'subscribe', nonce, 24 * 60 * 60 * 1000);
+            if (!subscriber) subscriber = new Newsletter({ email, source, isActive: false });
+            subscriber.source = source;
+            subscriber.confirmationTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+            subscriber.confirmationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            await subscriber.save();
+            await sendNewsletterConfirmationEmail(email, token);
         }
-
-        // Create new subscriber
-        subscriber = await Newsletter.create({
-            email,
-            source,
-        });
-
-        // Send welcome email in background
-        sendWelcomeEmail(email).catch(err =>
-            console.error('Failed to send welcome email (background):', err)
-        );
-
-        res.status(201).json({
-            success: true,
-            message: 'Successfully subscribed! Check your email for a welcome message',
-            data: {
-                email: subscriber.email,
-                subscribedAt: subscriber.subscribedAt,
-            },
-        });
-    } catch (error) {
-        console.error('Newsletter subscription error:', error);
-
-        if (error.code === 11000) {
-            return res.status(200).json({
-                success: true,
-                message: 'This email is already subscribed',
-            });
-        }
-
-        res.status(500).json({
-            success: false,
-            message: 'Failed to subscribe to newsletter',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        });
+        res.status(200).json({ success: true, message: 'If confirmation is needed, check your email to complete your subscription.' });
+    } catch (_error) {
+        res.status(503).json({ success: false, message: 'Newsletter confirmation is temporarily unavailable. Please try again.' });
     }
+};
+
+exports.confirmSubscription = async (req, res) => {
+    try {
+        const { email } = verifyNewsletterToken(req.body.token, 'subscribe');
+        const hash = crypto.createHash('sha256').update(req.body.token).digest('hex');
+        const subscriber = await Newsletter.findOneAndUpdate({ email, confirmationTokenHash: hash,
+            confirmationExpiresAt: { $gt: new Date() } }, {
+            $set: { isActive: true, subscribedAt: new Date(), unsubscribeNonce: crypto.randomBytes(24).toString('hex') },
+            $unset: { confirmationTokenHash: 1, confirmationExpiresAt: 1, unsubscribedAt: 1 },
+        }, { new: true });
+        if (!subscriber) return res.status(400).json({ success: false, message: 'This confirmation link is invalid or expired.' });
+        sendNewsletterWelcomeEmail(email, subscriber.unsubscribeNonce).catch(() => console.error('Newsletter welcome email unavailable'));
+        res.status(200).json({ success: true, message: 'Your newsletter subscription is confirmed.' });
+    } catch (_error) { res.status(400).json({ success: false, message: 'This confirmation link is invalid or expired.' }); }
 };
 
 /**
@@ -85,15 +53,17 @@ exports.getSubscribers = async (req, res) => {
     try {
         const { page = 1, limit = 50, isActive } = req.query;
 
+        const pageNum = boundedPage(page);
+        const limitNum = boundedLimit(limit, 50);
         const query = {};
         if (isActive !== undefined) {
-            query.isActive = isActive === 'true';
+            query.isActive = isActive === true || isActive === 'true';
         }
 
         const subscribers = await Newsletter.find(query)
             .sort({ subscribedAt: -1 })
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum)
             .select('-__v');
 
         const total = await Newsletter.countDocuments(query);
@@ -103,10 +73,10 @@ exports.getSubscribers = async (req, res) => {
             data: {
                 subscribers,
                 pagination: {
-                    currentPage: parseInt(page),
-                    totalPages: Math.ceil(total / limit),
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(total / limitNum),
                     totalSubscribers: total,
-                    limit: parseInt(limit),
+                    limit: limitNum,
                 },
             },
         });
@@ -137,7 +107,17 @@ exports.sendTrend = async (req, res) => {
         }
 
         // Get all active subscribers
-        const subscribers = await Newsletter.find({ isActive: true }).select('email');
+        const subscribers = await Newsletter.find({ isActive: true }).select('email unsubscribeNonce');
+        // Existing active subscriptions need a nonce before their next email.
+        for (const subscriber of subscribers) {
+            if (!subscriber.unsubscribeNonce) {
+                const nonce = crypto.randomBytes(24).toString('hex');
+                const updated = await Newsletter.findOneAndUpdate({ _id: subscriber._id, unsubscribeNonce: null },
+                    { $set: { unsubscribeNonce: nonce } }, { new: true });
+                const current = updated || await Newsletter.findById(subscriber._id);
+                subscriber.unsubscribeNonce = current.unsubscribeNonce;
+            }
+        }
 
         if (subscribers.length === 0) {
             return res.status(404).json({
@@ -147,7 +127,7 @@ exports.sendTrend = async (req, res) => {
         }
 
         // Send emails
-        const result = await sendTrendEmail(subscribers, subject, htmlContent, textContent);
+        const result = await sendNewsletterBroadcast(subscribers, subject, htmlContent);
 
         res.status(200).json({
             success: true,
@@ -171,40 +151,13 @@ exports.sendTrend = async (req, res) => {
  */
 exports.unsubscribe = async (req, res) => {
     try {
-        const { email } = req.body;
-
-        const subscriber = await Newsletter.findOne({ email });
-
-        if (!subscriber) {
-            return res.status(404).json({
-                success: false,
-                message: 'Email not found in our newsletter list',
-            });
-        }
-
-        if (!subscriber.isActive) {
-            return res.status(400).json({
-                success: false,
-                message: 'This email is already unsubscribed',
-            });
-        }
-
-        subscriber.isActive = false;
-        subscriber.unsubscribedAt = Date.now();
-        await subscriber.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Successfully unsubscribed from newsletter',
+        const { email, nonce } = verifyNewsletterToken(req.body.token, 'unsubscribe');
+        await Newsletter.updateOne({ email, unsubscribeNonce: nonce }, {
+            $set: { isActive: false, unsubscribedAt: new Date() },
+            $unset: { confirmationTokenHash: 1, confirmationExpiresAt: 1 },
         });
-    } catch (error) {
-        console.error('Unsubscribe error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to unsubscribe',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        });
-    }
+        res.status(200).json({ success: true, message: 'Your unsubscribe request has been processed.' });
+    } catch (_error) { res.status(400).json({ success: false, message: 'This unsubscribe link is invalid or expired.' }); }
 };
 
 /**

@@ -15,6 +15,7 @@ const addressSchema = Joi.object({
 });
 
 exports.guestCheckoutSchema = Joi.object({
+  idempotencyKey: Joi.string().pattern(/^[a-zA-Z0-9_-]{16,128}$/).optional(),
   email: Joi.string().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
@@ -68,6 +69,8 @@ exports.guestCheckoutSchema = Joi.object({
 });
 
 exports.authenticatedCheckoutSchema = Joi.object({
+  selectedItemIds: Joi.array().items(Joi.string().pattern(/^[a-f0-9]{24}$/i)).min(1).max(100).unique(),
+  idempotencyKey: Joi.string().pattern(/^[a-zA-Z0-9_-]{16,128}$/).optional(),
   shippingAddressId: Joi.string(),
   shippingAddress: addressSchema,
   billingAddressId: Joi.string(),

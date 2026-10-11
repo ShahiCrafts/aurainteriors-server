@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { getAdminCredentials } = require("../utils/adminCredentials");
 const mongoose = require("mongoose");
 const User = require("../models/user.model");
 const Category = require("../models/category.model");
@@ -49,29 +50,30 @@ const furnitureImages = {
 
 const runSeeder = async () => {
   try {
+    if (process.env.NODE_ENV !== "development" || process.env.SEED_DEMO_DATA !== "true") {
+      throw new Error("Demo seeding requires NODE_ENV=development and SEED_DEMO_DATA=true");
+    }
+    const { email: adminEmail, password } = getAdminCredentials();
     await connectDB();
 
     // 1. Seed Admin User if not exists
     console.log("Checking Admin User...");
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@aurainteriors.com";
     let adminUser = await User.findOne({ email: adminEmail });
     if (!adminUser) {
       adminUser = new User({
         firstName: "Admin",
         lastName: "User",
         email: adminEmail,
-        password: "password123",
+        password,
         role: "admin",
         phone: "9800000000",
         isEmailVerified: true,
         isActive: true,
       });
       await adminUser.save();
-      console.log(`✓ Admin user created: ${adminEmail} (password123)`);
+      console.log(`✓ Admin user created: ${adminEmail}`);
     } else {
-      adminUser.password = "password123";
-      await adminUser.save();
-      console.log(`✓ Admin user exists: ${adminEmail} (password updated)`);
+      console.log(`✓ Existing account preserved: ${adminEmail}`);
     }
 
     // 2. Seed Customer User if not exists

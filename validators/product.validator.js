@@ -2,6 +2,22 @@ const Joi = require("joi");
 
 const objectId = Joi.string().regex(/^[0-9a-fA-F]{24}$/, "valid ObjectId");
 
+const modelUrlsSchema = Joi.array().items(Joi.object({
+  url: Joi.string().uri({ scheme: ["http", "https"] }).max(2048).required(),
+  format: Joi.string().valid("glb", "gltf", "usdz").required(),
+  platform: Joi.string().valid("android", "ios", "universal"),
+})).max(20);
+const removeModelsSchema = Joi.array().items(Joi.string().uri({ scheme: ["http", "https"] }).max(2048)).max(100).unique();
+const jsonArray = schema => Joi.any().custom((value, helpers) => {
+  let parsed = value;
+  if (typeof value === "string") {
+    try { parsed = JSON.parse(value); } catch { return helpers.error("any.invalid"); }
+  }
+  const result = schema.validate(parsed, { abortEarly: false });
+  if (result.error) return helpers.error("any.invalid");
+  return result.value;
+});
+
 const dimensionsSchema = Joi.object({
   width: Joi.number().min(0).messages({
     "number.min": "Width cannot be negative",
@@ -62,6 +78,7 @@ exports.createProductSchema = Joi.object({
   modelUrl: Joi.string().uri().allow("").messages({
     "string.uri": "Model URL must be a valid URL",
   }),
+  modelUrls: jsonArray(modelUrlsSchema),
   dimensions: Joi.alternatives().try(dimensionsSchema, Joi.string()),
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
@@ -140,6 +157,7 @@ exports.updateProductSchema = Joi.object({
   modelUrl: Joi.string().uri().allow("", null).messages({
     "string.uri": "Model URL must be a valid URL",
   }),
+  modelUrls: jsonArray(modelUrlsSchema),
   dimensions: Joi.alternatives().try(dimensionsSchema, Joi.string()),
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
@@ -183,6 +201,7 @@ exports.updateProductSchema = Joi.object({
     Joi.array().items(Joi.string().trim().lowercase()),
     Joi.string()
   ),
+  removeModelFiles: jsonArray(removeModelsSchema),
   removeImages: Joi.alternatives().try(
     Joi.array().items(Joi.string()),
     Joi.string()
@@ -191,9 +210,13 @@ exports.updateProductSchema = Joi.object({
 
 exports.getProductsQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(1000).default(20),
+  limit: Joi.number().integer().min(1).max(100).default(20),
   sort: Joi.string().default("-createdAt"),
   category: Joi.string(),
+  categories: Joi.string().max(500),
+  colors: Joi.string().max(500),
+  materials: Joi.string().max(500),
+  minRating: Joi.number().min(0).max(5),
   status: Joi.string(),
   style: Joi.string(),
   minPrice: Joi.number().min(0),

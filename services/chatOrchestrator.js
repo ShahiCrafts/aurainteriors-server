@@ -287,7 +287,7 @@ class ChatOrchestrator {
 
       const useRag = this.shouldUseRag(userMessageContent);
       console.log(`[ORCHESTRATOR] Starting parallel context fetch (RAG=${useRag})`);
-      const historyPromise = ChatMessage.find({ chat: chatId })
+      const historyPromise = ChatMessage.find({ chat: chatId, deletedAt: null, isInternalNote: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(4)
         .select("senderRole content createdAt")
@@ -592,7 +592,7 @@ Rules:
       let aiSummary = "";
       if (this.apiKey) {
         try {
-          const recentMsgs = await ChatMessage.find({ chat: chat._id })
+          const recentMsgs = await ChatMessage.find({ chat: chat._id, deletedAt: null, isInternalNote: { $ne: true } })
             .sort({ createdAt: -1 })
             .limit(10)
             .lean();

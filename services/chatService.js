@@ -8,21 +8,11 @@ const User = require("../models/user.model");
 class ChatService {
 
   async resolveGuestSession(guestSessionId) {
-    if (!guestSessionId) return null;
-
-    const value = String(guestSessionId).trim();
-    if (!value) return null;
-
-    // Public browser identity is GuestSession.sessionId. Never pass an arbitrary
-    // public value to findById(), because Mongoose will throw a CastError.
-    let guestSession = await GuestSession.findOne({ sessionId: value }).select("_id sessionId").lean();
-
-    // Backward compatibility for browsers that stored the Mongo _id previously.
-    if (!guestSession && /^[a-fA-F0-9]{24}$/.test(value)) {
-      guestSession = await GuestSession.findById(value).select("_id sessionId").lean();
-    }
-
-    return guestSession;
+    // Only a high-entropy public capability grants access; Mongo IDs are not credentials.
+    if (typeof guestSessionId !== "string" || !/^guest_[a-f0-9]{64}$/.test(guestSessionId)) return null;
+    return GuestSession.findOne({ sessionId: guestSessionId,
+      createdAt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    }).select("_id sessionId email").lean();
   }
 
   async createChat(customerId, data = {}) {
@@ -65,7 +55,7 @@ class ChatService {
     const { subject, metadata } = data;
 
     // Resolve the public guest session key (guest_...) to the Mongo document.
-    // Legacy clients may still hold the Mongo ObjectId, so support both formats.
+    // Internal Mongo IDs are never accepted as guest credentials.
     const guestSession = await this.resolveGuestSession(guestSessionId);
     if (!guestSession) {
       throw new AppError("Invalid guest session", 400);
@@ -233,6 +223,7 @@ class ChatService {
 
   async sendMessage(chatId, senderId, senderRole, data = {}, guestSessionId = null) {
     const { content, attachments, isInternalNote, clientMessageId } = data;
+    if (isInternalNote && senderRole !== "admin") throw new AppError("Only admins can create internal notes", 403);
     const GuestUserService = require("./guestUserService");
 
     const chat = await Chat.findOne({
@@ -252,7 +243,11 @@ class ChatService {
 
     // For guest customers without senderId, use the system guest user placeholder
     let actualSenderId = senderId;
+    let senderGuestSession;
     if (senderRole === 'customer' && !senderId && guestSessionId) {
+      const guest = await this.resolveGuestSession(guestSessionId);
+      if (!guest) throw new AppError("Invalid guest session", 403);
+      senderGuestSession = guest._id;
       actualSenderId = await GuestUserService.getGuestUserId();
     }
 
@@ -268,6 +263,7 @@ class ChatService {
         chat: chatId,
         clientMessageId: clientMessageId || undefined,
         sender: actualSenderId,
+        senderGuestSession,
         senderRole,
         messageType,
         isInternalNote: isInternalNote || false,
@@ -283,6 +279,14 @@ class ChatService {
         if (existing) return existing;
       }
       throw error;
+    }
+
+    if (isInternalNote) {
+      await message.populate("sender", "firstName lastName role avatar");
+      global.notificationGateway?.io.to(`chat:${chatId}:admins`).emit("chat:message:new", {
+        chatId: String(chatId), message: message.toObject(), timestamp: new Date(),
+      });
+      return message.toObject();
     }
 
     // Update chat based on sender role.
@@ -500,7 +504,7 @@ class ChatService {
 
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) throw new AppError("You are not authorized to view these messages", 403);
-    return ChatMessage.getChatMessages(chatId, options);
+    return ChatMessage.getChatMessages(chatId, { ...options, includeInternalNotes: userRole === "admin" });
   }
 
   async markMessagesAsRead(chatId, userId, userRole, guestSessionId) {

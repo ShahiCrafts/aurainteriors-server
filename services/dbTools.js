@@ -11,7 +11,7 @@ class DbTools {
    */
   async searchProducts({ query, categoryName, limit = 5 }) {
     try {
-      const dbQuery = { status: "active" };
+      const dbQuery = { status: "active", deletedAt: null };
 
       if (categoryName) {
         const escapedCategory = String(categoryName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -59,7 +59,7 @@ class DbTools {
    */
   async getProductDetails({ sku, productId }) {
     try {
-      const dbQuery = {};
+      const dbQuery = { deletedAt: null, status: { $in: ["active", "out_of_stock"] } };
       if (productId) dbQuery._id = productId;
       else if (sku) dbQuery.sku = sku.toUpperCase();
       else return { error: "Either sku or productId must be provided" };

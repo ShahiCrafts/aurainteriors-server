@@ -20,7 +20,7 @@ function compactProductState(options = []) {
 }
 
 async function build({ chatId, userText, summary = '', productOptions = [] }) {
-  const history = await ChatMessage.find({ chat: chatId, deletedAt: null })
+  const history = await ChatMessage.find({ chat: chatId, deletedAt: null, isInternalNote: { $ne: true } })
     .sort({ createdAt: -1 })
     .limit(14)
     .select('senderRole content')

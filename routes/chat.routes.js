@@ -1,3 +1,4 @@
+const { authorizeUpload, receiveAttachment } = require("../middleware/chatUpload.middleware");
 const express = require("express");
 const router = express.Router();
 const chatController = require("../controllers/chat.controller");
@@ -26,6 +27,8 @@ router.get(
   protectOptional,
   chatController.getUploadSignature
 );
+
+router.post("/:id/attachments", protectOptional, chatRateLimit, authorizeUpload, receiveAttachment, chatController.uploadAttachment);
 
 // Customer chat list - authenticated only (guests don't have persistent lists)
 router.get(

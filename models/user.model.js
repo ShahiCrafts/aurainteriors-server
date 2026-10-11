@@ -68,6 +68,9 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    loginOtpChallenge: { type: String, select: false },
+    loginOtpAttempts: { type: Number, select: false, default: 0 },
+
     // Magic link (used for both signup and passwordless login)
     magicLinkToken: { type: String, select: false },
     magicLinkExpires: { type: Date, select: false },
@@ -123,8 +126,10 @@ userSchema.methods.comparePassword = async function (candidatePassword, userPass
 
 // Create OTP
 userSchema.methods.createOtp = function () {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit string
+  const otp = crypto.randomInt(100000, 1000000).toString(); // 6 digit string
   this.loginOtp = crypto.createHash("sha256").update(otp).digest("hex");
+  this.loginOtpChallenge = crypto.randomBytes(32).toString("hex");
+  this.loginOtpAttempts = 0;
   this.loginOtpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
   return otp;
 };

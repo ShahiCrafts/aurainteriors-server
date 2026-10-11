@@ -1,5 +1,5 @@
 const { PDFParse } = require("pdf-parse");
-const mammoth = require("mammoth");
+const extractDocxText = require("../utils/extractDocxText");
 const { QdrantClient } = require("@qdrant/js-client-rest");
 const Document = require("../models/document.model");
 const AppError = require("../utils/AppError");
@@ -29,8 +29,7 @@ class IngestionService {
       await parser.destroy();
       return data.text;
     } else if (fileType === "docx") {
-      const data = await mammoth.extractRawText({ buffer });
-      return data.value;
+      return extractDocxText(buffer);
     } else if (fileType === "txt" || fileType === "csv") {
       return buffer.toString("utf-8");
     } else {
@@ -247,6 +246,7 @@ class IngestionService {
           payload: {
             text: textChunk,
             documentId: doc._id.toString(),
+            visibility: doc.visibility || "private",
             fileName: doc.fileName,
             chunkIndex: i,
             totalChunks: chunks.length,

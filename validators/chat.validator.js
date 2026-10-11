@@ -8,12 +8,13 @@ exports.startChatSchema = Joi.object({
     "string.empty": "Chat subject is required",
     "string.max": "Subject cannot exceed 200 characters",
   }),
+  guestEmail: Joi.string().email().max(254).lowercase().trim().optional(),
   metadata: Joi.object({
     userAgent: Joi.string().optional(),
     ipAddress: Joi.string().ip().optional(),
     referrer: Joi.string().uri().allow('').optional(),
   }).optional(),
-  guestSessionId: Joi.string().optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
 });
 
 exports.sendMessageSchema = Joi.object({
@@ -24,10 +25,10 @@ exports.sendMessageSchema = Joi.object({
   attachments: Joi.array()
     .items(
       Joi.object({
-        fileName: Joi.string().required(),
-        fileUrl: Joi.string().required(),
-        fileType: Joi.string().required(),
-        fileSize: Joi.number().integer().positive().required(),
+        fileName: Joi.string().max(255).required(),
+        fileUrl: Joi.string().uri({ scheme: ["https"] }).max(2048).required(),
+        fileType: Joi.string().valid("image", "document").required(),
+        fileSize: Joi.number().integer().positive().max(10 * 1024 * 1024).required(),
       })
     )
     .max(3)
@@ -36,7 +37,7 @@ exports.sendMessageSchema = Joi.object({
       "array.max": "Maximum of 3 attachments allowed per message",
     }),
   isInternalNote: Joi.boolean().optional().default(false),
-  guestSessionId: Joi.string().optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
 });
 
 exports.updateTypingSchema = Joi.object({
@@ -61,11 +62,11 @@ exports.getChatsQuerySchema = Joi.object({
   sortBy: Joi.string()
     .valid("lastMessageAt", "createdAt", "priority")
     .default("lastMessageAt"),
-  guestSessionId: Joi.string().optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
 });
 
 exports.getMessagesQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(50),
-  guestSessionId: Joi.string().optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
 });

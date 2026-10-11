@@ -84,7 +84,7 @@ reviewSchema.index({ rating: 1 });
 reviewSchema.statics.calcAverageRating = async function (productId) {
   const stats = await this.aggregate([
     {
-      $match: { product: productId, isApproved: true },
+      $match: { product: new mongoose.Types.ObjectId(productId), isApproved: true },
     },
     {
       $group: {
@@ -141,8 +141,8 @@ reviewSchema.statics.getRatingBreakdown = async function (productId) {
 };
 
 // Update product rating after saving a review
-reviewSchema.post("save", function () {
-  this.constructor.calcAverageRating(this.product);
+reviewSchema.post("save", async function () {
+  await this.constructor.calcAverageRating(this.product);
 });
 
 // Update product rating after deleting a review

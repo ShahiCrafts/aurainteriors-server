@@ -12,7 +12,13 @@ const validate = (schema, property = "body") => {
       return next(new AppError(errorMessage, 400));
     }
 
-    req[property] = value;
+    if (property === "query") {
+      // Express 5 exposes a getter-only query property. Shadow it locally so
+      // downstream handlers see Joi defaults/coercions and stripped input.
+      Object.defineProperty(req, "query", { value, writable: true, configurable: true, enumerable: true });
+    } else {
+      req[property] = value;
+    }
     next();
   };
 };

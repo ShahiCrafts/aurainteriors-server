@@ -13,6 +13,8 @@ router
   .post(uploadDocumentFile, processDocumentFile, documentController.uploadDocument)
   .get(documentController.listDocuments);
 
+router.patch("/:id/visibility", documentController.updateVisibility);
+
 router
   .route("/:id")
   .delete(documentController.deleteDocument);

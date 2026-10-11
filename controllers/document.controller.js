@@ -16,10 +16,12 @@ exports.uploadDocument = async (req, res, next) => {
       return next(new AppError("Document file upload failed", 400));
     }
 
+    if (req.body.visibility !== undefined && !["private", "public"].includes(req.body.visibility)) return next(new AppError("Invalid document visibility", 400));
     const { fileName, fileUrl, cloudinaryPublicId, fileType } = req.processedDocument;
 
     const doc = await Document.create({
       fileName,
+      visibility: req.body.visibility || "private",
       fileType,
       fileUrl,
       filePublicId: cloudinaryPublicId,
@@ -143,4 +145,16 @@ exports.retryDocumentIngestion = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+exports.updateVisibility = async (req, res, next) => {
+  try {
+    if (!["private", "public"].includes(req.body.visibility)) return next(new AppError("Invalid document visibility", 400));
+    const doc = await Document.findByIdAndUpdate(req.params.id, { visibility: req.body.visibility }, { new: true, runValidators: true });
+    if (!doc) return next(new AppError("Document not found", 404));
+    // Mongo restriction takes effect immediately for private documents; public
+    // publishing requires ingestion to update vector payloads as well.
+    runDocumentIngestion(String(doc._id));
+    res.status(200).json({ status: "success", data: { document: doc } });
+  } catch (error) { next(error); }
 };

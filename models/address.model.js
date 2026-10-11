@@ -73,7 +73,7 @@ const addressSchema = new mongoose.Schema(
 addressSchema.index({ user: 1 });
 
 addressSchema.pre("save", async function () {
-  if (this.isDefault) {
+  if (this.isDefault && (this.isNew || this.isModified("isDefault") || this.isModified("user"))) {
     await this.constructor.updateMany(
       { user: this.user, _id: { $ne: this._id } },
       { isDefault: false }

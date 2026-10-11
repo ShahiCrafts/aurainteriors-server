@@ -1,3 +1,5 @@
+const { prepareOrderItems } = require("../services/checkoutItems.service");
+const { selectCartItems } = require("../utils/selectCartItems");
 const Discount = require("../models/discount.model");
 const Cart = require("../models/cart.model");
 const catchAsync = require("../utils/catchAsync");
@@ -254,4 +256,29 @@ exports.validateDiscount = catchAsync(async (req, res, next) => {
         : null,
     },
   });
+});
+
+exports.previewDiscount = catchAsync(async (req, res) => {
+  let items;
+  if (req.user) {
+    if (!req.body.selectedItemIds) throw new AppError("Select your cart items", 400);
+    const cart = await Cart.findOne({ user: req.user._id });
+    const selected = selectCartItems(cart?.items || [], req.body.selectedItemIds);
+    items = selected.map(item => ({ productId: item.product, quantity: item.quantity, variant: item.variant }));
+  } else {
+    if (!req.body.items) throw new AppError("Provide guest cart items", 400);
+    items = req.body.items;
+  }
+  if (!items?.length) throw new AppError("Select items before applying a promo", 400);
+  const prepared = await prepareOrderItems(items);
+  const subtotal = prepared.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discount = await Discount.findOne({ code: req.body.code });
+  if (!discount) throw new AppError("Invalid discount code", 400);
+  const validation = discount.validateForCart(subtotal);
+  if (!validation.valid) throw new AppError(validation.message, 400);
+  const discountAmount = discount.calculateDiscount(subtotal);
+  res.status(200).json({ status: "success", data: {
+    discount: { code: discount.code, discountPercentage: discount.discountPercentage, discountAmount },
+    cart: { subtotal, discountAmount, total: subtotal - discountAmount },
+  } });
 });

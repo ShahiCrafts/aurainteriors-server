@@ -1,9 +1,10 @@
 /**
  * Database Seeder Service
  * Safely seeds the database with initial data if it's empty
- * Runs automatically on first server startup (only once)
+ * Development-only, explicitly enabled demo data
  */
 
+const { getAdminCredentials } = require("../utils/adminCredentials");
 const User = require("../models/user.model");
 const Category = require("../models/category.model");
 const Product = require("../models/product.model");
@@ -62,7 +63,7 @@ const isDatabaseEmpty = async () => {
 const seedUsers = async () => {
   console.log("[seeder] 🧑 Seeding users...");
   
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@aurainteriors.com";
+  const { email: adminEmail, password } = getAdminCredentials();
   let adminUser = await User.findOne({ email: adminEmail });
   
   if (!adminUser) {
@@ -70,7 +71,7 @@ const seedUsers = async () => {
       firstName: "Admin",
       lastName: "User",
       email: adminEmail,
-      password: process.env.ADMIN_PASSWORD || "password123",
+      password,
       role: "admin",
       phone: "9800000000",
       isEmailVerified: true,
@@ -369,7 +370,9 @@ const seedOrders = async (customerUser, products) => {
  * Main seeder function - called from server.js
  */
 const initializeDatabaseIfEmpty = async () => {
+  if (process.env.NODE_ENV !== "development" || process.env.SEED_DEMO_DATA !== "true") return false;
   try {
+    getAdminCredentials();
     const isEmpty = await isDatabaseEmpty();
     
     if (!isEmpty) {

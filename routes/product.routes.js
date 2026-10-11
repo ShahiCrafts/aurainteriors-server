@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const productController = require("../controllers/product.controller");
-const { protect, restrictTo } = require("../middleware/auth.middleware");
+const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const {
   uploadProductFiles,
   processProductFiles,
@@ -21,12 +21,13 @@ router.use("/:productId/reviews", reviewRoutes);
 
 router.get(
   "/",
+  protectOptional,
   validate(getProductsQuerySchema, "query"),
   productController.getAllProducts
 );
 router.get("/featured", productController.getFeaturedProducts);
 router.get("/new-arrivals", productController.getNewArrivals);
-router.get("/:id", productController.getProduct);
+router.get("/:id", protectOptional, productController.getProduct);
 router.get("/:id/related", productController.getRelatedProducts);
 
 router.use(protect, restrictTo("admin"));

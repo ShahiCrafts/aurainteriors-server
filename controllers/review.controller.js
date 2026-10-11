@@ -1,8 +1,11 @@
+const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const reviewFilter = req => ({ _id: req.params.reviewId,
+  ...(req.params.productId ? { product: req.params.productId } : {}) });
 const notificationEventEmitter = require("../services/notificationEventEmitter");
 
 // Get all reviews for a product
@@ -17,7 +20,7 @@ exports.getProductReviews = catchAsync(async (req, res, next) => {
   } = req.query;
 
   // Verify product exists
-  const product = await Product.findById(productId);
+  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
@@ -29,12 +32,12 @@ exports.getProductReviews = catchAsync(async (req, res, next) => {
     filter.rating = parseInt(rating, 10);
   }
 
-  if (verified === "true") {
+  if (verified === true || verified === "true") {
     filter.isVerifiedPurchase = true;
   }
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
   // Get reviews and total count
@@ -71,7 +74,7 @@ exports.getProductReviews = catchAsync(async (req, res, next) => {
 exports.getReview = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
 
-  const review = await Review.findById(reviewId).populate(
+  const review = await Review.findOne(reviewFilter(req)).populate(
     "user",
     "firstName lastName avatar"
   );
@@ -92,7 +95,7 @@ exports.createReview = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
 
   // Verify product exists
-  const product = await Product.findById(productId);
+  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
@@ -153,7 +156,7 @@ exports.updateReview = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
   const userId = req.user._id;
 
-  const review = await Review.findById(reviewId);
+  const review = await Review.findOne(reviewFilter(req));
 
   if (!review) {
     return next(new AppError("Review not found", 404));
@@ -187,7 +190,7 @@ exports.deleteReview = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
   const userId = req.user._id;
 
-  const review = await Review.findById(reviewId);
+  const review = await Review.findOne(reviewFilter(req));
 
   if (!review) {
     return next(new AppError("Review not found", 404));
@@ -198,7 +201,7 @@ exports.deleteReview = catchAsync(async (req, res, next) => {
     return next(new AppError("You can only delete your own reviews", 403));
   }
 
-  await Review.findByIdAndDelete(reviewId);
+  await Review.findOneAndDelete(reviewFilter(req));
 
   res.status(200).json({
     status: "success",
@@ -211,7 +214,7 @@ exports.markHelpful = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
   const userId = req.user._id;
 
-  const review = await Review.findById(reviewId);
+  const review = await Review.findOne(reviewFilter(req));
 
   if (!review) {
     return next(new AppError("Review not found", 404));
@@ -294,8 +297,8 @@ exports.addAdminResponse = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
   const { comment } = req.body;
 
-  const review = await Review.findByIdAndUpdate(
-    reviewId,
+  const review = await Review.findOneAndUpdate(
+    reviewFilter(req),
     {
       adminResponse: {
         comment,
@@ -341,8 +344,8 @@ exports.getAllReviews = catchAsync(async (req, res, next) => {
     filter.product = product;
   }
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
   const [reviews, total] = await Promise.all([
@@ -374,7 +377,7 @@ exports.getAllReviews = catchAsync(async (req, res, next) => {
 exports.toggleApproval = catchAsync(async (req, res, next) => {
   const { reviewId } = req.params;
 
-  const review = await Review.findById(reviewId);
+  const review = await Review.findOne(reviewFilter(req));
 
   if (!review) {
     return next(new AppError("Review not found", 404));

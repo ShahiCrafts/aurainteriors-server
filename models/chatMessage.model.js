@@ -1,3 +1,4 @@
+const { boundedLimit, boundedPage } = require("../utils/listQuery");
 const mongoose = require("mongoose");
 
 const chatMessageSchema = new mongoose.Schema(
@@ -24,6 +25,7 @@ const chatMessageSchema = new mongoose.Schema(
         "Message must have a sender unless it is a system message",
       ],
     },
+    senderGuestSession: { type: mongoose.Schema.Types.ObjectId, ref: "GuestSession", default: null },
     senderRole: {
       type: String,
       enum: ["customer", "admin", "bot", "system"],
@@ -115,7 +117,8 @@ chatMessageSchema.statics.getChatMessages = async function (
   chatId,
   options = {}
 ) {
-  const { limit = 50, page = 1 } = options;
+  const limit = boundedLimit(options.limit, 50);
+  const page = boundedPage(options.page);
   const skip = (page - 1) * limit;
 
   const query = {
@@ -123,9 +126,11 @@ chatMessageSchema.statics.getChatMessages = async function (
     deletedAt: null,
   };
 
+  if (options.includeInternalNotes !== true) query.isInternalNote = { $ne: true };
+
   const [messages, total] = await Promise.all([
     this.find(query)
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .populate("sender", "firstName lastName email role avatar")
@@ -156,6 +161,7 @@ chatMessageSchema.statics.markAsRead = async function (chatId, senderRole) {
     {
       chat: chatId,
       senderRole: oppositeRole,
+      ...(senderRole === "customer" ? { isInternalNote: { $ne: true } } : {}),
       isRead: false,
       deletedAt: null,
     },

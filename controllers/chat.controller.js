@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const ChatService = require("../services/chatService");
 const GuestSession = require("../models/guestSession.model");
 const catchAsync = require("../utils/catchAsync");
@@ -11,19 +12,12 @@ const getGuestSessionId = (req) => {
 // ==================== CUSTOMER OPERATIONS ====================
 
 /**
- * Get upload signature for direct Cloudinary uploads
+ * Retired direct-upload endpoint; new attachments use authorized server uploads
  */
-exports.getUploadSignature = catchAsync(async (req, res, next) => {
-  const { generateUploadSignature } = require("../config/cloudinary");
-  
-  const signature = generateUploadSignature("aura/chat");
-
-  res.status(200).json({
-    status: "success",
-    data: {
-      signature,
-    },
-  });
+exports.getUploadSignature = (_req, res) => res.status(410).json({ status: "fail", message: "Use the chat attachment upload endpoint" });
+exports.uploadAttachment = catchAsync(async (req, res) => {
+  const data = await require("../services/chatUpload.service").uploadAttachment(req.params.id, req.attachmentActor, req.file);
+  res.status(201).json({ status: "success", data });
 });
 
 /**
@@ -55,12 +49,11 @@ exports.startChat = catchAsync(async (req, res, next) => {
 
     if (!guestSession) {
       guestSession = await GuestSession.create({
-        sessionId: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+        sessionId: `guest_${crypto.randomBytes(32).toString("hex")}`,
         email: guestEmail || null,
       });
     } else if (guestEmail && !guestSession.email) {
-      guestSession.email = guestEmail;
-      await guestSession.save();
+      await GuestSession.updateOne({ _id: guestSession._id, email: null }, { $set: { email: guestEmail } });
     }
 
     const chat = await ChatService.createGuestChat(guestSession.sessionId, {
@@ -162,6 +155,11 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   // Ensure either content or attachments is provided
   if ((!content || !content.trim()) && processedAttachments.length === 0) {
     return next(new AppError("Message content or attachments required", 400));
+  }
+
+  if (processedAttachments.length) {
+    const { actorKey, retainAttachments } = require("../services/chatUpload.service");
+    await retainAttachments(req.params.id, actorKey(req.user?._id, guestSessionId), processedAttachments);
   }
 
   const message = await ChatService.sendMessage(
@@ -325,39 +323,38 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
     return next(new AppError("Attachments must be an array", 400));
   }
 
-  // Validate that each attachment has required fields
-  const validAttachments = attachments.filter(att => 
-    att && att.fileName && att.fileUrl && att.fileType && typeof att.fileSize === 'number'
-  );
+  if (attachments.length < 1 || attachments.length > 3 || attachments.some(att =>
+    !att || typeof att.fileName !== "string" || !att.fileName || att.fileName.length > 255 ||
+    typeof att.fileUrl !== "string" || !/^https:\/\//.test(att.fileUrl) || att.fileUrl.length > 2048 ||
+    typeof att.fileType !== "string" || !att.fileType || !Number.isSafeInteger(att.fileSize) || att.fileSize <= 0
+  )) return next(new AppError("Provide 1–3 valid uploaded attachments", 400));
+  const validAttachments = attachments.map(({ fileName, fileUrl, fileType, fileSize }) => ({ fileName, fileUrl, fileType, fileSize }));
 
-  if (validAttachments.length === 0) {
-    return next(new AppError("No valid attachments provided", 400));
-  }
-
-  // Get the message to verify access
   const ChatMessage = require("../models/chatMessage.model");
-  const message = await ChatMessage.findById(messageId).populate('chat');
-
-  if (!message) {
-    return next(new AppError("Message not found", 404));
-  }
-
-  // Verify user has access to this chat
+  const message = await ChatMessage.findOne({ _id: messageId, deletedAt: null }).populate("chat");
+  if (!message?.chat) return next(new AppError("Message not found", 404));
   const chat = message.chat;
-  const isCustomer = req.user && chat.customer?.toString() === req.user._id.toString();
-  const isAdmin = req.user && req.user.role === 'admin';
-  const isGuest = guestSessionId ? await ChatService.authorizeChat(chat._id, null, 'customer', guestSessionId) : false;
+  const authorized = await ChatService.authorizeChat(chat._id, req.user?._id,
+    req.user?.role || "customer", req.user ? null : guestSessionId);
+  if (!authorized) return next(new AppError("You cannot update this message", 403));
 
-  if (!isCustomer && !isAdmin && !isGuest) {
-    return next(new AppError("You don't have permission to update this message", 403));
+  const ownership = { _id: messageId, chat: chat._id, deletedAt: null, isAiGenerated: false };
+  if (req.user) {
+    ownership.sender = req.user._id;
+    ownership.senderRole = req.user.role;
+    ownership.senderGuestSession = null;
+  } else {
+    const guest = await ChatService.resolveGuestSession(guestSessionId);
+    if (!guest) return next(new AppError("You cannot update this message", 403));
+    ownership.senderGuestSession = guest._id;
+    ownership.senderRole = "customer";
   }
-
-  // Update message attachments with real URLs from Cloudinary
-  const updatedMessage = await ChatMessage.findByIdAndUpdate(
-    messageId,
-    { attachments: validAttachments },
-    { new: true, runValidators: true }
-  ).populate('sender', 'firstName lastName email role avatar');
+  // Check authorship in the write predicate, including guests whose sender
+  // placeholder is shared. Chat participation alone does not authorize edits.
+  const updatedMessage = await ChatMessage.findOneAndUpdate(ownership,
+    { $set: { attachments: validAttachments } }, { new: true, runValidators: true })
+    .populate("sender", "firstName lastName email role avatar");
+  if (!updatedMessage) return next(new AppError("Message not found or not authored by you", 404));
 
   // Broadcast update via socket (if socket service available)
   try {

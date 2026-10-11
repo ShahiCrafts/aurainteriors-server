@@ -19,7 +19,7 @@ const keyGenerator = (req, res) => {
     console.error("Error in rate limit keyGenerator:", error.message);
   }
   // Use ipKeyGenerator helper for IPv6 compatibility
-  return ipKeyGenerator(req);
+  return `guest_${ipKeyGenerator(req.ip || req.socket?.remoteAddress || "unknown")}`;
 };
 
 // Rate limiter for chat endpoints

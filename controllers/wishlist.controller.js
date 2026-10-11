@@ -7,6 +7,7 @@ const AppError = require("../utils/AppError");
 exports.getWishlist = catchAsync(async (req, res, next) => {
   let wishlist = await Wishlist.findOne({ user: req.user._id }).populate({
     path: "products.product",
+    match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
     select: "name slug price originalPrice images category rating stock",
     populate: {
       path: "category",
@@ -19,7 +20,7 @@ exports.getWishlist = catchAsync(async (req, res, next) => {
   }
 
   // Transform products to include addedAt at the item level
-  const items = wishlist.products.map((item) => ({
+  const items = wishlist.products.filter(item => item.product).map((item) => ({
     _id: item._id,
     product: item.product,
     addedAt: item.addedAt,
@@ -46,7 +47,7 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
   }
 
   // Verify product exists
-  const product = await Product.findOne({ _id: productId, deletedAt: null });
+  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }

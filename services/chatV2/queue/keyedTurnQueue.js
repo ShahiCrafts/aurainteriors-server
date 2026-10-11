@@ -6,7 +6,9 @@ class KeyedTurnQueue{
   key=String(key);
   const prior=this.tails.get(key)||Promise.resolve();
   const run=prior.catch(()=>{}).then(()=>this.cancelled.has(key)?{cancelled:true}:job());
-  const tail=run.finally(()=>{if(this.tails.get(key)===tail)this.tails.delete(key)});
+  const cleanup=()=>{if(this.tails.get(key)===tail)this.tails.delete(key)};
+  // Internal tail always settles successfully; the caller still receives run rejection.
+  const tail=run.then(cleanup,cleanup);
   this.tails.set(key,tail);
   return run;
  }
