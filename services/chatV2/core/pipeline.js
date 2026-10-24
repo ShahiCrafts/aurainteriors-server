@@ -3,6 +3,7 @@ const { build } = require('./contextBuilder');
 const { schemas, execute } = require('../tools/registry');
 const { guard } = require('./outputGuard');
 const LlmGateway = require('../providers/llmGateway');
+const Semaphore = require('../queue/semaphore');
 
 function collectProductOptions(toolName, value) {
   const rows = toolName === 'searchProducts' && Array.isArray(value) ? value : toolName === 'getProductDetails' && value && !value.error ? [value] : [];
@@ -18,13 +19,29 @@ function collectProductOptions(toolName, value) {
 }
 
 class Pipeline {
-  constructor(config) { this.config = config; this.llm = new LlmGateway(config); }
+  constructor(config) {
+    this.config = config;
+    this.llm = new LlmGateway(config);
+    // AR-13: global bound on concurrent turns (CHAT_MAX_CONCURRENT_TURNS
+    // via loadChatConfig). A limit of 0/absent leaves the semaphore
+    // unbounded — the pre-AR-13 behavior.
+    this.turnSemaphore = new Semaphore(config.maxConcurrentTurns);
+  }
 
   async run(turn) {
     const started = Date.now();
     const r = route(turn.text);
     if (r.kind === 'empty') return { text: r.reply, metrics: { totalMs: Date.now() - started, route: 'empty' } };
 
+    const release = await this.turnSemaphore.acquire();
+    try {
+      return await this._runBounded(turn, started);
+    } finally {
+      release();
+    }
+  }
+
+  async _runBounded(turn, started) {
     try {
       let messages = await build({
         chatId: turn.chatId,

@@ -3,11 +3,20 @@ const ChatService = require("../services/chatService");
 const GuestSession = require("../models/guestSession.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const runtimeContext = require("../services/runtimeContext"); // AR-33: explicit registry, not globals
 
-// Helper to extract guest session ID from request (try multiple sources)
+// Helper to extract guest session ID from request. FA-33: bearer
+// credentials do not belong in URLs (they leak into logs, history and
+// Referer headers). Owner-approved 2026-10-23: the query-string
+// source is OFF by default and accepted only when
+// GUEST_SESSION_ALLOW_QUERY=1 (a legacy escape hatch for a client
+// that provably needs it). Header/cookie/body are always accepted
+// and take precedence. See OWNER_DECISIONS.md (D-3, decided).
 const getGuestSessionId = (req) => {
-  return req.body?.guestSessionId || req.query?.guestSessionId || req.headers?.['x-guest-session-id'] || req.cookies?.guestSessionId;
+  const fromQuery = require("../config/appConfig").getString("GUEST_SESSION_ALLOW_QUERY") === "1" ? req.query?.guestSessionId : undefined;
+  return req.headers?.['x-guest-session-id'] || req.cookies?.guestSessionId || req.body?.guestSessionId || fromQuery;
 };
+exports._getGuestSessionId = getGuestSessionId; // exported for tests
 
 // ==================== CUSTOMER OPERATIONS ====================
 
@@ -24,7 +33,16 @@ exports.uploadAttachment = catchAsync(async (req, res) => {
  * Start a new chat (Customer or Guest)
  */
 exports.startChat = catchAsync(async (req, res, next) => {
-  const { subject, metadata, guestEmail } = req.body;
+  const { subject, guestEmail } = req.body;
+  // FA-39: network metadata is derived server-side, never taken from the
+  // request body (a client could otherwise forge another user's IP/UA).
+  const metadata = {
+    ...(req.body.metadata || {}),
+    userAgent: String(req.get?.("user-agent") || "").slice(0, 512),
+    ipAddress: req.ip || "",
+    referrer: String(req.get?.("referer") || req.get?.("referrer") || "").slice(0, 512),
+  };
+
 
   if (req.isAuthenticated) {
     // Authenticated user
@@ -146,11 +164,14 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   const { content, attachments, clientMessageId } = req.body;
   const guestSessionId = getGuestSessionId(req);
 
-  // Attachments now come pre-processed from the frontend (Cloudinary URLs)
-  // Just validate and pass through
-  const processedAttachments = attachments && Array.isArray(attachments) 
-    ? attachments.filter(att => att && att.fileUrl && att.fileName)
-    : [];
+  // FA-14: attachments are validated with the SAME strict rules the
+  // update-attachments path enforces (https only, bounded fields, max 3) -
+  // previously any object with a truthy fileUrl/fileName was passed through.
+  const { validateChatAttachments } = require("../utils/chatAttachments");
+  const processedAttachments = attachments === undefined ? [] : validateChatAttachments(attachments);
+  if (processedAttachments === null) {
+    return next(new AppError("Provide valid uploaded attachments (max 3, https URLs)", 400));
+  }
 
   // Ensure either content or attachments is provided
   if ((!content || !content.trim()) && processedAttachments.length === 0) {
@@ -323,12 +344,10 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
     return next(new AppError("Attachments must be an array", 400));
   }
 
-  if (attachments.length < 1 || attachments.length > 3 || attachments.some(att =>
-    !att || typeof att.fileName !== "string" || !att.fileName || att.fileName.length > 255 ||
-    typeof att.fileUrl !== "string" || !/^https:\/\//.test(att.fileUrl) || att.fileUrl.length > 2048 ||
-    typeof att.fileType !== "string" || !att.fileType || !Number.isSafeInteger(att.fileSize) || att.fileSize <= 0
-  )) return next(new AppError("Provide 1–3 valid uploaded attachments", 400));
-  const validAttachments = attachments.map(({ fileName, fileUrl, fileType, fileSize }) => ({ fileName, fileUrl, fileType, fileSize }));
+  // FA-14: shared strict validator (utils/chatAttachments).
+  const { validateChatAttachments } = require("../utils/chatAttachments");
+  const validAttachments = validateChatAttachments(attachments);
+  if (!validAttachments || validAttachments.length < 1) return next(new AppError("Provide 1–3 valid uploaded attachments", 400));
 
   const ChatMessage = require("../models/chatMessage.model");
   const message = await ChatMessage.findOne({ _id: messageId, deletedAt: null }).populate("chat");
@@ -353,19 +372,20 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
   // placeholder is shared. Chat participation alone does not authorize edits.
   const updatedMessage = await ChatMessage.findOneAndUpdate(ownership,
     { $set: { attachments: validAttachments } }, { new: true, runValidators: true })
-    .populate("sender", "firstName lastName email role avatar");
+    .populate("sender", "firstName lastName role avatar"); // FA-58: no sender email to chat participants
   if (!updatedMessage) return next(new AppError("Message not found or not authored by you", 404));
 
-  // Broadcast update via socket (if socket service available)
+  // Broadcast update via socket. S-9/AR-07: the previous code required
+  // ../services/socketService, which does not exist anywhere in the
+  // repo - the require threw on every call, the broadcast never fired,
+  // and the catch logged "Failed to broadcast socket update". Emit
+  // through the real gateway, the way every other chat broadcast does.
   try {
-    const socketService = require('../services/socketService');
-    if (socketService && socketService.broadcastChatUpdate) {
-      socketService.broadcastChatUpdate(chat._id.toString(), {
-        type: 'message:attachments:updated',
-        message: updatedMessage,
-        messageId: messageId.toString(),
-      });
-    }
+    runtimeContext.getIo()?.to(`chat:${chat._id.toString()}`).emit('message:attachments:updated', { // AR-33: registry, not global.notificationGateway
+      chatId: chat._id.toString(),
+      message: updatedMessage,
+      messageId: messageId.toString(),
+    });
   } catch (error) {
     console.error("Failed to broadcast socket update:", error.message);
     // Don't fail the response if socket broadcast fails

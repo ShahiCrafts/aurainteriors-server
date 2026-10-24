@@ -1,4 +1,5 @@
 const multer = require("multer");
+const nosqlSanitize = require("./nosqlSanitize.middleware");
 const ChatService = require("../services/chatService");
 const { actorKey } = require("../services/chatUpload.service");
 const { MAX_ATTACHMENT_BYTES, MIME_TYPES } = require("../utils/chatAttachmentPolicy");
@@ -14,9 +15,15 @@ exports.authorizeUpload = catchAsync(async (req, res, next) => {
   next();
 });
 const receive = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1, fields: 0 },
-  fileFilter: (_req, file, cb) => cb(MIME_TYPES.includes(file.mimetype) ? null : new AppError("Unsupported attachment type", 400), MIME_TYPES.includes(file.mimetype)),
+  fileFilter: (_req, file, cb) => {
+    // One decision, stated once (B-07): pass either an error or an
+    // accept flag, not a redundant pair computed twice.
+    if (MIME_TYPES.includes(file.mimetype)) return cb(null, true);
+    return cb(new AppError("Unsupported attachment type", 400), false);
+  },
 }).single("file");
 exports.receiveAttachment = (req, res, next) => receive(req, res, error => {
   if (error) return next(new AppError(error.code === "LIMIT_FILE_SIZE" ? "Attachments must be at most 10 MB" : "Invalid attachment upload", 400));
-  next();
+  // FA-61: multipart body exists only now - re-run the operator-key check.
+  return nosqlSanitize(req, res, next);
 });

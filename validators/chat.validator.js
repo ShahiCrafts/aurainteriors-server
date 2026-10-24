@@ -9,11 +9,10 @@ exports.startChatSchema = Joi.object({
     "string.max": "Subject cannot exceed 200 characters",
   }),
   guestEmail: Joi.string().email().max(254).lowercase().trim().optional(),
-  metadata: Joi.object({
-    userAgent: Joi.string().optional(),
-    ipAddress: Joi.string().ip().optional(),
-    referrer: Joi.string().uri().allow('').optional(),
-  }).optional(),
+  // FA-39: userAgent / ipAddress / referrer are NOT accepted from the
+  // client - the server derives them from the request (see startChat).
+  // stripUnknown drops them if a client sends them anyway.
+  metadata: Joi.object({}).optional(),
   guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
 });
 

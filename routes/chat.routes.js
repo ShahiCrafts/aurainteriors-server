@@ -1,6 +1,11 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const objectIdParam = require("../middleware/objectIdParam.middleware");
 const { authorizeUpload, receiveAttachment } = require("../middleware/chatUpload.middleware");
 const express = require("express");
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
+router.param("id", objectIdParam);
 const chatController = require("../controllers/chat.controller");
 const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const { chatRateLimit, sendMessageRateLimit, startChatRateLimit } = require("../middleware/rateLimit.middleware");

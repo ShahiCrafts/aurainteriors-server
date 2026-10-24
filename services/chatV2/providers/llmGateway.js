@@ -1,6 +1,16 @@
 const CircuitBreaker=require('./circuitBreaker');
 const breaker=new CircuitBreaker();
 function timeoutSignal(ms){const c=new AbortController();const id=setTimeout(()=>c.abort(new Error('timeout')),Math.max(1,ms));return{controller:c,signal:c.signal,clear:()=>clearTimeout(id)}}
+// FA-06: overall deadline for one provider completion (env-configurable,
+// default 120s). Generous enough for normal model latency; it exists so a
+// silently stalled provider cannot hold a chat's turn queue forever.
+function streamDeadlineMs(){const n=Number(require("../../../config/appConfig").getInt("CHAT_LLM_STREAM_TIMEOUT_MS"));return Number.isFinite(n)&&n>0?n:120000}
+// AR-13: jittered backoff between provider attempts (100ms doubling,
+// capped at 1s, plus up to 100ms of jitter). It only SPACES retries —
+// outcomes are unchanged — so a recovering provider is not hit by the
+// next provider's traffic pattern in lockstep and failovers do not
+// thundering-herd the fallback.
+function providerBackoff(attempt){const base=Math.min(1000,100*2**attempt);const ms=base+Math.floor(Math.random()*100);return new Promise(r=>setTimeout(r,ms))}
 
 function accumulateToolCall(calls, tc){
  const index=Number.isInteger(tc.index)?tc.index:calls.size;
@@ -16,7 +26,8 @@ class LlmGateway{
  constructor(config){this.config=config}
  async complete({messages,tools,onToken}){
   let last;
-  for(const p of this.config.providers){
+  for(let attempt=0;attempt<this.config.providers.length;attempt++){
+   const p=this.config.providers[attempt];
    const key=`${p.name}:${p.model}`;if(!breaker.canTry(key))continue;
    try{
     const out=await this._stream(p,key,{messages,tools,onToken});
@@ -39,42 +50,54 @@ class LlmGateway{
     }
     return out;
    }
-   catch(e){last=e;console.warn('chat_llm_provider_failed',{provider:p.name,model:p.model,code:e?.code||null,error:e?.message});if(!e.breakerRecorded)breaker.failure(key)}
+   catch(e){last=e;console.warn('chat_llm_provider_failed',{provider:p.name,model:p.model,code:e?.code||null,error:e?.message});if(!e.breakerRecorded)breaker.failure(key);if(attempt<this.config.providers.length-1)await providerBackoff(attempt)}
   }
   throw last||new Error('No healthy AI provider available');
  }
 
  async _completeJson(p,key,{messages,tools}){
-  const res=await fetch(`${p.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${p.apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model:p.model,messages,tools,tool_choice:'auto',temperature:this.config.temperature,max_tokens:this.config.maxTokens,stream:false})});
+  const deadline=timeoutSignal(streamDeadlineMs());
+  try{
+  const res=await fetch(`${p.baseUrl}/chat/completions`,{signal:deadline.signal,method:'POST',headers:{Authorization:`Bearer ${p.apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model:p.model,messages,tools,tool_choice:'auto',temperature:this.config.temperature,max_tokens:this.config.maxTokens,stream:false})});
   if(res.status===401||res.status===403){breaker.failure(key,{fatal:true});const e=new Error(`${p.name} authentication failed`);e.breakerRecorded=true;throw e}
   if(res.status===429){const seconds=Number(res.headers.get('retry-after'));breaker.failure(key,{retryAfterMs:Number.isFinite(seconds)?seconds*1000:0});const e=new Error(`${p.name} rate limited`);e.breakerRecorded=true;throw e}
   if(!res.ok)throw new Error(`${p.name} HTTP ${res.status}`);
   const body=await res.json();
   const choice=body?.choices?.[0]||{};
   const message=choice.message||{};
+  // AR-13: a successful JSON completion records breaker success, like
+  // _stream does — previously only the stream path recorded it, so a
+  // successful recovery through this path left the failure count (and
+  // any half-open probe claim) untouched.
+  breaker.success(key);
   return{provider:p.name,model:p.model,message:{role:'assistant',content:typeof message.content==='string'?message.content:'',tool_calls:Array.isArray(message.tool_calls)&&message.tool_calls.length?message.tool_calls:undefined},usage:body?.usage||null,finishReason:choice.finish_reason||null};
+  }finally{deadline.clear()}
  }
 
  async _stream(p,key,{messages,tools,onToken}){
   let res;
-  // Deliberately no application response deadline/AbortController here. A valid
-  // model turn is allowed to finish naturally; UI communicates progress via
-  // ai:thinking_start/stop rather than converting normal model latency to errors.
-  try{res=await fetch(`${p.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${p.apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model:p.model,messages,tools,tool_choice:'auto',temperature:this.config.temperature,max_tokens:this.config.maxTokens,stream:true,stream_options:{include_usage:true}})})}catch(e){throw e}
+  // FA-06: an overall stream deadline (streamDeadlineMs, default 120s,
+  // env CHAT_LLM_STREAM_TIMEOUT_MS) aborts a silently stalled provider so
+  // it cannot wedge the per-chat turn queue. Normal model latency is well
+  // inside the deadline; progress is still communicated via ai:thinking_*.
+  const deadline=timeoutSignal(streamDeadlineMs());
+  try{res=await fetch(`${p.baseUrl}/chat/completions`,{signal:deadline.signal,method:'POST',headers:{Authorization:`Bearer ${p.apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model:p.model,messages,tools,tool_choice:'auto',temperature:this.config.temperature,max_tokens:this.config.maxTokens,stream:true,stream_options:{include_usage:true}})})}catch(e){deadline.clear();throw e}
   if(res.status===401||res.status===403){breaker.failure(key,{fatal:true});const e=new Error(`${p.name} authentication failed`);e.breakerRecorded=true;throw e}
   if(res.status===429){const seconds=Number(res.headers.get('retry-after'));breaker.failure(key,{retryAfterMs:Number.isFinite(seconds)?seconds*1000:0});const e=new Error(`${p.name} rate limited`);e.breakerRecorded=true;throw e}
   if(!res.ok)throw new Error(`${p.name} HTTP ${res.status}`)
-  const reader=res.body?.getReader();if(!reader)throw new Error(`${p.name} missing stream body`)
+  const reader=res.body?.getReader();if(!reader){deadline.clear();throw new Error(`${p.name} missing stream body`)}
+  deadline.signal.addEventListener('abort',()=>{try{reader.cancel()}catch{}},{once:true});
   const decoder=new TextDecoder();let buf='',content='',usage=null,finishReason=null;const calls=new Map();
   const event=chunk=>{usage=chunk.usage||usage;const choice=chunk.choices?.[0];if(!choice)return;finishReason=choice.finish_reason||finishReason;const d=choice.delta||{};if(d.content){content+=d.content;onToken?.(d.content)}for(const tc of d.tool_calls||[])accumulateToolCall(calls,tc)};
-  while(true){const {done,value}=await reader.read();if(done)break;buf+=decoder.decode(value,{stream:true});buf=parseSse(buf,event)}
+  try{while(true){const {done,value}=await reader.read();if(done)break;buf+=decoder.decode(value,{stream:true});buf=parseSse(buf,event)}
   buf+=decoder.decode();
   buf=parseSse(buf,event);
   // Some compatible providers close the stream without a final blank line.
   // Parse the remaining complete data line rather than silently discarding it.
   if(buf.trim()){for(const line of buf.split(/\r?\n/)){if(!line.startsWith('data:'))continue;const data=line.slice(5).trim();if(data&&data!=='[DONE]')event(JSON.parse(data));}}
+  if(deadline.signal.aborted){const e=new Error(`${p.name} stream deadline exceeded`);e.code='STREAM_TIMEOUT';throw e}
   breaker.success(key);return{provider:p.name,model:p.model,message:{role:'assistant',content,tool_calls:calls.size?[...calls.values()]:undefined},usage,finishReason};
+  }catch(e){if(deadline.signal.aborted&&e.code!=='STREAM_TIMEOUT'){const t=new Error(`${p.name} stream deadline exceeded`);t.code='STREAM_TIMEOUT';throw t}throw e}finally{deadline.clear()}
  }
 }
-async function validateConfiguredModels(config,{timeoutMs=900}={}){const results=[];await Promise.all(config.providers.map(async p=>{try{const t=timeoutSignal(timeoutMs);const r=await fetch(`${p.baseUrl}/models`,{signal:t.signal,headers:{Authorization:`Bearer ${p.apiKey}`}});t.clear();if(!r.ok){results.push({provider:p.name,ok:false,status:r.status});return}const body=await r.json();const ids=new Set((body.data||[]).map(x=>x.id));results.push({provider:p.name,ok:ids.has(p.model),model:p.model})}catch(e){results.push({provider:p.name,ok:false,error:e.name})}}));return results}
-module.exports=LlmGateway;module.exports.validateConfiguredModels=validateConfiguredModels;module.exports._parseSse=parseSse;module.exports._accumulateToolCall=accumulateToolCall;
+module.exports=LlmGateway;module.exports._parseSse=parseSse;module.exports._accumulateToolCall=accumulateToolCall;

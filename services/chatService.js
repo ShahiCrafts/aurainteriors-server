@@ -4,15 +4,180 @@ const GuestSession = require("../models/guestSession.model");
 const AppError = require("../utils/AppError");
 const notificationEventEmitter = require("./notificationEventEmitter");
 const User = require("../models/user.model");
+const runtimeContext = require("./runtimeContext"); // AR-33: explicit registry, not globals
+
+// FA-07 (FRESH) / AR-30: the chatV2 turn identity, extracted from the
+// v2 dispatcher's inline turn context so it can be unit-tested.
+// userId comes from the chat's server-side customer record only (null
+// for guest chats); guestSessionId travels separately as a lookup
+// throttle key (FA-13) and is never an account identity.
+function buildV2TurnIdentity({ customer, guestSessionId = null }) {
+  return {
+    userId: customer ? String(customer) : null,
+    guestSessionId: guestSessionId || null,
+  };
+}
+
+// FA-34 (FRESH): chat-existence oracle. For non-admin callers, an
+// unauthorized chat must be indistinguishable from a missing one (404);
+// admins keep an explicit 403.
+function denyChatAccess(userRole) {
+  if (userRole === "admin") throw new AppError("You are not authorized for this chat", 403);
+  throw new AppError("Chat not found", 404);
+}
+
+// AR-38: ONE bookkeeping path for every persisted message. Extracted
+// from sendMessage so the chatV2 bot job runs the SAME updates the
+// legacy pipeline got by sending bot replies through sendMessage:
+// lastMessageAt (chat-list ordering), per-role lastRead markers,
+// markAsRead for bot replies, and the chat:messages:read broadcast.
+// Returns didReopen (a customer message reopening a resolved/closed
+// chat), which sendMessage needs for its system-message block.
+async function applyMessageBookkeeping(chat, chatId, senderRole, senderId) {
+  // Update chat based on sender role.
+  // CHAT-FIXES-8 Fix 1: Use timestamp-based read tracking instead of static counters.
+  // Unread counts are now derived dynamically: count(messages.createdAt > lastReadAt).
+  const now = new Date();
+  const updateData = {
+    lastMessageAt: now,
+  };
+
+  let didReopen = false;
+
+  if (senderRole === "customer") {
+    // When the customer sends, they've implicitly read up to now
+    updateData.lastReadCustomerAt = now;
+    updateData.customerTyping = false;
+
+    // CHAT-FIXES-9 Fix 1: Reopen resolved/closed chat to ai_handling, reactivating AI bot
+    if (["resolved", "closed"].includes(chat.status)) {
+      updateData.status = "ai_handling";
+      updateData.metadata = {
+        ...(chat.metadata || {}),
+        botActive: true,
+      };
+      didReopen = true;
+    }
+  } else if (senderRole === "bot") {
+    // Bot reply — bot has read the customer's messages!
+    updateData.lastReadAdminAt = now;
+
+    // Mark all customer messages in this chat as read
+    await ChatMessage.markAsRead(chatId, "admin");
+
+    // Broadcast read status via socket so customer's client knows it's read/seen
+    if (runtimeContext.getNotificationGateway()) {
+      const roomId = chatId.toString();
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:messages:read", {
+        chatId: roomId,
+        userId: senderId,
+        userRole: "admin",
+      });
+    }
+  } else {
+    // Human admin reply — admin has seen the conversation up to now
+    updateData.lastReadAdminAt = now;
+    updateData.adminTyping = false;
+    updateData.metadata = {
+      ...(chat.metadata || {}),
+      botActive: false,
+    };
+    if (["ai_handling", "escalated", "waiting", "active"].includes(chat.status)) {
+      updateData.status = "agent_handling";
+    }
+  }
+
+  Chat.updateOne({ _id: chatId }, { $set: updateData }).catch((error) => {
+    console.error("Chat metadata update failed:", error.message);
+  });
+
+  return didReopen;
+}
+
+// AR-16: response-time aggregation for getChatStats. The ORIGINAL
+// pipeline aggregated over chats and $lookup-ed the ENTIRE
+// chatmessages collection per chat, $filter-ing in memory — cost grew
+// with total message volume. This pipeline aggregates over
+// chatmessages instead: $match admin messages (fully index-supported
+// once the owner runs MIGRATIONS.md M-5, {senderRole:1, chat:1,
+// createdAt:1}; correct without it via the {chat, createdAt} index),
+// sort per chat by
+// createdAt, $group $first = the chat's first admin reply, then a SMALL
+// $lookup against chats (one document per chat WITH an admin reply, not
+// per message) for the chat's createdAt + status/deletedAt filter, and
+// $avg. Definition note: "first admin message" here means the EARLIEST
+// by createdAt; the original took the first element of the $lookup
+// array (unspecified order — in practice insertion order). The two
+// coincide on data inserted in createdAt order (asserted by the
+// real-mongod fixture probe, tests/platform/ar16-chat-stats.test.js).
+function firstAdminResponsePipeline() {
+  return [
+    { $match: { senderRole: "admin" } },
+    { $sort: { chat: 1, createdAt: 1 } },
+    { $group: { _id: "$chat", firstAdminAt: { $first: "$createdAt" } } },
+    {
+      $lookup: {
+        from: "chats",
+        localField: "_id",
+        foreignField: "_id",
+        as: "chatDoc",
+      },
+    },
+    { $unwind: "$chatDoc" },
+    {
+      $match: {
+        "chatDoc.status": { $in: ["ai_handling", "escalated", "agent_handling", "resolved", "closed"] },
+        "chatDoc.deletedAt": null,
+      },
+    },
+    {
+      $project: {
+        responseTime: { $subtract: ["$firstAdminAt", "$chatDoc.createdAt"] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        avgResponseTime: { $avg: "$responseTime" },
+      },
+    },
+  ];
+}
 
 class ChatService {
 
   async resolveGuestSession(guestSessionId) {
     // Only a high-entropy public capability grants access; Mongo IDs are not credentials.
     if (typeof guestSessionId !== "string" || !/^guest_[a-f0-9]{64}$/.test(guestSessionId)) return null;
-    return GuestSession.findOne({ sessionId: guestSessionId,
-      createdAt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-    }).select("_id sessionId email").lean();
+    // AR-41: validity (and the model's TTL index) anchor to CREATION,
+    // so an actively chatting guest loses their session exactly 24h
+    // after it was minted. GUEST_SESSION_TTL_MODE=activity anchors
+    // validity to lastActivityAt instead (default preserves current
+    // behavior) - flip it together with the TTL re-anchor in
+    // MIGRATIONS.md M-2, in the order documented there.
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activityAnchored = require("../config/appConfig").getString("GUEST_SESSION_TTL_MODE") === "activity";
+    const session = await GuestSession.findOne({
+      sessionId: guestSessionId,
+      ...(activityAnchored ? { lastActivityAt: { $gt: cutoff } } : { createdAt: { $gt: cutoff } }),
+    }).select("_id sessionId email lastActivityAt").lean();
+    if (session) {
+      // AR-41: keep lastActivityAt honest on the hot path. It was
+      // previously set only at creation, by the pre-save hook, and
+      // when a chat is created - the resolve path (every guest
+      // message / socket handshake) never touched it, so an
+      // activity-anchored TTL would have had nothing to anchor to.
+      // Throttled (at most one write per session per 5 minutes),
+      // conditional (racing touches are harmless), fire-and-forget.
+      const staleBefore = new Date(Date.now() - 5 * 60 * 1000);
+      if (!session.lastActivityAt || session.lastActivityAt < staleBefore) {
+        GuestSession.updateOne(
+          { _id: session._id, lastActivityAt: { $lt: staleBefore } },
+          { $set: { lastActivityAt: new Date() } }
+        ).catch((error) => console.error("Guest session activity touch failed:", error.message));
+      }
+    }
+    return session;
   }
 
   async createChat(customerId, data = {}) {
@@ -198,10 +363,16 @@ class ChatService {
     // Authorization check
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to view this chat", 403);
+      denyChatAccess(userRole);
     }
 
-    return this.enrichChatWithUnreadCounts(chat);
+    const enriched = await this.enrichChatWithUnreadCounts(chat);
+    // FA-58: the customer's email is staff-only data; other participants
+    // (including the customer and guests) do not receive it here.
+    if (userRole !== "admin" && enriched.customer && typeof enriched.customer === "object") {
+      delete enriched.customer.email;
+    }
+    return enriched;
   }
 
   async getCustomerChats(customerId, options = {}) {
@@ -222,7 +393,16 @@ class ChatService {
   }
 
   async sendMessage(chatId, senderId, senderRole, data = {}, guestSessionId = null) {
-    const { content, attachments, isInternalNote, clientMessageId } = data;
+    const { content, isInternalNote, clientMessageId } = data;
+    // FA-14: attachments are re-validated at the persistence sink with the
+    // same strict rules as the update path - a caller bypassing the
+    // controller cannot persist arbitrary attachment URLs.
+    let attachments = data.attachments;
+    if (attachments !== undefined) {
+      const { validateChatAttachments } = require("../utils/chatAttachments");
+      attachments = validateChatAttachments(attachments);
+      if (attachments === null) throw new AppError("Invalid attachments", 400);
+    }
     if (isInternalNote && senderRole !== "admin") throw new AppError("Only admins can create internal notes", 403);
     const GuestUserService = require("./guestUserService");
 
@@ -238,7 +418,7 @@ class ChatService {
     // Authorization check for message sender
     const isAuthorized = await this.authorizeChat(chatId, senderId, senderRole, guestSessionId, chat);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to message this chat", 403);
+      denyChatAccess(senderRole);
     }
 
     // For guest customers without senderId, use the system guest user placeholder
@@ -246,7 +426,7 @@ class ChatService {
     let senderGuestSession;
     if (senderRole === 'customer' && !senderId && guestSessionId) {
       const guest = await this.resolveGuestSession(guestSessionId);
-      if (!guest) throw new AppError("Invalid guest session", 403);
+      if (!guest) denyChatAccess(senderRole);
       senderGuestSession = guest._id;
       actualSenderId = await GuestUserService.getGuestUserId();
     }
@@ -283,68 +463,15 @@ class ChatService {
 
     if (isInternalNote) {
       await message.populate("sender", "firstName lastName role avatar");
-      global.notificationGateway?.io.to(`chat:${chatId}:admins`).emit("chat:message:new", {
+      runtimeContext.getNotificationGateway()?.io.to(`chat:${chatId}:admins`).emit("chat:message:new", {
         chatId: String(chatId), message: message.toObject(), timestamp: new Date(),
       });
       return message.toObject();
     }
 
-    // Update chat based on sender role.
-    // CHAT-FIXES-8 Fix 1: Use timestamp-based read tracking instead of static counters.
-    // Unread counts are now derived dynamically: count(messages.createdAt > lastReadAt).
-    const now = new Date();
-    const updateData = {
-      lastMessageAt: now,
-    };
-
-    let didReopen = false;
-
-    if (senderRole === "customer") {
-      // When the customer sends, they've implicitly read up to now
-      updateData.lastReadCustomerAt = now;
-      updateData.customerTyping = false;
-
-      // CHAT-FIXES-9 Fix 1: Reopen resolved/closed chat to ai_handling, reactivating AI bot
-      if (["resolved", "closed"].includes(chat.status)) {
-        updateData.status = "ai_handling";
-        updateData.metadata = {
-          ...(chat.metadata || {}),
-          botActive: true,
-        };
-        didReopen = true;
-      }
-    } else if (senderRole === "bot") {
-      // Bot reply — bot has read the customer's messages!
-      updateData.lastReadAdminAt = now;
-      
-      // Mark all customer messages in this chat as read
-      await ChatMessage.markAsRead(chatId, "admin");
-
-      // Broadcast read status via socket so customer's client knows it's read/seen
-      if (global.notificationGateway) {
-        const roomId = chatId.toString();
-        global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:messages:read", {
-          chatId: roomId,
-          userId: senderId,
-          userRole: "admin",
-        });
-      }
-    } else {
-      // Human admin reply — admin has seen the conversation up to now
-      updateData.lastReadAdminAt = now;
-      updateData.adminTyping = false;
-      updateData.metadata = {
-        ...(chat.metadata || {}),
-        botActive: false,
-      };
-      if (["ai_handling", "escalated", "waiting", "active"].includes(chat.status)) {
-        updateData.status = "agent_handling";
-      }
-    }
-
-    const chatUpdatePromise = Chat.updateOne({ _id: chatId }, { $set: updateData }).catch((error) => {
-      console.error("Chat metadata update failed:", error.message);
-    });
+    // AR-38: shared bookkeeping (see applyMessageBookkeeping above) -
+    // the chatV2 bot job runs the same path for bot replies.
+    const didReopen = await applyMessageBookkeeping(chat, chatId, senderRole, senderId);
 
     // If customer message reopened the chat, post a system message about AI reactivated
     if (didReopen) {
@@ -361,9 +488,9 @@ class ChatService {
             content: "Conversation reopened. AI Assistant has been reactivated to assist you.",
             deliveredAt: new Date(),
           });
-          if (global.notificationGateway) {
-            const populated = await sysMsg.populate("sender", "firstName lastName email role avatar");
-            global.notificationGateway.io.to(`chat:${chatId.toString()}`).emit("chat:message:new", {
+          if (runtimeContext.getNotificationGateway()) {
+            const populated = await sysMsg.populate("sender", "firstName lastName role avatar");
+            runtimeContext.getNotificationGateway().io.to(`chat:${chatId.toString()}`).emit("chat:message:new", {
               chatId: chatId.toString(),
               message: populated.toObject(),
               timestamp: new Date(),
@@ -377,13 +504,13 @@ class ChatService {
     }
 
     // Broadcast message via socket if gateway is available
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const messageData = message.toObject();
       const roomId = chatId.toString();
 
       console.log(`Broadcasting message to room chat:${roomId}`);
 
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:message:new", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:message:new", {
         chatId: roomId,
         message: messageData,
         timestamp: new Date(),
@@ -391,13 +518,13 @@ class ChatService {
 
       // Broadcast status change socket events
       if (didReopen) {
-        global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:status:changed", {
+        runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:status:changed", {
           chatId: roomId,
           status: "ai_handling",
           botActive: true,
         });
       } else if (senderRole === "admin" && ["ai_handling", "escalated", "waiting", "active"].includes(chat.status)) {
-        global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:status:changed", {
+        runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:status:changed", {
           chatId: roomId,
           status: "agent_handling",
           botActive: false,
@@ -409,86 +536,68 @@ class ChatService {
     // Wait: if it reopened, the bot is active now, so it should trigger!
     const updatedBotActive = didReopen ? true : (!chat.metadata || chat.metadata.botActive !== false);
     if (senderRole === "customer" && updatedBotActive) {
-      if (process.env.CHAT_PIPELINE !== "legacy") {
-        const { queue, pipeline } = require("./chatV2");
-        const retrievalService = require("./retrievalService");
-        const roomId = chatId.toString();
-        queue.resume(roomId);
-        queue.enqueue(roomId, async () => {
-          const latest = await Chat.findById(chatId).select("status metadata customer").lean();
-          if (!latest || latest.status === "agent_handling" || latest.status === "closed") return;
-          const emit = (event, payload = {}) => global.notificationGateway?.io.to(`chat:${roomId}`).emit(event, { chatId: roomId, ...payload });
-          let thinkingStarted = false;
-          try {
-            emit("ai:thinking_start");
-            thinkingStarted = true;
-            const result = await pipeline.run({
-              chatId, text: content, productOptions: latest.metadata?.lastProductOptions || [],
-              context: {
-                userId: latest.customer?.toString() || null,
-                handoff: async (reason) => {
-                  await Chat.updateOne({ _id: chatId, status: "ai_handling" }, { $set: { status: "escalated", "metadata.botActive": false, "metadata.handoffReason": String(reason).slice(0,500) } });
-                  queue.cancel(roomId);
-                  emit("chat:status:changed", { status: "escalated", botActive: false });
-                  return { ok: true, status: "escalated" };
-                },
-                retrieve: async (query) => retrievalService.retrieveContext(query, { timeoutMs: 250 }),
-              },
-              onToken: null,
-            });
-            if (Array.isArray(result.productOptions) && result.productOptions.length) {
-              await Chat.updateOne({ _id: chatId }, { $set: { 'metadata.lastProductOptions': result.productOptions.slice(0, 5) } });
-            }
-            const stillAi = await Chat.exists({ _id: chatId, status: "ai_handling" });
-            if (!stillAi) return;
-            const botMessage = await ChatMessage.create({ chat: chatId, senderRole: "bot", messageType: "text", isAiGenerated: true, content: result.text, deliveredAt: new Date() });
-            emit("chat:message:new", { message: botMessage.toObject() });
-            emit("ai:complete", { messageId: botMessage._id, degraded: !!result.degraded });
-          } catch (error) {
-            emit("ai:error", { message: "Assistant temporarily unavailable" });
-          } finally {
-            if (thinkingStarted) emit("ai:thinking_stop");
-          }
-        }).catch(error => console.error("chat_v2_turn_failed", { chatId: roomId, error: error.message }));
-        return message.toObject();
-      }
-      (async () => {
+      // AR-30 (D-B): the legacy chatOrchestrator pipeline was removed —
+      // chatV2 is the only pipeline and CHAT_PIPELINE is inert.
+      // Rollback is the git tag `pre-legacy-chat-removal`.
+      const { queue, pipeline } = require("./chatV2");
+      const retrievalService = require("./retrievalService");
+      const roomId = chatId.toString();
+      queue.resume(roomId);
+      queue.enqueue(roomId, async () => {
+        const latest = await Chat.findById(chatId).select("status metadata customer").lean();
+        if (!latest || latest.status === "agent_handling" || latest.status === "closed") return;
+        const emit = (event, payload = {}) => runtimeContext.getNotificationGateway()?.io.to(`chat:${roomId}`).emit(event, { chatId: roomId, ...payload });
+        let thinkingStarted = false;
         try {
-          // Get admin/bot user record (system agent)
-          const botUser = await User.findOne({ role: "admin" }).select("_id email");
-          const botUserId = botUser ? botUser._id : actualSenderId;
-
-          // AI reads the customer's message right before processing it
-          await ChatMessage.markAsRead(chatId, "admin");
-          await Chat.findByIdAndUpdate(chatId, { lastReadAdminAt: new Date() });
-
-          if (global.notificationGateway) {
-            const roomId = chatId.toString();
-            global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:messages:read", {
+          emit("ai:thinking_start");
+          thinkingStarted = true;
+          const result = await pipeline.run({
+            chatId, text: content, productOptions: latest.metadata?.lastProductOptions || [],
+            context: {
+              // FA-07/FA-13: identity fields come from
+              // buildV2TurnIdentity — the chat's server-side customer
+              // record (null for guests) plus the guest session id
+              // carried separately as the registry's lookup-throttle
+              // key (commit-audit C-4); never from the model.
+              ...buildV2TurnIdentity({ customer: latest.customer, guestSessionId }),
               chatId: roomId,
-              userId: botUserId,
-              userRole: "admin",
-            });
+              handoff: async (reason) => {
+                await Chat.updateOne({ _id: chatId, status: "ai_handling" }, { $set: { status: "escalated", "metadata.botActive": false, "metadata.handoffReason": String(reason).slice(0,500) } });
+                queue.cancel(roomId);
+                emit("chat:status:changed", { status: "escalated", botActive: false });
+                return { ok: true, status: "escalated" };
+              },
+              // AR-39: the RAG embedding budget is configurable via
+              // RAG_EMBEDDING_TIMEOUT_MS (see retrievalService
+              // .embeddingTimeoutMs); its default is 250 — the value
+              // that used to be hard-coded here.
+              retrieve: async (query) => retrievalService.retrieveContext(query, { timeoutMs: retrievalService.embeddingTimeoutMs() }),
+            },
+            onToken: null,
+          });
+          if (Array.isArray(result.productOptions) && result.productOptions.length) {
+            await Chat.updateOne({ _id: chatId }, { $set: { 'metadata.lastProductOptions': result.productOptions.slice(0, 5) } });
           }
-
-          // Call Orchestrator — it owns the ai:thinking_start/stop/error indicator lifecycle
-          const chatOrchestrator = require("./chatOrchestrator");
-          const customerUser = await User.findById(actualSenderId).select("email");
-          const customerEmail = customerUser ? customerUser.email : null;
-          const customerId = actualSenderId ? actualSenderId.toString() : null;
-
-          const responseText = await chatOrchestrator.handleUserMessage(
-            chatId, content, customerEmail, customerId
-          );
-
-          // Bot response: only pass guestSessionId if this is a guest chat
-          await this.sendMessage(chatId, botUserId, "bot", {
-            content: responseText
-          }, senderRole === 'customer' && !senderId ? guestSessionId : null);
+          const stillAi = await Chat.exists({ _id: chatId, status: "ai_handling" });
+          if (!stillAi) return;
+          const botMessage = await ChatMessage.create({ chat: chatId, senderRole: "bot", messageType: "text", isAiGenerated: true, content: result.text, deliveredAt: new Date() });
+          // AR-38: the v2 job previously skipped sendMessage's
+          // bookkeeping entirely - lastMessageAt stayed at the
+          // customer's message (chat lists mis-ordered), the bot
+          // never marked the customer's messages read, and no
+          // chat:messages:read was broadcast. Run the shared path;
+          // the bot message stays sender-less in storage, so the
+          // read broadcast carries userId null (see CLIENT_IMPACT.md).
+          await applyMessageBookkeeping(latest, chatId, "bot", null);
+          emit("chat:message:new", { message: botMessage.toObject() });
+          emit("ai:complete", { messageId: botMessage._id, degraded: !!result.degraded });
         } catch (error) {
-          console.error("Chatbot processing error:", error.message);
+          emit("ai:error", { message: "Assistant temporarily unavailable" });
+        } finally {
+          if (thinkingStarted) emit("ai:thinking_stop");
         }
-      })();
+      }).catch(error => console.error("chat_v2_turn_failed", { chatId: roomId, error: error.message }));
+      return message.toObject();
     }
 
     return message.toObject();
@@ -503,8 +612,8 @@ class ChatService {
     if (!chat) throw new AppError("Chat not found", 404);
 
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
-    if (!isAuthorized) throw new AppError("You are not authorized to view these messages", 403);
-    return ChatMessage.getChatMessages(chatId, { ...options, includeInternalNotes: userRole === "admin" });
+    if (!isAuthorized) denyChatAccess(userRole);
+    return ChatMessage.getChatMessages(chatId, { ...options, includeInternalNotes: userRole === "admin", includeSenderEmail: userRole === "admin" });
   }
 
   async markMessagesAsRead(chatId, userId, userRole, guestSessionId) {
@@ -515,7 +624,7 @@ class ChatService {
 
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to mark these messages", 403);
+      denyChatAccess(userRole);
     }
 
     const now = new Date();
@@ -529,9 +638,9 @@ class ChatService {
     ]);
 
     // Broadcast read status via socket
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const roomId = chatId.toString();
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:messages:read", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:messages:read", {
         chatId: roomId,
         userId,
         userRole,
@@ -555,15 +664,15 @@ class ChatService {
     // Authorization check
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to update this chat", 403);
+      denyChatAccess(userRole);
     }
 
     // Typing is ephemeral presence, not durable business state. Persisting every
     // keystroke to Mongo adds write latency/load and provides no recovery value.
     // Broadcast typing status via socket
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const roomId = chatId.toString();
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:typing:status", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:typing:status", {
         chatId: roomId,
         isTyping,
         userRole,
@@ -586,7 +695,7 @@ class ChatService {
     // Authorization check
     const isAuthorized = await this.authorizeChat(chatId, userId, userRole, guestSessionId, chat);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to close this chat", 403);
+      denyChatAccess(userRole);
     }
 
     chat.status = "closed";
@@ -594,9 +703,9 @@ class ChatService {
     await chat.save();
 
     // Broadcast close event via socket
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const roomId = chatId.toString();
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:closed", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:closed", {
         chatId: roomId,
         closedBy: userId,
         closedAt: new Date(),
@@ -624,9 +733,9 @@ class ChatService {
     ).lean();
 
     // Broadcast resolve event via socket
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const roomId = chatId.toString();
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:resolved", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:resolved", {
         chatId: roomId,
         resolvedBy: userId,
         resolvedAt: new Date(),
@@ -647,57 +756,11 @@ class ChatService {
         Chat.countDocuments({ status: "closed", deletedAt: null }),
       ]);
 
-    const chatsWithResponses = await Chat.aggregate([
-      {
-        $match: {
-          status: { $in: ["ai_handling", "escalated", "agent_handling", "resolved", "closed"] },
-          deletedAt: null,
-        },
-      },
-      {
-        $lookup: {
-          from: "chatmessages",
-          localField: "_id",
-          foreignField: "chat",
-          as: "messages",
-        },
-      },
-      {
-        $project: {
-          createdAt: 1,
-          firstAdminMessage: {
-            $arrayElemAt: [
-              {
-                $filter: {
-                  input: "$messages",
-                  as: "msg",
-                  cond: { $eq: ["$$msg.senderRole", "admin"] },
-                },
-              },
-              0,
-            ],
-          },
-        },
-      },
-      {
-        $match: {
-          "firstAdminMessage.createdAt": { $exists: true },
-        },
-      },
-      {
-        $project: {
-          responseTime: {
-            $subtract: ["$firstAdminMessage.createdAt", "$createdAt"],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          avgResponseTime: { $avg: "$responseTime" },
-        },
-      },
-    ]);
+    // AR-16: see firstAdminResponsePipeline above — the average is
+    // computed over chatmessages (first admin reply per chat) with only
+    // a per-chat $lookup back to chats, instead of materializing every
+    // message of every chat via a chats-side $lookup.
+    const chatsWithResponses = await ChatMessage.aggregate(firstAdminResponsePipeline());
 
     const avgResponseTimeMs =
       chatsWithResponses.length > 0
@@ -741,7 +804,7 @@ class ChatService {
     // Authorization check
     const isAuthorized = await this.authorizeChat(chatId, userId, role, guestSessionId);
     if (!isAuthorized) {
-      throw new AppError("You are not authorized to update this chat", 403);
+      denyChatAccess(role);
     }
 
     chat.metadata = {
@@ -784,13 +847,13 @@ class ChatService {
           });
 
           // Broadcast the acknowledgment message via socket
-          if (global.notificationGateway) {
+          if (runtimeContext.getNotificationGateway()) {
             const roomId = chatId.toString();
             const ackMsg = await ChatMessage.findOne({ chat: chatId, content: ackContent })
               .sort({ createdAt: -1 })
-              .populate("sender", "firstName lastName email role avatar");
+              .populate("sender", "firstName lastName role avatar");
             if (ackMsg) {
-              global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:message:new", {
+              runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:message:new", {
                 chatId: roomId,
                 message: ackMsg.toObject(),
                 timestamp: new Date(),
@@ -804,9 +867,9 @@ class ChatService {
     }
 
     // Broadcast status change
-    if (global.notificationGateway) {
+    if (runtimeContext.getNotificationGateway()) {
       const roomId = chatId.toString();
-      global.notificationGateway.io.to(`chat:${roomId}`).emit("chat:status:changed", {
+      runtimeContext.getNotificationGateway().io.to(`chat:${roomId}`).emit("chat:status:changed", {
         chatId: roomId,
         status: chat.status,
         botActive: botActive,
@@ -818,3 +881,5 @@ class ChatService {
 }
 
 module.exports = new ChatService();
+module.exports.buildV2TurnIdentity = buildV2TurnIdentity;
+module.exports._firstAdminResponsePipeline = firstAdminResponsePipeline;

@@ -1,23 +1,60 @@
 const mongoose = require("mongoose");
+const { escapeRegExp } = require("../utils/escapeRegex");
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const Order = require("../models/order.model");
 const Address = require("../models/address.model");
 const User = require("../models/user.model");
 
+// FA-13 / FA-32 (FRESH): guest order lookups disclose as little as possible
+// and fail indistinguishably. One shared error string; a per-key failure
+// throttle (5 failures per 15 minutes) blunts order-id/email grinding.
+const GUEST_LOOKUP_ERROR = "Order not found, or the email does not match this order.";
+const guestLookupFailures = new Map();
+function guestLookupThrottled(key) {
+  const entry = guestLookupFailures.get(key);
+  if (!entry) return false;
+  if (Date.now() > entry.resetAt) { guestLookupFailures.delete(key); return false; }
+  return entry.count >= 5;
+}
+function noteGuestLookupFailure(key) {
+  const now = Date.now();
+  const entry = guestLookupFailures.get(key);
+  if (!entry || now > entry.resetAt) guestLookupFailures.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  else entry.count += 1;
+  if (guestLookupFailures.size > 10000) guestLookupFailures.clear();
+}
+
+// AR-36: getOrderHistory returns at most this many (most recent) orders.
+const ORDER_HISTORY_LIMIT = 20;
+
+// AR-37: apply a caller-supplied time budget to a Mongoose query as
+// maxTimeMS, so a query abandoned by the chatV2 tool timeout is also
+// CANCELLED server-side instead of running to completion. Callers
+// without a budget (the legacy orchestrator) pass no opts and keep the
+// previous unbounded-by-default behavior. The typeof guard keeps
+// lightweight query stubs (tests) working unchanged.
+function applyMaxTime(query, opts) {
+  const ms = opts && Number(opts.maxTimeMS);
+  if (Number.isFinite(ms) && ms > 0 && query && typeof query.maxTimeMS === "function") {
+    return query.maxTimeMS(Math.floor(ms));
+  }
+  return query;
+}
+
 class DbTools {
   /**
    * Search product catalog
    */
-  async searchProducts({ query, categoryName, limit = 5 }) {
+  async searchProducts({ query, categoryName, limit = 5 }, opts = {}) {
     try {
       const dbQuery = { status: "active", deletedAt: null };
 
       if (categoryName) {
-        const escapedCategory = String(categoryName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const category = await Category.findOne({
+        const escapedCategory = escapeRegExp(categoryName);
+        const category = await applyMaxTime(Category.findOne({
           name: { $regex: new RegExp(`^${escapedCategory}$`, "i") },
-        }).select("_id").lean();
+        }), opts).select("_id").lean();
         if (category) {
           dbQuery.category = category._id;
         }
@@ -29,7 +66,7 @@ class DbTools {
         dbQuery.$text = { $search: String(query).slice(0, 80) };
       }
 
-      const products = await Product.find(dbQuery)
+      const products = await applyMaxTime(Product.find(dbQuery), opts)
         .limit(Math.min(Math.max(Number(limit) || 5, 1), 10))
         .select("name price originalPrice stock sku status description slug")
         .populate("category", "name")
@@ -57,14 +94,14 @@ class DbTools {
   /**
    * Get detailed product specifications
    */
-  async getProductDetails({ sku, productId }) {
+  async getProductDetails({ sku, productId }, opts = {}) {
     try {
       const dbQuery = { deletedAt: null, status: { $in: ["active", "out_of_stock"] } };
       if (productId) dbQuery._id = productId;
       else if (sku) dbQuery.sku = sku.toUpperCase();
       else return { error: "Either sku or productId must be provided" };
 
-      const product = await Product.findOne(dbQuery)
+      const product = await applyMaxTime(Product.findOne(dbQuery), opts)
         .populate("category", "name")
         .lean();
 
@@ -92,26 +129,26 @@ class DbTools {
   /**
    * Retrieve order status securely.
    */
-  async getOrderStatus({ orderId, email, userId }) {
+  async getOrderStatus({ orderId, email, userId, lookupKey }, opts = {}) {
     try {
       // --- Logged-in customer path ---
       if (userId) {
         const query = { user: userId };
         if (orderId) {
           // Specific order requested
-          const order = await Order.findOne({
+          const order = await applyMaxTime(Order.findOne({
             $or: [
               { orderId, user: userId },
               ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId, user: userId }] : []),
             ],
-          }).lean();
+          }), opts).lean();
 
           if (!order) return { error: "Order not found for your account" };
           return this._formatOrder(order);
         }
 
         // No orderId — return the 3 most recent orders for the customer to choose from
-        const orders = await Order.find(query)
+        const orders = await applyMaxTime(Order.find(query), opts)
           .sort({ createdAt: -1 })
           .limit(3)
           .lean();
@@ -136,21 +173,30 @@ class DbTools {
         return { error: "Please provide your order ID and the email address used when placing the order to look up your order status." };
       }
 
-      const order = await Order.findOne({
+      // FA-13: failed guest lookups are throttled per caller key so the
+      // orderId+email pair cannot be ground against the catalogue.
+      if (lookupKey && guestLookupThrottled(lookupKey)) {
+        return { error: "Too many lookup attempts. Please try again later." };
+      }
+
+      const order = await applyMaxTime(Order.findOne({
         $or: [
           { orderId },
           ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
         ],
-      }).populate("user", "email").lean();
+      }), opts).populate("user", "email").lean();
 
-      if (!order) return { error: "Order not found" };
-
-      const orderEmail = order.isGuestOrder ? order.guestInfo?.email : order.user?.email;
-      if (!orderEmail || orderEmail.toLowerCase() !== email.toLowerCase()) {
-        return { error: "Email verification failed for this order. You are not authorized to view this order's status." };
+      const orderEmail = order ? (order.isGuestOrder ? order.guestInfo?.email : order.user?.email) : null;
+      // FA-32: ONE uniform error for "no such order" and "email mismatch" -
+      // the two cases must be indistinguishable to the caller.
+      if (!order || !orderEmail || orderEmail.toLowerCase() !== String(email).toLowerCase()) {
+        if (lookupKey) noteGuestLookupFailure(lookupKey);
+        return { error: GUEST_LOOKUP_ERROR };
       }
 
-      return this._formatOrder(order);
+      // FA-13: guests receive a minimal status view - never the shipping
+      // address, phone, or stored payment-gateway payload.
+      return this._formatGuestOrder(order);
     } catch (error) {
       console.error("DbTools getOrderStatus error:", error.message);
       return { error: "Failed to retrieve order status" };
@@ -159,11 +205,20 @@ class DbTools {
 
   /**
    * Retrieve order history for logged-in user (read-only).
+   * AR-36: bounded to the most recent ORDER_HISTORY_LIMIT orders — the
+   * previous implementation loaded the user's ENTIRE history into
+   * memory and the tool pipeline. Projection matches _formatOrder's
+   * field set (the same discipline as getOrderStatus' formatted view);
+   * formatted output for users with <= the limit is unchanged.
    */
-  async getOrderHistory({ userId }) {
+  async getOrderHistory({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const orders = await Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
+      const orders = await applyMaxTime(Order.find({ user: userId }), opts)
+        .sort({ createdAt: -1 })
+        .limit(ORDER_HISTORY_LIMIT)
+        .select("orderId orderStatus paymentMethod paymentStatus total shippingAddress items createdAt")
+        .lean();
       return orders.map(o => this._formatOrder(o));
     } catch (error) {
       console.error("DbTools getOrderHistory error:", error.message);
@@ -174,13 +229,13 @@ class DbTools {
   /**
    * Retrieve default address for logged-in user (read-only).
    */
-  async getDefaultAddress({ userId }) {
+  async getDefaultAddress({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const address = await Address.findOne({ user: userId, isDefault: true }).lean();
+      const address = await applyMaxTime(Address.findOne({ user: userId, isDefault: true }), opts).lean();
       if (address) return address;
 
-      const fallback = await Address.findOne({ user: userId }).lean();
+      const fallback = await applyMaxTime(Address.findOne({ user: userId }), opts).lean();
       return fallback || null;
     } catch (error) {
       console.error("DbTools getDefaultAddress error:", error.message);
@@ -191,10 +246,10 @@ class DbTools {
   /**
    * Retrieve all saved addresses for logged-in user (read-only).
    */
-  async getSavedAddresses({ userId }) {
+  async getSavedAddresses({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const addresses = await Address.find({ user: userId }).lean();
+      const addresses = await applyMaxTime(Address.find({ user: userId }), opts).lean();
       return addresses;
     } catch (error) {
       console.error("DbTools getSavedAddresses error:", error.message);
@@ -205,10 +260,10 @@ class DbTools {
   /**
    * Retrieve customer profile information (read-only).
    */
-  async getProfileInfo({ userId }) {
+  async getProfileInfo({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const user = await User.findById(userId).select("firstName lastName email role phone createdAt").lean();
+      const user = await applyMaxTime(User.findById(userId), opts).select("firstName lastName email role phone createdAt").lean();
       if (!user) return { error: "User profile not found" };
       return {
         fullName: `${user.firstName} ${user.lastName}`,
@@ -220,6 +275,18 @@ class DbTools {
       console.error("DbTools getProfileInfo error:", error.message);
       return { error: "Failed to retrieve profile information" };
     }
+  }
+
+  // FA-13: the guest view of an order - status-level fields only.
+  _formatGuestOrder(order) {
+    return {
+      orderId: order.orderId,
+      status: order.orderStatus,
+      paymentStatus: order.paymentStatus,
+      total: order.total,
+      itemCount: Array.isArray(order.items) ? order.items.length : 0,
+      createdAt: order.createdAt,
+    };
   }
 
   _formatOrder(order) {
@@ -248,3 +315,4 @@ class DbTools {
 }
 
 module.exports = new DbTools();
+module.exports.ORDER_HISTORY_LIMIT = ORDER_HISTORY_LIMIT;
