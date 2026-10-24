@@ -2,10 +2,15 @@ const { boundedPage, boundedLimit } = require("../utils/listQuery");
 const crypto = require("crypto");
 const Notification = require("../models/notification.model");
 const User = require("../models/user.model");
+const { sanitizeActionUrl } = require("../utils/safeUrl");
+const runtimeContext = require("./runtimeContext"); // AR-33: explicit registry, not globals
 
 class NotificationService {
   async createNotification(data) {
     const payload = { ...data };
+    // FA-73: stored actionUrl is rendered as a link by clients - only
+    // http(s) or site-relative URLs may be stored.
+    if ("actionUrl" in payload) payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
     if (payload.idempotencyKey) {
       // Stable primary key deduplicates campaign retries across processes,
       // without depending on deployment-time creation of a new unique index.
@@ -33,7 +38,7 @@ class NotificationService {
         notificationId ||= notification._id;
         sentCount++;
         // Offline delivery is persisted; socket availability cannot mark it failed.
-        try { global.io?.to(String(recipient)).emit("notification:new", notification); }
+        try { runtimeContext.getIo()?.to(String(recipient)).emit("notification:new", notification); } // AR-33: registry, not global.io
         catch (_error) { console.error("Notification realtime delivery unavailable"); }
       } catch (_error) { failedCount++; }
     }
@@ -55,7 +60,7 @@ class NotificationService {
       title,
       message,
       data,
-      actionUrl
+      actionUrl: sanitizeActionUrl(actionUrl) // FA-73
     }));
 
     return await Notification.insertMany(notifications);
@@ -95,9 +100,11 @@ class NotificationService {
     });
   }
 
-  async markAsRead(notificationId) {
-    return await Notification.findByIdAndUpdate(
-      notificationId,
+  // FA-36: scoped by recipient at the sink - a caller bug can no longer
+  // mark (or probe) another user's notification.
+  async markAsRead(notificationId, userId) {
+    return await Notification.findOneAndUpdate(
+      { _id: notificationId, recipient: userId },
       { isRead: true },
       { new: true }
     );

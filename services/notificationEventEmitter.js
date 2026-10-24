@@ -1,4 +1,5 @@
 const EventEmitter = require("events");
+const runtimeContext = require("./runtimeContext"); // AR-33: explicit registry, not globals
 const notificationService = require("./notificationService");
 
 class NotificationEventEmitter extends EventEmitter {
@@ -120,18 +121,26 @@ class NotificationEventEmitter extends EventEmitter {
   }
 
   broadcastToAdmins(event, data) {
-    if (global.io) {
-      global.io.to("admin:notifications").emit(event, data);
+    const io = runtimeContext.getIo();
+    if (io) {
+      io.to("admin:notifications").emit(event, data);
     }
   }
 
   broadcastToUser(userId, notification) {
-    if (global.io) {
-      global.io.to(`user:${userId}`).emit("notification:new", notification);
-      global.io.to(`user:${userId}`).emit("badge:update", {
-        unreadCount: 1
-      });
-    }
+    const io = runtimeContext.getIo();
+    if (!io) return;
+    // AR-07: sockets join the BARE userId room (notificationGateway.js)
+    // and notificationService emits to the bare id as well. This method
+    // previously emitted to `user:${userId}` - a room nobody ever joins,
+    // so order realtime notifications reached no client - and the badge
+    // payload hardcoded unreadCount: 1. Emit to the joined room and
+    // compute the real count.
+    const room = String(userId);
+    io.to(room).emit("notification:new", notification);
+    notificationService.getUnreadCount(userId)
+      .then((unreadCount) => { io.to(room).emit("badge:update", { unreadCount }); })
+      .catch((error) => { console.error("Failed to compute unread badge count:", error.message); });
   }
 }
 

@@ -24,38 +24,31 @@ class PushTokenService {
     }
 
     try {
-      const userDeviceIndex = `${userId}_${deviceId}`;
-
-      const existing = await DevicePushToken.findOne({
-        _userDeviceIndex: userDeviceIndex,
-      });
-
-      if (existing) {
-        existing.token = token;
-        existing.isActive = true;
-        existing.lastUsedAt = new Date();
-        existing.registeredAt = new Date();
-        existing.failureCount = 0;
-        existing.metadata = { ...existing.metadata, ...metadata };
-        await existing.save();
-        return existing;
-      }
-
-      const newToken = new DevicePushToken({
-        user: userId,
+      // FA-69: one atomic upsert keyed on the (user, deviceId) compound
+      // unique index - the previous find-then-insert raced under
+      // concurrent registration and depended on the pre-save hook
+      // maintaining a shadow field. Metadata keys are $set individually
+      // so keys from earlier registrations are preserved (the old
+      // merge behavior).
+      const now = new Date();
+      const $set = {
         token,
-        deviceId,
         deviceName,
         platform,
-        _userDeviceIndex: userDeviceIndex,
         isActive: true,
-        lastUsedAt: new Date(),
-        registeredAt: new Date(),
-        metadata,
-      });
-
-      await newToken.save();
-      return newToken;
+        lastUsedAt: now,
+        registeredAt: now,
+        failureCount: 0,
+        _userDeviceIndex: `${userId}_${deviceId}`,
+      };
+      for (const [k, v] of Object.entries(metadata || {})) {
+        $set[`metadata.${k}`] = v;
+      }
+      return await DevicePushToken.findOneAndUpdate(
+        { user: userId, deviceId },
+        { $set, $setOnInsert: { user: userId, deviceId } },
+        { upsert: true, new: true, runValidators: true }
+      );
     } catch (error) {
       if (error.code === 11000) {
         throw new AppError("Token already registered to another device", 409);
