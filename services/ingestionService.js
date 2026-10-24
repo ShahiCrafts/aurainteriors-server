@@ -1,22 +1,22 @@
 const { PDFParse } = require("pdf-parse");
 const extractDocxText = require("../utils/extractDocxText");
-const { QdrantClient } = require("@qdrant/js-client-rest");
 const Document = require("../models/document.model");
 const AppError = require("../utils/AppError");
 
 class IngestionService {
   constructor() {
-    // Qdrant Configuration
-    const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
-    const qdrantApiKey = process.env.QDRANT_API_KEY;
-
-    this.qdrant = new QdrantClient({
-      url: qdrantUrl,
-      apiKey: qdrantApiKey,
-    });
+    // OA-1 -9: no Qdrant client at construction (boot without Qdrant
+    // stays valid). First OPERATION resolves via the shared resolver
+    // and fails loudly naming QDRANT_URL when unconfigured.
+    this.qdrant = null;
 
     this.collectionName = "knowledge_base";
     this.vectorSize = Number(process.env.EMBEDDING_VECTOR_SIZE) || 2048; // standard dimension for nvidia/llama-nemotron-embed-1b-v2
+  }
+
+  qdrantClient() {
+    if (!this.qdrant) this.qdrant = require("../config/appConfig").createQdrantClient();
+    return this.qdrant;
   }
 
   /**
@@ -72,11 +72,15 @@ class IngestionService {
         chunks.push(chunk);
       }
 
-      // Advance by chunk size minus overlap
-      start = end - chunkOverlap;
-      if (start >= cleanedText.length || chunkOverlap >= chunkSize) {
+      // Stop at the end of the text (B-31): previously the loop
+      // advanced by (chunkSize - overlap) past the final chunk and
+      // emitted the tail AGAIN as a small duplicate chunk, polluting
+      // the vector index with repeated content.
+      if (end >= cleanedText.length) {
         break;
       }
+      // Advance by chunk size minus overlap, always making progress.
+      start = Math.max(end - chunkOverlap, start + 1);
     }
 
     return chunks;
@@ -97,6 +101,7 @@ class IngestionService {
 
     try {
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(20000), // B-12: was unbounded
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -132,11 +137,11 @@ class IngestionService {
    */
   async initCollection() {
     try {
-      const collections = await this.qdrant.getCollections();
+      const collections = await this.qdrantClient().getCollections();
       const exists = collections.collections.some((c) => c.name === this.collectionName);
 
       if (!exists) {
-        await this.qdrant.createCollection(this.collectionName, {
+        await this.qdrantClient().createCollection(this.collectionName, {
           vectors: {
             size: this.vectorSize,
             distance: "Cosine",
@@ -182,19 +187,28 @@ class IngestionService {
             type: "authenticated",
             expires_at: Math.floor(Date.now() / 1000) + 3600, // Valid for 1 hour
           });
-          console.log(`[INGESTION] Generated secure download URL: ${downloadUrl}`);
+          // Never log the URL itself: it is a signed credential (B-10).
+          console.log(`[INGESTION] Generated secure download URL for document ${doc._id}`);
         } catch (signError) {
           console.warn("[INGESTION] Cloudinary private URL signing failed. Falling back:", signError.message);
         }
       }
 
-      const response = await fetch(downloadUrl, { headers });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file from URL ${downloadUrl}: ${response.statusText}`);
+      // FA-16: fetch via the shared guarded helper - the host is resolved
+      // and validated once (all address forms), the request is pinned to
+      // the validated address, redirects are re-validated per hop, and
+      // the body is capped WHILE STREAMING (the previous code buffered
+      // the whole response before checking its size).
+      const parsedFetchUrl = new URL(downloadUrl);
+      if (parsedFetchUrl.protocol !== "https:") {
+        throw new Error(`Refusing to fetch document from a non-https URL for document ${doc._id}`);
       }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      const { guardedFetch } = require("../utils/guardedFetch");
+      const response = await guardedFetch(downloadUrl, { headers, timeoutMs: 15000, maxBytes: 25 * 1024 * 1024 });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file for document ${doc._id}: HTTP ${response.status}`);
+      }
+      const buffer = await response.buffer();
 
       // Parse Text
       const rawText = await this.parseFile(buffer, doc.fileType);
@@ -207,22 +221,26 @@ class IngestionService {
         throw new Error("No text content could be extracted from this document.");
       }
 
+      // AR-05: optional per-job chunk cap (INGEST_MAX_CHUNKS_PER_JOB,
+      // positive int; unset = no cap, preserving the previous
+      // acceptance exactly). Checked before any embedding/Qdrant
+      // work; the catch below marks the document "failed".
+      const maxChunks = Number(process.env.INGEST_MAX_CHUNKS_PER_JOB);
+      if (Number.isInteger(maxChunks) && maxChunks > 0 && chunks.length > maxChunks) {
+        throw new Error(
+          `Document produced ${chunks.length} chunks, exceeding INGEST_MAX_CHUNKS_PER_JOB=${maxChunks}`
+        );
+      }
+
       // Initialize Collection
       await this.initCollection();
 
-      // Soft delete/remove old chunks of this document to prevent duplicates
-      await this.qdrant.delete(this.collectionName, {
-        filter: {
-          must: [
-            {
-              key: "documentId",
-              match: {
-                value: doc._id.toString(),
-              },
-            },
-          ],
-        },
-      });
+      // AR-05 embed-then-swap: every run embeds under a fresh run id
+      // and upserts FIRST; the previous version's points are deleted
+      // only after the new version is live (below), so a failure
+      // mid-embed leaves the document's existing vectors searchable.
+      // (The previous code deleted the old points before embedding.)
+      const ingestRun = require("crypto").randomUUID();
 
       // Embed and Upload Chunks
       const points = [];
@@ -251,14 +269,42 @@ class IngestionService {
             chunkIndex: i,
             totalChunks: chunks.length,
             fileType: doc.fileType,
+            // AR-05: additive run marker for the embed-then-swap
+            // delete below; retrieval filters only on
+            // visibility/documentId, so this field is inert there.
+            ingestRun,
           },
         });
       }
 
       // Batch upload points to Qdrant
-      await this.qdrant.upsert(this.collectionName, {
+      await this.qdrantClient().upsert(this.collectionName, {
         wait: true,
         points: points,
+      });
+
+      // AR-05: ONLY after the new version is live, delete the
+      // previous version's points - every point of this document
+      // that does NOT belong to this run.
+      await this.qdrantClient().delete(this.collectionName, {
+        filter: {
+          must: [
+            {
+              key: "documentId",
+              match: {
+                value: doc._id.toString(),
+              },
+            },
+          ],
+          must_not: [
+            {
+              key: "ingestRun",
+              match: {
+                value: ingestRun,
+              },
+            },
+          ],
+        },
       });
 
       doc.status = "indexed";

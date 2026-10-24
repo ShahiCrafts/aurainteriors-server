@@ -1,7 +1,29 @@
 const Announcement = require("../models/announcement.model");
 const AppError = require("../utils/AppError");
 const NotificationService = require("./notificationService");
+const { asEnum, asBoolean } = require("../utils/params");
+const { boundedPage, boundedLimit } = require("../utils/listQuery");
 const User = require("../models/user.model");
+
+// Fields a client may set on an announcement. Everything else on the
+// document (createdBy, updatedBy, viewCount, publishedAt, _id, ...) is
+// server-managed; updateAnnouncement previously copied every key in
+// the request body onto the document (mass assignment, C-03).
+// FA-04: "status" is deliberately NOT client-settable here - lifecycle
+// transitions go only through publishAnnouncement / scheduleAnnouncement /
+// archiveAnnouncement, which enforce the state machine's guards.
+const ANNOUNCEMENT_CLIENT_FIELDS = [
+  "title", "content", "summary", "type", "priority",
+  "targetAudience", "scheduledAt", "expiresAt", "isPinned",
+  "imageUrl", "actionUrl", "actionLabel", "tags",
+];
+const pickAnnouncementFields = (data = {}) => {
+  const picked = {};
+  for (const field of ANNOUNCEMENT_CLIENT_FIELDS) {
+    if (data[field] !== undefined) picked[field] = data[field];
+  }
+  return picked;
+};
 
 class AnnouncementService {
   /**
@@ -9,21 +31,30 @@ class AnnouncementService {
    */
   async getAllAnnouncements(options = {}) {
     const {
-      page = 1,
-      limit = 20,
       status,
       type,
       priority,
       isPinned,
     } = options;
 
+    // AR-19: bound pagination to the house contract (page <= 10000,
+    // limit <= 100, NaN -> defaults). Previously raw parseInt values
+    // reached skip/limit uncapped — limit=100000 returned up to
+    // 100000 rows and NaN produced NaN skip. See CLIENT_IMPACT.md.
+    const page = boundedPage(options.page);
+    const limit = boundedLimit(options.limit, 20);
     const skip = (page - 1) * limit;
     const query = {};
 
-    if (status) query.status = status;
-    if (type) query.type = type;
-    if (priority) query.priority = priority;
-    if (isPinned !== undefined) query.isPinned = isPinned;
+    // FA-56: coerce at the sink - raw option values never reach the filter.
+    const statusC = asEnum(status, ["draft", "scheduled", "published", "archived"]);
+    const typeC = asEnum(type, ["general", "maintenance", "update", "promotion", "policy", "event"]);
+    const priorityC = asEnum(priority, ["low", "normal", "high", "critical"]);
+    const pinnedC = asBoolean(isPinned);
+    if (statusC !== undefined) query.status = statusC;
+    if (typeC !== undefined) query.type = typeC;
+    if (priorityC !== undefined) query.priority = priorityC;
+    if (pinnedC !== undefined) query.isPinned = pinnedC;
 
     const [announcements, total] = await Promise.all([
       Announcement.find(query)
@@ -67,7 +98,7 @@ class AnnouncementService {
    */
   async createAnnouncement(data, userId) {
     const announcement = new Announcement({
-      ...data,
+      ...pickAnnouncementFields(data),
       createdBy: userId,
       status: data.scheduledAt ? "scheduled" : "draft",
     });
@@ -87,21 +118,17 @@ class AnnouncementService {
       throw new AppError("Announcement not found", 404);
     }
 
-    // Prevent editing published announcements (unless archiving)
-    if (
-      announcement.status === "published" &&
-      data.status !== "archived"
-    ) {
+    // Published announcements are immutable here; archiving has its own
+    // endpoint (FA-04 - status can no longer ride the generic update).
+    if (announcement.status === "published") {
       throw new AppError(
         "Published announcements can only be archived",
         400
       );
     }
 
-    // Update fields
-    Object.keys(data).forEach((key) => {
-      announcement[key] = data[key];
-    });
+    // Update fields (whitelist only - see ANNOUNCEMENT_CLIENT_FIELDS)
+    Object.assign(announcement, pickAnnouncementFields(data));
 
     announcement.updatedBy = userId;
 
@@ -143,13 +170,20 @@ class AnnouncementService {
 
     await announcement.save();
 
-    // Optionally send notifications to users about the announcement
-    await this.notifyUsersAboutAnnouncement(announcement);
+    // Optionally send notifications to users about the announcement.
+    // AR-04: in queue mode notifyUsersAboutAnnouncement enqueues
+    // instead of fanning out inline; the queued result is surfaced
+    // so the controller can answer 202 (see CLIENT_IMPACT.md).
+    const notifyResult = await this.notifyUsersAboutAnnouncement(announcement);
 
-    return announcement.populate([
+    const populated = await announcement.populate([
       { path: "createdBy", select: "firstName lastName email" },
       { path: "updatedBy", select: "firstName lastName email" },
     ]);
+    if (notifyResult && notifyResult.queued) {
+      return { announcement: populated, queued: true, jobId: notifyResult.jobId };
+    }
+    return populated;
   }
 
   /**
@@ -234,7 +268,10 @@ class AnnouncementService {
    * Get active announcements for users (Public)
    */
   async getPublicAnnouncements(options = {}) {
-    const { page = 1, limit = 10, type, userRole = "customer" } = options;
+    const { type, userRole = "customer" } = options;
+    // AR-19: bounded pagination, same house contract as above.
+    const page = boundedPage(options.page);
+    const limit = boundedLimit(options.limit, 10);
     const skip = (page - 1) * limit;
     const now = new Date();
 
@@ -327,13 +364,21 @@ class AnnouncementService {
 
     for (const announcement of scheduledAnnouncements) {
       try {
-        announcement.status = "published";
-        announcement.publishedAt = now;
-        announcement.scheduledAt = null;
-        await announcement.save();
+        // AR-08: atomic claim, the FA-70 pattern promotions already
+        // use. The find-then-save version let two concurrent ticks
+        // (two instances, or instance + manual trigger) both read
+        // status "scheduled" and both publish + fan out. The
+        // conditional update transitions the document exactly once;
+        // the losing tick gets null and skips.
+        const claimed = await Announcement.findOneAndUpdate(
+          { _id: announcement._id, status: "scheduled" },
+          { $set: { status: "published", publishedAt: now, scheduledAt: null } },
+          { new: true }
+        );
+        if (!claimed) continue;
 
         // Notify users
-        await this.notifyUsersAboutAnnouncement(announcement);
+        await this.notifyUsersAboutAnnouncement(claimed);
 
         results.processed++;
       } catch (error) {
@@ -349,9 +394,25 @@ class AnnouncementService {
   }
 
   /**
-   * Notify users about a new announcement
+   * Notify users about a new announcement.
+   * AR-04: BROADCAST_MODE=queue enqueues the fan-out (the publish
+   * itself stays synchronous); inline mode runs it immediately.
+   * Scheduled announcements reach the same branch via
+   * processScheduledAnnouncements -> notifyUsersAboutAnnouncement.
    */
   async notifyUsersAboutAnnouncement(announcement) {
+    const broadcastJobs = require("./broadcastJobs.service");
+    if (broadcastJobs.isQueueMode()) {
+      const job = await broadcastJobs.enqueueAnnouncement(announcement._id);
+      return { queued: true, jobId: job._id };
+    }
+    return this.performAnnouncementBroadcast(announcement);
+  }
+
+  /**
+   * The fan-out body itself (used directly by the AR-04 job handler).
+   */
+  async performAnnouncementBroadcast(announcement) {
     try {
       // Get target users based on audience type
       const targetAudienceType = announcement.targetAudience?.type || "all";

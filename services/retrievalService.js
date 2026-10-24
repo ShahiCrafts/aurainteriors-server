@@ -1,17 +1,48 @@
 const Document = require("../models/document.model");
-const { QdrantClient } = require("@qdrant/js-client-rest");
+
+// AR-39: a failure caused by a TIMEOUT (our embedding AbortController,
+// or the Qdrant client's own abort) vs any other failure — the two must
+// be distinguishable in the logs, because both surface as "retrieve
+// returned []".
+function isTimeoutError(error) {
+  if (!error) return false;
+  if (error.name === "AbortError" || error.name === "TimeoutError") return true;
+  return /abort|timed out|timeout|time limit/i.test(String(error.message || ""));
+}
 
 class RetrievalService {
   constructor() {
-    const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
-    const qdrantApiKey = process.env.QDRANT_API_KEY;
-
-    this.qdrant = new QdrantClient({
-      url: qdrantUrl,
-      apiKey: qdrantApiKey,
-    });
-
+    // OA-1: lazy shared-resolver client (see ingestionService).
+    // Construction never throws when QDRANT_URL is unset; the first
+    // search operation fails loudly naming QDRANT_URL.
+    this.qdrant = null; // pre-AR-32 property name: tests replace this field with a stub (AR-39 seam) - the lazy accessor below honors a pre-set value
     this.collectionName = "knowledge_base";
+  }
+
+  qdrantClient() {
+    if (!this.qdrant) {
+      // AR-39: explicit client timeout (SDK default was 300 s).
+      this.qdrant = require("../config/appConfig").createQdrantClient(process.env, { timeout: this.qdrantTimeoutMs() });
+    }
+    return this.qdrant;
+  }
+
+  // AR-39: the embedding budget for chat RAG, from
+  // RAG_EMBEDDING_TIMEOUT_MS. DEFAULT = 250 ms — exactly the value
+  // chatService used to hard-code at the retrieve call site — so
+  // behavior is unchanged until an operator raises it (a cold external
+  // embedding call commonly exceeds 250 ms; measure before tuning).
+  embeddingTimeoutMs(env = process.env) {
+    const n = Number(env.RAG_EMBEDDING_TIMEOUT_MS);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 250;
+  }
+
+  // AR-39: explicit Qdrant client timeout (RAG_QDRANT_TIMEOUT_MS,
+  // default 5000 ms). Previously the search call had no timeout at
+  // all beyond the SDK's 300 s client default.
+  qdrantTimeoutMs(env = process.env) {
+    const n = Number(env.RAG_QDRANT_TIMEOUT_MS);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5000;
   }
 
   /**
@@ -67,16 +98,22 @@ class RetrievalService {
    * Perform vector similarity search against Qdrant index
    */
   async search(query, limit = 5, minScore = 0.5, { timeoutMs = 300 } = {}) {
+    let stage = "embedding";
     try {
       console.log(`[RAG] Generating embedding for query: "${query}"`);
       const queryEmbedding = await this.getEmbedding(query, "query", { timeoutMs });
 
+      stage = "qdrant";
       console.log(`[RAG] Searching Qdrant collection: "${this.collectionName}"`);
-      const searchResult = await this.qdrant.search(this.collectionName, {
+      const searchResult = await this.qdrantClient().search(this.collectionName, {
         filter: { must: [{ key: "visibility", match: { value: "public" } }] },
         vector: queryEmbedding,
         limit: Math.min(Math.max(Number(limit) || 5, 1), 10),
         with_payload: true,
+        // AR-39: explicit per-request timeout (seconds, the Qdrant
+        // API's unit for the search request) derived from the same
+        // configured client budget as the constructor timeout.
+        timeout: Math.max(1, Math.ceil(this.qdrantTimeoutMs() / 1000)),
       });
 
       const ids = searchResult.map(hit => hit.payload?.documentId).filter(id => typeof id === "string" && /^[a-f0-9]{24}$/i.test(id));
@@ -95,6 +132,13 @@ class RetrievalService {
       console.log(`[RAG] Found ${matches.length} matching chunks matching score >= ${minScore}`);
       return matches;
     } catch (error) {
+      // AR-39: an empty result caused by a TIMEOUT gets its own
+      // structured one-line JSON log (stable event name
+      // "rag_retrieve_timeout") so timeout-empty is distinguishable
+      // from no-match-empty and from other failures in the logs.
+      if (isTimeoutError(error)) {
+        console.log(JSON.stringify({ event: "rag_retrieve_timeout", stage, timeoutMs }));
+      }
       console.error("Qdrant similarity search failed:", error.message);
       // Fallback: return empty array so system does not crash
       return [];

@@ -13,7 +13,6 @@
  */
 
 const sharp = require('sharp');
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
@@ -76,13 +75,14 @@ const compressImageFile = async (filePath, options = {}) => {
  */
 const compressImageFromUrl = async (imageUrl, options = {}) => {
   try {
-    // Download image from URL
-    const response = await axios.get(imageUrl, {
-      responseType: 'arraybuffer',
-      timeout: 10000, // 10 second timeout
-    });
+    // FA-66: download through the shared guarded fetch helper (SSRF
+    // validation + address pinning + redirect re-validation + streaming
+    // byte cap). Previously this fetched arbitrary URLs with no controls.
+    const { guardedFetch } = require("./guardedFetch");
+    const response = await guardedFetch(imageUrl, { timeoutMs: 10000, maxBytes: 15 * 1024 * 1024 });
+    if (!response.ok) throw new Error(`Image download failed: HTTP ${response.status}`);
 
-    const imageBuffer = Buffer.from(response.data, 'binary');
+    const imageBuffer = await response.buffer();
     
     // Log original size
     const originalSize = imageBuffer.length;

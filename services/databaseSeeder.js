@@ -5,40 +5,22 @@
  */
 
 const { getAdminCredentials } = require("../utils/adminCredentials");
-const User = require("../models/user.model");
 const Category = require("../models/category.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
-
-const furnitureImages = {
-  sofas: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
-  ],
-  beds: [
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80"
-  ],
-  dining: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
-  ],
-  chairs: [
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80"
-  ],
-  decor: [
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80"
-  ],
-  lighting: [
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
-  ]
-};
+// AR-31(c): the catalog/data core shared with scripts/seed.js lives in
+// services/seedCatalog.js (furnitureImages, categoriesData, demo-user
+// seeding, category creation, sample-order generation). This file
+// keeps the boot-path entry point, its gates and its log shape — and
+// its own (reduced) productsData below: the two entry points' product
+// documents diverge and were NOT unified (see seedCatalog.js header).
+const {
+  furnitureImages,
+  ensureSeedAdmin,
+  ensureSeedCustomer,
+  createSeedCategories,
+  buildSampleOrders,
+} = require("./seedCatalog");
 
 /**
  * Check if database needs seeding
@@ -59,49 +41,20 @@ const isDatabaseEmpty = async () => {
 
 /**
  * Create or update admin and customer users
+ * (AR-31(c): shared with scripts/seed.js via seedCatalog; this entry
+ * point's log wording is passed through `messages`.)
  */
 const seedUsers = async () => {
   console.log("[seeder] 🧑 Seeding users...");
-  
-  const { email: adminEmail, password } = getAdminCredentials();
-  let adminUser = await User.findOne({ email: adminEmail });
-  
-  if (!adminUser) {
-    adminUser = new User({
-      firstName: "Admin",
-      lastName: "User",
-      email: adminEmail,
-      password,
-      role: "admin",
-      phone: "9800000000",
-      isEmailVerified: true,
-      isActive: true,
-    });
-    await adminUser.save();
-    console.log(`  ✓ Admin user created: ${adminEmail}`);
-  } else {
-    console.log(`  ✓ Admin user already exists: ${adminEmail}`);
-  }
 
-  const customerEmail = "customer@aurainteriors.com";
-  let customerUser = await User.findOne({ email: customerEmail });
-  
-  if (!customerUser) {
-    customerUser = new User({
-      firstName: "Saugat",
-      lastName: "Shahi",
-      email: customerEmail,
-      password: "password123",
-      role: "customer",
-      phone: "9877665544",
-      isEmailVerified: true,
-      isActive: true,
-    });
-    await customerUser.save();
-    console.log(`  ✓ Customer user created: ${customerEmail}`);
-  } else {
-    console.log(`  ✓ Customer user already exists: ${customerEmail}`);
-  }
+  const messages = {
+    adminCreated: (email) => `  ✓ Admin user created: ${email}`,
+    adminExists: (email) => `  ✓ Admin user already exists: ${email}`,
+    customerCreated: (email) => `  ✓ Customer user created: ${email}`,
+    customerExists: (email) => `  ✓ Customer user already exists: ${email}`,
+  };
+  const adminUser = await ensureSeedAdmin({ messages });
+  const customerUser = await ensureSeedCustomer({ messages });
 
   return { adminUser, customerUser };
 };
@@ -111,19 +64,9 @@ const seedUsers = async () => {
  */
 const seedCategories = async () => {
   console.log("[seeder] 📂 Seeding categories...");
-  
-  const categoriesData = [
-    { name: "Living Room", description: "Designer sofas and accent chairs for a statement living space.", image: furnitureImages.sofas[0], sortOrder: 1 },
-    { name: "Bedroom", description: "Premium beds and nightstands for the ultimate sleep experience.", image: furnitureImages.beds[0], sortOrder: 2 },
-    { name: "Dining", description: "Elegant dining sets and sideboards for shared moments.", image: furnitureImages.dining[0], sortOrder: 3 },
-    { name: "Lighting", description: "Sculptural lighting to illuminate your home with style.", image: furnitureImages.lighting[0], sortOrder: 4 },
-    { name: "Decor", description: "Curated objects and wall art for the finishing touch.", image: furnitureImages.decor[0], sortOrder: 5 }
-  ];
-  
-  const createdCategories = await Category.create(categoriesData);
-  const catMap = {};
-  createdCategories.forEach(c => catMap[c.name] = c._id);
-  
+
+  const { createdCategories, catMap } = await createSeedCategories();
+
   console.log(`  ✓ Created ${createdCategories.length} categories`);
   return catMap;
 };
@@ -304,63 +247,12 @@ const seedProducts = async (catMap) => {
 
 /**
  * Create sample orders for analytics
+ * (AR-31(c): generation shared with scripts/seed.js via seedCatalog.)
  */
 const seedOrders = async (customerUser, products) => {
   console.log("[seeder] 📦 Seeding sample orders...");
-  
-  const orders = [];
-  const numOrders = 20;
-  const now = new Date();
 
-  for (let i = 0; i < numOrders; i++) {
-    const daysAgo = Math.floor(Math.random() * 60);
-    const date = new Date(now);
-    date.setDate(date.getDate() - daysAgo);
-
-    const numItems = Math.floor(Math.random() * 3) + 1;
-    const orderItems = [];
-    let subtotal = 0;
-
-    for (let j = 0; j < numItems; j++) {
-      const prod = products[Math.floor(Math.random() * products.length)];
-      const qty = Math.floor(Math.random() * 2) + 1;
-      orderItems.push({
-        product: prod._id,
-        name: prod.name,
-        price: prod.price,
-        quantity: qty,
-        image: prod.images[0].url
-      });
-      subtotal += prod.price * qty;
-    }
-
-    orders.push({
-      user: customerUser._id,
-      guestInfo: {
-        email: customerUser.email,
-        firstName: customerUser.firstName,
-        lastName: customerUser.lastName,
-        phone: customerUser.phone || "9800000000"
-      },
-      items: orderItems,
-      shippingAddress: {
-        fullName: `${customerUser.firstName} ${customerUser.lastName}`,
-        phone: customerUser.phone || "9800000000",
-        addressLine1: "Baneshwor-10",
-        city: "Kathmandu",
-        postalCode: "44600",
-        country: "Nepal"
-      },
-      subtotal,
-      total: subtotal,
-      paymentMethod: i % 4 === 0 ? "esewa" : "cod",
-      paymentStatus: i % 4 === 0 ? "paid" : "pending",
-      orderStatus: i % 10 === 0 ? "delivered" : "processing",
-      createdAt: date,
-      orderedAt: date,
-      isGuestOrder: false
-    });
-  }
+  const orders = buildSampleOrders(customerUser, products);
 
   await Order.create(orders);
   console.log(`  ✓ Created ${orders.length} sample orders`);

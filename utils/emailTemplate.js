@@ -8,7 +8,7 @@ const generateVerificationEmailWithCode = (name, verificationCode) => {
 
         <!-- Logo -->
         <div style="padding: 32px 0;">
-          <img src="https://aurainteriors.com/aura-logo.png" alt="Aura Interiors Logo" width="60" style="margin-bottom: 16px;">
+          <img src="${require("../config/appConfig").requireAtUse("EMAIL_LOGO_URL")}" alt="Aura Interiors Logo" width="60" style="margin-bottom: 16px;">
         </div>
 
         <!-- Greeting -->
@@ -35,7 +35,7 @@ const generateVerificationEmailWithCode = (name, verificationCode) => {
           <p style="margin: 0;">&copy; ${new Date().getFullYear()} Aura Interiors. All rights reserved.</p>
           <p style="margin: 4px 0 0;">
             Need help?
-            <a href="mailto:support@aurainteriors.live" style="color: #1f2937; text-decoration: underline;">
+            <a href="mailto:${require("../config/appConfig").requireAtUse("SUPPORT_EMAIL")}" style="color: #1f2937; text-decoration: underline;">
               Contact Support
             </a>
           </p>
@@ -117,7 +117,7 @@ const generateOrderConfirmationEmail = (order) => {
 
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); padding: 32px; text-align: center;">
-          <img src="https://aurainteriors.com/aura-logo.png" alt="Aura Interiors" width="50" style="margin-bottom: 16px; filter: brightness(0) invert(1);">
+          <img src="${require("../config/appConfig").requireAtUse("EMAIL_LOGO_URL")}" alt="Aura Interiors" width="50" style="margin-bottom: 16px; filter: brightness(0) invert(1);">
           <h1 style="color: #ffffff; font-size: 24px; margin: 0; font-weight: 700;">Order Confirmed!</h1>
           <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0;">Thank you for shopping with Aura Interiors</p>
         </div>
@@ -213,7 +213,7 @@ const generateOrderConfirmationEmail = (order) => {
 
           <!-- CTA Button -->
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/track-order?orderId=${orderId}&email=${encodeURIComponent(guestInfo.email)}"
+            <a href="${require("../config/appConfig").requireAtUse("FRONTEND_URL")}/track-order?orderId=${orderId}&email=${encodeURIComponent(guestInfo.email)}"
                style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 14px;">
               Track Your Order
             </a>
@@ -222,7 +222,7 @@ const generateOrderConfirmationEmail = (order) => {
           <!-- Help Text -->
           <p style="font-size: 14px; color: #6b7280; text-align: center; margin: 0; line-height: 1.6;">
             If you have any questions about your order, please contact our support team at
-            <a href="mailto:support@aurainteriors.live" style="color: #0d9488; text-decoration: none;">support@aurainteriors.live</a>
+            <a href="mailto:${require("../config/appConfig").requireAtUse("SUPPORT_EMAIL")}" style="color: #0d9488; text-decoration: none;">${require("../config/appConfig").requireAtUse("SUPPORT_EMAIL")}</a>
           </p>
 
         </div>

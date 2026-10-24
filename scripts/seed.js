@@ -2,11 +2,22 @@ require("dotenv").config();
 const { getAdminCredentials } = require("../utils/adminCredentials");
 const mongoose = require("mongoose");
 const { connectDatabase } = require("../config/database");
-const User = require("../models/user.model");
 const Category = require("../models/category.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
-const { compressImageFromUrl } = require("../utils/imageCompression");
+// AR-31(c): the catalog/data core shared with the boot-path seeder
+// (services/databaseSeeder.js) lives in services/seedCatalog.js. This
+// script keeps its CLI entry point, its destructive-reseed guard and
+// its log shape — and its own (enriched) productsData below: the two
+// entry points' product documents diverge and were NOT unified (see
+// seedCatalog.js header).
+const {
+  furnitureImages,
+  ensureSeedAdmin,
+  ensureSeedCustomer,
+  createSeedCategories,
+  buildSampleOrders,
+} = require("../services/seedCatalog");
 
 const connectDB = async () => {
   if (!process.env.MONGO_URI) {
@@ -38,87 +49,32 @@ const assertSafeSeedTarget = async () => {
   }
 };
 
-const furnitureImages = {
-  sofas: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
-  ],
-  beds: [
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80"
-  ],
-  dining: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
-  ],
-  chairs: [
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80"
-  ],
-  decor: [
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80"
-  ],
-  lighting: [
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
-  ]
-};
-
 const runSeeder = async () => {
   try {
     if (process.env.NODE_ENV !== "development" || process.env.SEED_DEMO_DATA !== "true") {
       throw new Error("Demo seeding requires NODE_ENV=development and SEED_DEMO_DATA=true");
     }
-    const { email: adminEmail, password } = getAdminCredentials();
+    // Fail fast on missing/invalid admin credentials before connecting
+    // (ensureSeedAdmin below resolves them again for the actual seed).
+    getAdminCredentials();
     await connectDB();
     await assertSafeSeedTarget();
 
-    // 1. Seed Admin User if not exists
+    // 1. Seed Admin User if not exists (AR-31(c): shared with the
+    // boot-path seeder via seedCatalog; this script's log wording is
+    // passed through `messages`.)
     console.log("Checking Admin User...");
-    let adminUser = await User.findOne({ email: adminEmail });
-    if (!adminUser) {
-      adminUser = new User({
-        firstName: "Admin",
-        lastName: "User",
-        email: adminEmail,
-        password,
-        role: "admin",
-        phone: "9800000000",
-        isEmailVerified: true,
-        isActive: true,
-      });
-      await adminUser.save();
-      console.log(`✓ Admin user created: ${adminEmail}`);
-    } else {
-      console.log(`✓ Existing account preserved: ${adminEmail}`);
-    }
+    const userMessages = {
+      adminCreated: (email) => `✓ Admin user created: ${email}`,
+      adminExists: (email) => `✓ Existing account preserved: ${email}`,
+      customerCreated: (email) => `✓ Customer user created: ${email}`,
+      customerExists: (email) => `✓ Customer user exists, left unchanged: ${email}`,
+    };
+    await ensureSeedAdmin({ messages: userMessages });
 
     // 2. Seed Customer User if not exists
     console.log("Checking Customer User...");
-    const customerEmail = "customer@aurainteriors.com";
-    let customerUser = await User.findOne({ email: customerEmail });
-    if (!customerUser) {
-      customerUser = new User({
-        firstName: "Saugat",
-        lastName: "Shahi",
-        email: customerEmail,
-        password: "password123",
-        role: "customer",
-        phone: "9877665544",
-        isEmailVerified: true,
-        isActive: true,
-      });
-      await customerUser.save();
-      console.log(`✓ Customer user created: ${customerEmail} (password123)`);
-    } else {
-      customerUser.password = "password123";
-      await customerUser.save();
-      console.log(`✓ Customer user exists: ${customerEmail} (password updated)`);
-    }
+    const customerUser = await ensureSeedCustomer({ messages: userMessages });
 
     // 3. Clear existing catalog data
     console.log("Clearing catalog data (Categories, Products, Orders)...");
@@ -126,38 +82,19 @@ const runSeeder = async () => {
     await Product.deleteMany({});
     await Order.deleteMany({});
 
-    // 4. Create Categories (with image compression)
+    // 4. Create Categories (AR-31(c): shared data + creation via
+    // seedCatalog). The old per-image download+compress loop that ran
+    // here was DEAD: `compressedImageBuffer` was assigned and never
+    // read — the categories were created from the original URLs
+    // regardless — so it was removed as behavior-neutral cleanup
+    // (it only cost 5 network downloads and log noise per run).
     console.log("Creating categories...");
-    const categoriesData = [
-      { name: "Living Room", description: "Designer sofas and accent chairs for a statement living space.", image: furnitureImages.sofas[0], sortOrder: 1 },
-      { name: "Bedroom", description: "Premium beds and nightstands for the ultimate sleep experience.", image: furnitureImages.beds[0], sortOrder: 2 },
-      { name: "Dining", description: "Elegant dining sets and sideboards for shared moments.", image: furnitureImages.dining[0], sortOrder: 3 },
-      { name: "Lighting", description: "Sculptural lighting to illuminate your home with style.", image: furnitureImages.lighting[0], sortOrder: 4 },
-      { name: "Decor", description: "Curated objects and wall art for the finishing touch.", image: furnitureImages.decor[0], sortOrder: 5 }
-    ];
-    
-    // Download and compress category images before saving
-    console.log("Downloading and compressing category images...");
-    for (const category of categoriesData) {
-      try {
-        const compressedImageBuffer = await compressImageFromUrl(category.image);
-        // For now, keep the URL since we don't have a file storage set up in seed
-        // In production, this would be uploaded to Cloudinary/storage with compression
-        console.log(`✓ Compressed image for category: ${category.name}`);
-      } catch (error) {
-        console.warn(`Warning: Could not compress image for ${category.name}, using original URL`);
-      }
-    }
-    
-    const createdCategories = await Category.create(categoriesData);
-    const catMap = {};
-    createdCategories.forEach(c => catMap[c.name] = c._id);
+    const { createdCategories, catMap } = await createSeedCategories();
     console.log(`✓ Created ${createdCategories.length} categories.`);
 
-    // 5. Create Products (with image compression)
+    // 5. Create Products
     console.log("Creating premium catalog products...");
-    console.log("Downloading and compressing product images (this may take a minute)...");
-    
+
     const productsData = [
       {
         name: "Aura Sheesham Wood 3 Seater Sofa Cum Bed",
@@ -425,81 +362,17 @@ const runSeeder = async () => {
       }
     ];
 
-    // Compress product images before creating them
-    console.log("Compressing product images...");
-    for (const product of productsData) {
-      if (product.images && product.images.length > 0) {
-        for (const image of product.images) {
-          try {
-            const compressedImageBuffer = await compressImageFromUrl(image.url);
-            // In production, upload compressed buffer to Cloudinary
-            // For seed, we keep the URL but log compression benefit
-            console.log(`✓ Compressed image for product: ${product.name}`);
-          } catch (error) {
-            console.warn(`Warning: Could not compress image for ${product.name}, using original URL`);
-          }
-        }
-      }
-    }
+    // (The per-product download+compress loop that ran here was the
+    // same dead code as the category loop above — result assigned to
+    // `compressedImageBuffer` and never read — and was removed with it.)
 
     const createdProducts = await Product.create(productsData);
     console.log(`✓ Created ${createdProducts.length} premium products.`);
 
-    // 6. Create historical simulated orders
+    // 6. Create historical simulated orders (AR-31(c): generation
+    // shared with the boot-path seeder via seedCatalog).
     console.log("Generating simulated historical order records...");
-    const orders = [];
-    const numOrders = 20;
-    const now = new Date();
-
-    for (let i = 0; i < numOrders; i++) {
-      const daysAgo = Math.floor(Math.random() * 60);
-      const date = new Date(now);
-      date.setDate(date.getDate() - daysAgo);
-
-      const numItems = Math.floor(Math.random() * 3) + 1;
-      const orderItems = [];
-      let subtotal = 0;
-
-      for (let j = 0; j < numItems; j++) {
-        const prod = createdProducts[Math.floor(Math.random() * createdProducts.length)];
-        const qty = Math.floor(Math.random() * 2) + 1;
-        orderItems.push({
-          product: prod._id,
-          name: prod.name,
-          price: prod.price,
-          quantity: qty,
-          image: prod.images[0].url
-        });
-        subtotal += prod.price * qty;
-      }
-
-      orders.push({
-        user: customerUser._id,
-        guestInfo: {
-          email: customerUser.email,
-          firstName: customerUser.firstName,
-          lastName: customerUser.lastName,
-          phone: customerUser.phone || "9800000000"
-        },
-        items: orderItems,
-        shippingAddress: {
-          fullName: `${customerUser.firstName} ${customerUser.lastName}`,
-          phone: customerUser.phone || "9800000000",
-          addressLine1: "Baneshwor-10",
-          city: "Kathmandu",
-          postalCode: "44600",
-          country: "Nepal"
-        },
-        subtotal,
-        total: subtotal,
-        paymentMethod: i % 4 === 0 ? "esewa" : "cod",
-        paymentStatus: i % 4 === 0 ? "paid" : "pending",
-        orderStatus: i % 10 === 0 ? "delivered" : "processing",
-        createdAt: date,
-        orderedAt: date,
-        isGuestOrder: false
-      });
-    }
+    const orders = buildSampleOrders(customerUser, createdProducts);
 
     await Order.create(orders);
     console.log(`✓ Created ${orders.length} simulated orders.`);

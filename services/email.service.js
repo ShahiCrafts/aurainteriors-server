@@ -1,20 +1,34 @@
 const { issueNewsletterToken } = require("./newsletterToken.service");
 const { escapeHtml, safeUrl, escapeEmailData } = require("../utils/escapeHtml");
+const { maskEmail } = require("../utils/maskEmail");
 const axios = require("axios");
 
-const BREVO_API_BASE = "https://api.brevo.com/v3";
+// AR-09: the Brevo client previously had NO timeout - an unresponsive
+// Brevo endpoint hung the caller (request or broadcast loop) forever.
+// BREVO_TIMEOUT_MS bounds every call (default 15000). BREVO_API_BASE_URL
+// exists so the endpoint can be pointed at a mock/fault-injection
+// server in tests and staging; default is the production API.
+const appConfig = require("../config/appConfig");
+const BREVO_API_BASE = appConfig.getString("BREVO_API_BASE_URL"); // frozen at import, as today
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const brevoTimeoutMs = (() => {
+  const n = Number(appConfig.getInt("BREVO_TIMEOUT_MS"));
+  return Number.isFinite(n) && n > 0 ? n : 15000;
+})();
 
 const brevoClient = axios.create({
   baseURL: BREVO_API_BASE,
+  timeout: brevoTimeoutMs,
   headers: {
     "api-key": BREVO_API_KEY,
     "Content-Type": "application/json",
   },
 });
 
-const FROM = process.env.EMAIL_FROM || '"Aura Interiors" <support@aurainteriors.live>';
-const FRONTEND = process.env.FRONTEND_URL || "http://localhost:5173";
+// OA-1: EMAIL_FROM / FRONTEND_URL fallbacks REMOVED. Resolved live at
+// use; using either while unset throws an error naming the variable.
+const FROM = () => appConfig.requireAtUse("EMAIL_FROM");
+const FRONTEND = () => appConfig.requireAtUse("FRONTEND_URL");
 
 const BRAND = {
   orange: "#F27318",
@@ -92,10 +106,13 @@ const baseTemplate = (content) => `
 
 const divider = `<div style="height: 1px; background-color: ${BRAND.border}; margin: 28px 0;"></div>`;
 
+// FA-71: the helper itself enforces a safe href and an escaped label, so
+// no caller can produce an unsafe button by forgetting to sanitize.
 const ctaButton = (href, label) =>
-  `<a href="${href}" style="display: inline-block; padding: 13px 28px; background-color: ${BRAND.orange}; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
-    ${label}
+  `<a href="${safeUrl(href)}" style="display: inline-block; padding: 13px 28px; background-color: ${BRAND.orange}; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+    ${escapeHtml(label)}
   </a>`;
+exports.ctaButton = ctaButton;
 
 const securityNote = (msg) =>
   `<table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: ${BRAND.bg}; border-radius: 8px; margin-top: 24px;">
@@ -110,16 +127,18 @@ const parseEmailAddress = (emailStr) => {
   // Parse "Name <email@domain.com>" format
   const match = emailStr.match(/^"?([^<"]*)"?\s*<(.+)>$/);
   if (match) {
-    return { name: match[1].trim(), email: match[2].trim() };
+    // FA-57: a display name must never carry CR/LF, quotes or angle
+    // brackets into a message header / API sender field.
+    return { name: match[1].replace(/[\r\n"<>]/g, "").trim(), email: match[2].trim() };
   }
   // Handle plain email
   return { email: emailStr };
 };
 
 const send = async (to, subject, html) => {
-  console.log(`[email:send] Attempting to send to: ${to}, subject: ${subject}`);
+  console.log(`[email:send] Attempting to send to: ${maskEmail(to)}, subject: ${subject}`);
   
-  const sender = parseEmailAddress(FROM);
+  const sender = parseEmailAddress(FROM());
   
   try {
     const response = await brevoClient.post("/smtp/email", {
@@ -152,7 +171,7 @@ exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
 
       <h1 style="text-align: center; margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: ${BRAND.dark}; letter-spacing: -0.4px; line-height: 1.2;">Sign in to Aura Interiors</h1>
       <p style="text-align: center; margin: 0 0 24px 0; font-size: 15px; color: ${BRAND.dark}; line-height: 1.6;">
-        Hi ${email} — click the button below to sign in. This link is secure and expires in <strong style="font-weight: 700;">15 minutes</strong>.
+        Hi ${escapeHtml(email)} — click the button below to sign in. This link is secure and expires in <strong style="font-weight: 700;">15 minutes</strong>.
       </p>
 
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 24px;">
@@ -258,7 +277,7 @@ exports.sendWelcomeEmail = (email, firstName) =>
       </p>
 
       <div style="text-align: center; margin: 32px 0;">
-        ${ctaButton(`${FRONTEND}/shop`, "Browse the collection")}
+        ${ctaButton(`${FRONTEND()}/shop`, "Browse the collection")}
       </div>
 
       ${securityNote("Questions? Just reply to this email — we're happy to help.")}
@@ -295,12 +314,12 @@ exports.sendNewsletterWelcomeEmail = (email, nonce) =>
       </table>
 
       <div style="text-align: center; margin: 32px 0;">
-        ${ctaButton(`${FRONTEND}/shop`, "Browse collections")}
+        ${ctaButton(`${FRONTEND()}/shop`, "Browse collections")}
       </div>
 
       <p style="margin: 0; font-size: 12px; color: ${BRAND.muted}; text-align: center;">
         Didn't subscribe?
-        <a href="${FRONTEND}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", nonce, 90 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe here</a>.
+        <a href="${FRONTEND()}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", nonce, 30 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe here</a>.
       </p>
     `),
   );
@@ -317,12 +336,12 @@ exports.sendNewsletterBroadcast = async (subscribers, subject, htmlContent) => {
         ${htmlContent}
         <p style="margin-top: 32px; font-size: 12px; color: ${BRAND.muted}; text-align: center;">
           You received this because you subscribed to the Aura Interiors newsletter.
-          <a href="${FRONTEND}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", unsubscribeNonce, 90 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe</a>
+          <a href="${FRONTEND()}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", unsubscribeNonce, 30 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe</a>
         </p>
       `),
     }));
 
-    const sender = parseEmailAddress(FROM);
+    const sender = parseEmailAddress(FROM());
 
     const results = await Promise.allSettled(
       batchEmails.map(({ email, htmlContent }) =>
@@ -414,7 +433,7 @@ exports.sendOrderConfirmationEmail = async (order) => {
   `;
 
   // Track URL
-  const trackUrl = `${FRONTEND}/track-order?orderId=${orderId}&email=${encodeURIComponent(email)}`;
+  const trackUrl = `${FRONTEND()}/track-order?orderId=${orderId}&email=${encodeURIComponent(email)}`;
 
   const content = `
     <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #1A1714; letter-spacing: -0.3px; text-align: left;">
@@ -501,7 +520,7 @@ exports.verifyEmailConfig = async () => {
   try {
     // Test the API key by making a simple request
     const response = await brevoClient.get("/account");
-    console.log("[email] Brevo API config is valid. Account:", response.data.email);
+    console.log("[email] Brevo API config is valid. Account:", maskEmail(response.data.email));
     return true;
   } catch (err) {
     console.error("[email] Brevo API config error:", err.response?.data || err.message);
@@ -509,6 +528,6 @@ exports.verifyEmailConfig = async () => {
   }
 };
 exports.sendNewsletterConfirmationEmail = (email, token) => send(email, "Confirm your Aura Interiors newsletter subscription",
-  baseTemplate(`<p>Confirm your subscription to receive Aura Interiors news.</p>${ctaButton(safeUrl(`${FRONTEND}/newsletter/confirm?token=${encodeURIComponent(token)}`), "Confirm subscription")}`));
+  baseTemplate(`<p>Confirm your subscription to receive Aura Interiors news.</p>${ctaButton(safeUrl(`${FRONTEND()}/newsletter/confirm?token=${encodeURIComponent(token)}`), "Confirm subscription")}`));
 exports.sendContactResponseEmail = (email, name, message) => send(email, "Aura Interiors response to your enquiry",
   baseTemplate(`<p>Hello ${escapeHtml(name)},</p><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`));

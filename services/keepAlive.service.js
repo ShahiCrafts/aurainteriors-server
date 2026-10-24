@@ -9,7 +9,11 @@
  *   - Production: Enabled automatically when NODE_ENV=production
  * 
  * Configuration:
- *   - KEEP_ALIVE_ENABLED: Set to 'true' to enable (auto-enabled in production)
+ *   - KEEPALIVE_ENABLED: AR-44 gate — when set to a non-empty value it decides
+ *     enablement (true/1/on/yes or false/0/off/no, case-insensitive); this is
+ *     the only way to disable keep-alive in production. Unset/empty or an
+ *     unparseable value falls back to the legacy rule below.
+ *   - KEEP_ALIVE_ENABLED: Legacy — set to 'true' to enable (auto-enabled in production)
  *   - KEEP_ALIVE_INTERVAL: Interval in minutes between pings (default: 14 minutes)
  *   - BACKEND_URL: Base URL to ping (required for external pinging)
  */
@@ -18,20 +22,46 @@ const axios = require("axios");
 
 class KeepAliveService {
   constructor(options = {}) {
-    // Auto-enable in production, unless explicitly disabled
+    // Legacy rule (unchanged): auto-enable in production, or when the
+    // legacy KEEP_ALIVE_ENABLED is exactly "true".
     const isProduction = process.env.NODE_ENV === "production";
-    this.enabled =
+    const legacyEnabled =
       (process.env.KEEP_ALIVE_ENABLED === "true") || isProduction;
+
+    // AR-44 (D-E): KEEPALIVE_ENABLED, when set to a non-empty value,
+    // overrides the legacy rule. Parsed case-insensitively after trim:
+    // true/1/on/yes -> enabled, false/0/off/no -> disabled. Any other
+    // value warns once and falls back to the legacy rule. Unset/empty
+    // keeps the legacy rule exactly (including the production
+    // auto-enable quirk).
+    this.enabled = legacyEnabled;
+    const gateRaw = process.env.KEEPALIVE_ENABLED;
+    if (typeof gateRaw === "string" && gateRaw.trim() !== "") {
+      const gateValue = gateRaw.trim().toLowerCase();
+      if (["true", "1", "on", "yes"].includes(gateValue)) {
+        this.enabled = true;
+      } else if (["false", "0", "off", "no"].includes(gateValue)) {
+        this.enabled = false;
+      } else {
+        console.warn(
+          `[KeepAlive] Ignoring unrecognized KEEPALIVE_ENABLED value "${gateRaw}"; falling back to legacy enablement rule`,
+        );
+      }
+    }
 
     // Default: ping every 14 minutes (Render has a 15-minute idle timeout on free tier)
     this.intervalMinutes =
       parseInt(process.env.KEEP_ALIVE_INTERVAL) || 14;
 
-    // Use custom backend URL or infer from environment
+    // OA-1: the localhost last resort is REMOVED. RENDER_EXTERNAL_URL
+    // is retained as a middle fallback ONLY because it is a
+    // platform-provided value (Render injects it; it is not an app
+    // default). If neither is set, backendUrl stays null and ping()
+    // fails loudly naming BACKEND_URL - never a silent wrong URL.
     this.backendUrl =
       process.env.BACKEND_URL ||
       process.env.RENDER_EXTERNAL_URL ||
-      `http://localhost:${process.env.PORT || 3001}`;
+      null;
 
     this.intervalId = null;
     this.requestCount = 0;
@@ -89,6 +119,11 @@ class KeepAliveService {
    * Perform a health check ping
    */
   async ping() {
+    if (!this.backendUrl) {
+      const error = "BACKEND_URL is not configured: set BACKEND_URL (or run on a platform that provides RENDER_EXTERNAL_URL) before using keep-alive";
+      console.error(`[KeepAlive] \u2717 ${error}`);
+      return { success: false, duration: 0, error, timestamp: new Date() };
+    }
     const startTime = Date.now();
 
     try {
