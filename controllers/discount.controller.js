@@ -1,9 +1,15 @@
 const { prepareOrderItems } = require("../services/checkoutItems.service");
+const {
+  resolveDiscount,
+  evaluateDiscount,
+  sumCartSubtotal,
+} = require("../services/discountResolution.service");
 const { selectCartItems } = require("../utils/selectCartItems");
 const Discount = require("../models/discount.model");
 const Cart = require("../models/cart.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const { boundedLimit, boundedPage } = require("../utils/listQuery");
 
 exports.getAllDiscounts = catchAsync(async (req, res, next) => {
   const { status, page = 1, limit = 20 } = req.query;
@@ -18,8 +24,8 @@ exports.getAllDiscounts = catchAsync(async (req, res, next) => {
     filter.isActive = false;
   }
 
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = boundedPage(page);
+  const limitNum = boundedLimit(limit, 20);
   const skip = (pageNum - 1) * limitNum;
 
   const [discounts, total] = await Promise.all([
@@ -168,11 +174,9 @@ exports.applyDiscount = catchAsync(async (req, res, next) => {
     return next(new AppError("Please provide a discount code", 400));
   }
 
-  const discount = await Discount.findOne({ code: code.toUpperCase() });
-
-  if (!discount) {
-    return next(new AppError("Invalid discount code", 400));
-  }
+  // AR-31(a): resolution + evaluation via the shared core
+  // (services/discountResolution.service.js).
+  const discount = await resolveDiscount(code);
 
   const cart = await Cart.findOne({ user: req.user._id }).populate({
     path: "items.product",
@@ -183,19 +187,13 @@ exports.applyDiscount = catchAsync(async (req, res, next) => {
     return next(new AppError("Your cart is empty", 400));
   }
 
-  let subtotal = 0;
-  for (const item of cart.items) {
-    if (item.product) {
-      subtotal += item.product.price * item.quantity;
-    }
-  }
+  const subtotal = sumCartSubtotal(cart);
 
-  const validation = discount.validateForCart(subtotal);
+  const { validation, discountAmount } = evaluateDiscount(discount, subtotal);
   if (!validation.valid) {
     return next(new AppError(validation.message, 400));
   }
 
-  const discountAmount = discount.calculateDiscount(subtotal);
   const finalTotal = subtotal - discountAmount;
 
   res.status(200).json({
@@ -219,27 +217,17 @@ exports.applyDiscount = catchAsync(async (req, res, next) => {
 exports.validateDiscount = catchAsync(async (req, res, next) => {
   const { code } = req.params;
 
-  const discount = await Discount.findOne({ code: code.toUpperCase() });
-
-  if (!discount) {
-    return next(new AppError("Invalid discount code", 400));
-  }
+  // AR-31(a): resolution + evaluation via the shared core.
+  const discount = await resolveDiscount(code);
 
   const cart = await Cart.findOne({ user: req.user._id }).populate({
     path: "items.product",
     select: "price",
   });
 
-  let subtotal = 0;
-  if (cart && cart.items.length > 0) {
-    for (const item of cart.items) {
-      if (item.product) {
-        subtotal += item.product.price * item.quantity;
-      }
-    }
-  }
+  const subtotal = sumCartSubtotal(cart);
 
-  const validation = discount.validateForCart(subtotal);
+  const { validation, discountAmount } = evaluateDiscount(discount, subtotal);
 
   res.status(200).json({
     status: "success",
@@ -251,7 +239,7 @@ exports.validateDiscount = catchAsync(async (req, res, next) => {
             code: discount.code,
             discountPercentage: discount.discountPercentage,
             minimumOrderAmount: discount.minimumOrderAmount,
-            discountAmount: discount.calculateDiscount(subtotal),
+            discountAmount,
           }
         : null,
     },
@@ -272,11 +260,13 @@ exports.previewDiscount = catchAsync(async (req, res) => {
   if (!items?.length) throw new AppError("Select items before applying a promo", 400);
   const prepared = await prepareOrderItems(items);
   const subtotal = prepared.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discount = await Discount.findOne({ code: req.body.code });
-  if (!discount) throw new AppError("Invalid discount code", 400);
-  const validation = discount.validateForCart(subtotal);
+  // AR-31(a): was `Discount.findOne({ code: req.body.code })` VERBATIM —
+  // the one lookup site that did not normalize, so a stored (uppercase)
+  // code failed preview unless typed in exact uppercase. Now resolved
+  // through the shared core, identical verdicts to apply/validate.
+  const discount = await resolveDiscount(req.body.code);
+  const { validation, discountAmount } = evaluateDiscount(discount, subtotal);
   if (!validation.valid) throw new AppError(validation.message, 400);
-  const discountAmount = discount.calculateDiscount(subtotal);
   res.status(200).json({ status: "success", data: {
     discount: { code: discount.code, discountPercentage: discount.discountPercentage, discountAmount },
     cart: { subtotal, discountAmount, total: subtotal - discountAmount },

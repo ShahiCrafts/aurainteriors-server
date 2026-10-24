@@ -1,4 +1,5 @@
 const Joi = require("joi");
+const { joiSafeUrl } = require("../utils/safeUrl");
 
 const validCategories = [
   "living_room",
@@ -15,6 +16,7 @@ const targetAudienceSchema = Joi.object({
     .valid("all", "subscribers", "category", "custom")
     .default("subscribers"),
   categories: Joi.array()
+    .max(50)
     .items(Joi.string().valid(...validCategories))
     .when("type", {
       is: "category",
@@ -22,6 +24,7 @@ const targetAudienceSchema = Joi.object({
       otherwise: Joi.array().optional(),
     }),
   userIds: Joi.array()
+    .max(1000)
     .items(Joi.string().hex().length(24))
     .when("type", {
       is: "custom",
@@ -47,8 +50,8 @@ exports.createPromotionSchema = Joi.object({
   discount: Joi.string().hex().length(24).optional().messages({
     "string.length": "Invalid discount ID format",
   }),
-  actionUrl: Joi.string().uri({ allowRelative: true }).max(500).optional(),
-  imageUrl: Joi.string().uri().max(500).optional(),
+  actionUrl: joiSafeUrl(Joi, 500).optional(),
+  imageUrl: joiSafeUrl(Joi, 500).optional(),
   priority: Joi.string().valid("low", "normal", "high").default("normal"),
   tags: Joi.array().items(Joi.string().max(50).trim()).max(10).optional(),
   expiresAt: Joi.date().iso().min("now").optional(),
@@ -61,12 +64,10 @@ exports.updatePromotionSchema = Joi.object({
   targetAudience: targetAudienceSchema.optional(),
   scheduledAt: Joi.date().iso().min("now").allow(null).optional(),
   discount: Joi.string().hex().length(24).allow(null).optional(),
-  actionUrl: Joi.string()
-    .uri({ allowRelative: true })
-    .max(500)
+  actionUrl: joiSafeUrl(Joi, 500)
     .allow(null)
     .optional(),
-  imageUrl: Joi.string().uri().max(500).allow(null).optional(),
+  imageUrl: joiSafeUrl(Joi, 500).allow(null).optional(),
   priority: Joi.string().valid("low", "normal", "high").optional(),
   tags: Joi.array().items(Joi.string().max(50).trim()).max(10).optional(),
   expiresAt: Joi.date().iso().min("now").optional(),

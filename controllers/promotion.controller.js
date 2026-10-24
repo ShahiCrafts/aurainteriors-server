@@ -84,6 +84,16 @@ exports.updatePromotion = catchAsync(async (req, res, next) => {
 exports.sendPromotion = catchAsync(async (req, res, next) => {
   const result = await PromotionService.sendPromotion(req.params.id);
 
+  // AR-04: queue mode answers 202 with the job id (poll
+  // GET /api/v1/jobs/:id); inline keeps the existing 200 shape.
+  if (result.queued) {
+    return res.status(202).json({
+      status: "success",
+      message: result.message,
+      data: { jobId: result.jobId, queued: true },
+    });
+  }
+
   res.status(200).json({
     status: "success",
     message: result.message,
@@ -155,7 +165,7 @@ exports.trackEngagement = catchAsync(async (req, res, next) => {
     );
   }
 
-  await PromotionService.trackEngagement(promotionId, action);
+  await PromotionService.trackEngagement(promotionId, action, req.user?._id);
 
   res.status(200).json({
     status: "success",

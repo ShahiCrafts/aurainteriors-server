@@ -1,5 +1,10 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
+router.param("id", objectIdParam);
 const discountController = require("../controllers/discount.controller");
 const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");

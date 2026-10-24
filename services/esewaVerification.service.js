@@ -1,17 +1,41 @@
 const crypto = require("crypto");
 const axios = require("axios");
 const SIGNED_FIELDS = "transaction_code,status,total_amount,transaction_uuid,product_code,signed_field_names";
-const TEST_SECRET = "8gBm/:&EnhH.1/q";
+// FA-19: NO credential material lives in this source file any more -
+// not even eSewa's published sandbox secret, which used to sit here as
+// a literal and silently became the active key whenever NODE_ENV was
+// development. Every environment supplies its own ESEWA_MERCHANT_ID
+// and ESEWA_SECRET_KEY. For sandbox work, copy eSewa's published test
+// values into your local .env and set ESEWA_ENV=sandbox. The sandbox
+// endpoints are used ONLY for ESEWA_ENV=sandbox or NODE_ENV=test;
+// every other environment talks to the production endpoints, and a
+// missing key fails fast instead of falling back to a known secret.
+// Whether the old literal should also be purged from git history is
+// the owner's call (OWNER_DECISIONS.md, FA-19) - it is eSewa's public
+// test value, but it should still stop being this repo's fallback.
 exports.getEsewaConfig = () => {
-  const production = process.env.NODE_ENV === "production";
-  const merchantId = process.env.ESEWA_MERCHANT_ID || (production ? "" : "EPAYTEST");
-  const secretKey = process.env.ESEWA_SECRET_KEY || (production ? "" : TEST_SECRET);
-  if (!merchantId || !secretKey || (production && (merchantId === "EPAYTEST" || secretKey === TEST_SECRET))) {
+  // Lead review item 3 (GROUP C): the NODE_ENV "development" default lived
+  // at ~6 call sites pre-AR-32; it now lives only in the registry and this
+  // reads it from there. Behavior is identical for set/unset values (the
+  // registry returns def "development" on empty); a whitespace-only
+  // NODE_ENV now normalizes to "development" instead of "" (saner, and
+  // consistent with validateEnv).
+  const nodeEnv = String(require("../config/appConfig").get("NODE_ENV")).trim().toLowerCase();
+  const production = nodeEnv === "production";
+  const sandbox = process.env.ESEWA_ENV === "sandbox" || nodeEnv === "test";
+  const merchantId = process.env.ESEWA_MERCHANT_ID || "";
+  const secretKey = process.env.ESEWA_SECRET_KEY || "";
+  if (!merchantId || !secretKey) {
+    throw new Error(production
+      ? "Valid production eSewa merchant credentials are required"
+      : "eSewa merchant credentials are required: set ESEWA_MERCHANT_ID and ESEWA_SECRET_KEY (for sandbox testing, use eSewa's published test credentials with ESEWA_ENV=sandbox)");
+  }
+  if (production && merchantId === "EPAYTEST") {
     throw new Error("Valid production eSewa merchant credentials are required");
   }
   return { merchantId, secretKey,
-    paymentUrl: production ? "https://epay.esewa.com.np/api/epay/main/v2/form" : "https://rc-epay.esewa.com.np/api/epay/main/v2/form",
-    statusUrl: production ? "https://epay.esewa.com.np/api/epay/transaction/status/" : "https://uat.esewa.com.np/api/epay/transaction/status/",
+    paymentUrl: sandbox ? "https://rc-epay.esewa.com.np/api/epay/main/v2/form" : "https://epay.esewa.com.np/api/epay/main/v2/form",
+    statusUrl: sandbox ? "https://uat.esewa.com.np/api/epay/transaction/status/" : "https://epay.esewa.com.np/api/epay/transaction/status/",
   };
 };
 const amountMinor = (value) => {
@@ -64,9 +88,18 @@ exports.verifyEsewaRefund = async (order, config) => {
     params: { product_code: config.merchantId, transaction_uuid: order.orderId, total_amount: order.total.toFixed(2) },
     timeout: 10000, maxRedirects: 0, maxContentLength: 16384,
   });
-  if (data?.status !== "FULL_REFUND" || (data.product_code ?? data.scd) !== config.merchantId ||
-      (data.transaction_uuid ?? data.pid) !== order.orderId ||
-      amountMinor(data.total_amount ?? data.totalAmount) !== amountMinor(order.total.toFixed(2)) ||
-      (data.ref_id ?? data.refId) !== order.paymentDetails?.transactionId) throw new Error("REFUND_NOT_VERIFIED");
-  return data.ref_id ?? data.refId;
+  // Same field-conflict discipline as verifyEsewaPayment (B-23): when
+  // the provider returns BOTH the modern and legacy spellings of a
+  // field and they disagree, the response is not trustworthy - the
+  // previous ?? fallback silently trusted whichever came first.
+  const field = (primary, legacy) => {
+    if (data?.[primary] !== undefined && data?.[legacy] !== undefined &&
+        String(data[primary]) !== String(data[legacy])) throw new Error("REFUND_NOT_VERIFIED");
+    return data?.[primary] ?? data?.[legacy];
+  };
+  if (data?.status !== "FULL_REFUND" || field("product_code", "scd") !== config.merchantId ||
+      field("transaction_uuid", "pid") !== order.orderId ||
+      amountMinor(field("total_amount", "totalAmount")) !== amountMinor(order.total.toFixed(2)) ||
+      field("ref_id", "refId") !== order.paymentDetails?.transactionId) throw new Error("REFUND_NOT_VERIFIED");
+  return field("ref_id", "refId");
 };

@@ -36,10 +36,11 @@ exports.guestCheckoutSchema = Joi.object({
     }),
 
   items: Joi.array()
+    .max(50)
     .items(
       Joi.object({
         productId: Joi.string().required(),
-        quantity: Joi.number().integer().min(1).required(),
+        quantity: Joi.number().integer().min(1).max(99).required(),
         variant: Joi.object({
           color: Joi.string().allow(""),
           size: Joi.string().allow(""),

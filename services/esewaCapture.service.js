@@ -4,6 +4,8 @@ const Order = require("../models/order.model");
 const Product = require("../models/product.model");
 const Cart = require("../models/cart.model");
 const PaymentCapture = require("../models/paymentCapture.model");
+const { recordGuestStockConfirmFailure } = require("./guestStockMetrics.service");
+const stockReservation = require("./stockReservation.service");
 
 // Called only after callback verification. Provider verification is the caller's responsibility.
 exports.captureEsewaPayment = async (orderId, merchantId, response) => {
@@ -44,8 +46,25 @@ exports.captureEsewaPayment = async (orderId, merchantId, response) => {
       for (const [product, quantity] of quantities) {
         const changed = await Product.updateOne({ _id: product, deletedAt: null, status: "active", stock: { $gte: quantity } },
           { $inc: { stock: -quantity } }, { session });
-        if (changed.modifiedCount !== 1) throw new Error("PAYMENT_OUT_OF_STOCK");
+        if (changed.modifiedCount !== 1) {
+          // AR-25 (always-on): a GUEST capture failing on stock —
+          // money moved, fulfillment impossible — is counted +
+          // logged before the existing review_required fallback.
+          if (order.isGuestOrder === true) {
+            recordGuestStockConfirmFailure({
+              orderId: order._id,
+              source: "esewaCapture",
+              reason: "PAYMENT_OUT_OF_STOCK",
+            });
+          }
+          throw new Error("PAYMENT_OUT_OF_STOCK");
+        }
       }
+      // AR-25: stock is now committed for real, so any reservation
+      // holds this order carried are consumed. (The review_required
+      // path above/below deliberately leaves holds alone: they
+      // expire by TTL, or a later reconcile consumes them.)
+      await stockReservation.consumeForOrder(order._id, session);
     }
     const outcome = reason ? "review_required" : "confirmed";
     await PaymentCapture.create([{ _id: key, order: order._id, outcome, reason }], { session });
