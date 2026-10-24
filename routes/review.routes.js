@@ -1,6 +1,13 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router({ mergeParams: true }); // mergeParams to access productId from parent router
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
 const reviewController = require("../controllers/review.controller");
+const objectIdParam = require("../middleware/objectIdParam.middleware");
+// FA-77: guard the id params this router actually uses.
+router.param("reviewId", objectIdParam);
+router.param("productId", objectIdParam);
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
 const {

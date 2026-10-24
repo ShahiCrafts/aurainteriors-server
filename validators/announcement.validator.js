@@ -1,4 +1,5 @@
 const Joi = require("joi");
+const { joiSafeUrl } = require("../utils/safeUrl");
 
 // Valid announcement types
 const validTypes = ["general", "maintenance", "update", "promotion", "policy", "event"];
@@ -46,8 +47,8 @@ exports.createAnnouncementSchema = Joi.object({
     "date.min": "Expiration time must be in the future",
   }),
   isPinned: Joi.boolean().default(false),
-  imageUrl: Joi.string().uri({ allowRelative: true }).max(500).optional().allow("", null),
-  actionUrl: Joi.string().uri({ allowRelative: true }).max(500).optional().allow("", null),
+  imageUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
+  actionUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
   actionLabel: Joi.string().max(50).optional().allow("", null),
   tags: Joi.array()
     .items(Joi.string().trim().max(50))
@@ -89,8 +90,8 @@ exports.updateAnnouncementSchema = Joi.object({
   scheduledAt: Joi.date().iso().optional().allow(null),
   expiresAt: Joi.date().iso().optional().allow(null),
   isPinned: Joi.boolean().optional(),
-  imageUrl: Joi.string().uri({ allowRelative: true }).max(500).optional().allow("", null),
-  actionUrl: Joi.string().uri({ allowRelative: true }).max(500).optional().allow("", null),
+  imageUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
+  actionUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
   actionLabel: Joi.string().max(50).optional().allow("", null),
   tags: Joi.array()
     .items(Joi.string().trim().max(50))

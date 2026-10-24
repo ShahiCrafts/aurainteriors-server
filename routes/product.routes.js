@@ -1,5 +1,11 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
+router.param("id", objectIdParam);
+router.param("productId", objectIdParam);
 const productController = require("../controllers/product.controller");
 const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const {
@@ -7,6 +13,7 @@ const {
   processProductFiles,
 } = require("../middleware/upload.middleware");
 const validate = require("../middleware/validate.middleware");
+const { deleteFromCloudinary } = require("../config/cloudinary");
 const {
   createProductSchema,
   updateProductSchema,
@@ -32,20 +39,36 @@ router.get("/:id/related", productController.getRelatedProducts);
 
 router.use(protect, restrictTo("admin"));
 
+// FA-23: body validation runs BEFORE any file is uploaded to
+// Cloudinary, and if a later step rejects the request, every asset this
+// request uploaded is deleted again - no orphaned storage.
+const cleanupUploadedProductFiles = async (err, req, res, next) => {
+  try {
+    const uploaded = [
+      ...(req.files?.images || []).map((f) => [f.cloudinaryPublicId, "image"]),
+      ...(req.files?.modelFiles || []).map((f) => [f.cloudinaryPublicId, "raw"]),
+    ].filter(([id]) => Boolean(id));
+    await Promise.allSettled(uploaded.map(([id, type]) => deleteFromCloudinary(id, type)));
+  } catch { /* cleanup is best-effort; the original error wins */ }
+  next(err);
+};
+
 router.post(
   "/",
   uploadProductFiles,
-  processProductFiles,
   validate(createProductSchema),
-  productController.createProduct
+  processProductFiles,
+  productController.createProduct,
+  cleanupUploadedProductFiles
 );
 
 router.patch(
   "/:id",
   uploadProductFiles,
-  processProductFiles,
   validate(updateProductSchema),
-  productController.updateProduct
+  processProductFiles,
+  productController.updateProduct,
+  cleanupUploadedProductFiles
 );
 
 router.delete("/:id", productController.deleteProduct);

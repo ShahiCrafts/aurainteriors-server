@@ -8,6 +8,28 @@ const validVariant = variant => variant && typeof variant === "object" && !Array
     typeof variant[key] === "string" && variant[key].length <= 100);
 const visibleItems = cart => cart.items.filter(item => item.product);
 
+// FA-47 / AR-26: ONE guarded-write helper for every cart mutation. The
+// update only lands if the cart has not changed since it was read
+// (optimistic concurrency on __v): two racing mutations can no longer
+// both pass their checks against a stale snapshot - the loser gets a
+// 409 instead of silently overwriting. Returns true when the write
+// landed (and bumps the local version to match the stored one).
+const guardedCartWrite = async (cart, items) => {
+  const write = await Cart.updateOne(
+    { _id: cart._id, __v: cart.__v },
+    { $set: { items }, $inc: { __v: 1 } }
+  );
+  if (write.matchedCount !== 1) return false;
+  cart.__v += 1;
+  return true;
+};
+const cartConflictError = () => new AppError("Your cart was updated in another request. Please retry.", 409);
+
+// AR-26: with CART_GET_READONLY=on, GET /cart performs no writes at all
+// (no create-on-GET, no persisted prune). Default (unset) preserves the
+// historical create-and-prune behavior exactly. See FLAGS.md.
+const cartGetReadOnly = () => require("../config/appConfig").getString("CART_GET_READONLY") === "on";
+
 
 // Get user's cart
 exports.getCart = catchAsync(async (req, res, next) => {
@@ -22,6 +44,13 @@ exports.getCart = catchAsync(async (req, res, next) => {
   });
 
   if (!cart) {
+    if (cartGetReadOnly()) {
+      // AR-26: no cart document exists and GET must not create one.
+      return res.status(200).json({
+        success: true,
+        data: { cart: { _id: null, items: [], totalItems: 0, subtotal: 0 } },
+      });
+    }
     cart = await Cart.create({ user: req.user._id, items: [] });
   }
 
@@ -36,8 +65,10 @@ exports.getCart = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Remove invalid items if any were found
-  if (validItems.length !== cart.items.length) {
+  // Remove invalid items if any were found. AR-26: with
+  // CART_GET_READONLY=on the prune is response-only (visibleItems below
+  // already excludes them); the stored cart is left untouched.
+  if (validItems.length !== cart.items.length && !cartGetReadOnly()) {
     cart.items = validItems;
     await cart.save();
   }
@@ -116,7 +147,10 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     });
   }
 
-  await cart.save();
+  // FA-47 guarded write via the shared AR-26 helper (see top of file).
+  if (!(await guardedCartWrite(cart, cart.items))) {
+    return next(cartConflictError());
+  }
 
   // Populate and return updated cart
   await cart.populate({
@@ -185,7 +219,10 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   }
 
   item.quantity = quantity;
-  await cart.save();
+  // FA-47 guarded write via the shared AR-26 helper (see top of file).
+  if (!(await guardedCartWrite(cart, cart.items))) {
+    return next(cartConflictError());
+  }
 
   // Populate and return updated cart
   await cart.populate({
@@ -238,7 +275,11 @@ exports.removeFromCart = catchAsync(async (req, res, next) => {
   }
 
   cart.items.splice(itemIndex, 1);
-  await cart.save();
+  // AR-26: guarded write, same as add/update - was a plain save()
+  // (whole-array last-writer-wins) before.
+  if (!(await guardedCartWrite(cart, cart.items))) {
+    return next(cartConflictError());
+  }
 
   // Populate and return updated cart
   await cart.populate({
@@ -280,8 +321,11 @@ exports.clearCart = catchAsync(async (req, res, next) => {
     return next(new AppError("Cart not found", 404));
   }
 
+  // AR-26: guarded write, same as add/update - was a plain save().
+  if (!(await guardedCartWrite(cart, []))) {
+    return next(cartConflictError());
+  }
   cart.items = [];
-  await cart.save();
 
   res.status(200).json({
     success: true,

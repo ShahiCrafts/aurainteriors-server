@@ -1,13 +1,23 @@
 const { sendContactResponseEmail } = require("../services/email.service");
-const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
+const { boundedLimit, boundedPage, safeSort } = require("../utils/listQuery");
+const { asEnum, asBoolean } = require("../utils/params");
+const { literalRegExp } = require("../utils/escapeRegex");
 const Contact = require("../models/contact.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const notificationEventEmitter = require("../services/notificationEventEmitter");
+const { stripHtmlTags } = require("../utils/escapeHtml");
 
 // PUBLIC: Submit a contact form
 exports.submitContact = catchAsync(async (req, res, next) => {
-  const { name, email, phone, subject, message, category } = req.body;
+  const { email, phone, category } = req.body;
+  // FA-11: the public form is stored as PLAIN TEXT - markup is stripped at
+  // ingestion so stored fields cannot become script in admin views,
+  // notifications, or email. (The response email already escapes; this
+  // closes the stored-content path itself.)
+  const name = stripHtmlTags(req.body.name);
+  const subject = stripHtmlTags(req.body.subject);
+  const message = stripHtmlTags(req.body.message);
 
   const contact = await Contact.create({
     name,
@@ -62,37 +72,30 @@ exports.getAllContacts = catchAsync(async (req, res, next) => {
   const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
-  // Build filter
+  // Build filter (FA-56: values coerced against the model enums at the sink)
   const filter = {};
 
-  if (status) {
-    filter.status = status;
-  }
-
-  if (category) {
-    filter.category = category;
-  }
-
-  if (priority) {
-    filter.priority = priority;
-  }
-
-  if (isRead !== undefined) {
-    filter.isRead = isRead === "true";
-  }
+  const statusC = asEnum(status, ["new", "in-progress", "resolved", "closed"]);
+  const categoryC = asEnum(category, ["general", "support", "sales", "partnership", "feedback", "other"]);
+  const priorityC = asEnum(priority, ["low", "medium", "high"]);
+  const isReadC = asBoolean(isRead);
+  if (statusC !== undefined) filter.status = statusC;
+  if (categoryC !== undefined) filter.category = categoryC;
+  if (priorityC !== undefined) filter.priority = priorityC;
+  if (isReadC !== undefined) filter.isRead = isReadC;
 
   if (search) {
     filter.$or = [
-      { name: literalRegex(search) },
-      { email: literalRegex(search) },
-      { subject: literalRegex(search) },
-      { message: literalRegex(search) },
+      { name: literalRegExp(search) },
+      { email: literalRegExp(search) },
+      { subject: literalRegExp(search) },
+      { message: literalRegExp(search) },
     ];
   }
 
   const [contacts, total] = await Promise.all([
     Contact.find(filter)
-      .sort(sort)
+      .sort(safeSort(sort, ["createdAt", "name", "email"]))
       .skip(skip)
       .limit(limitNum)
       .populate("assignedTo", "firstName lastName email")
@@ -236,7 +239,7 @@ exports.deleteContact = catchAsync(async (req, res, next) => {
 
 // ADMIN: Bulk update contacts
 exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
-  const { ids, status, isRead } = req.body;
+  const { ids, status, isRead, priority, assignedTo } = req.body;
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     return next(new AppError("Please provide contact IDs", 400));
@@ -251,10 +254,18 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
   if (isRead !== undefined && typeof isRead !== "boolean") {
     return next(new AppError("isRead must be a boolean", 400));
   }
-  if (status === undefined && isRead === undefined) return next(new AppError("Provide an update", 400));
+  if (priority !== undefined && !["low", "medium", "high"].includes(priority)) {
+    return next(new AppError("Invalid contact priority", 400));
+  }
+  if (assignedTo !== undefined && assignedTo !== null && (typeof assignedTo !== "string" || !/^[a-f0-9]{24}$/i.test(assignedTo))) {
+    return next(new AppError("Invalid assignee", 400));
+  }
+  if (status === undefined && isRead === undefined && priority === undefined && assignedTo === undefined) return next(new AppError("Provide an update", 400));
   const uniqueIds = [...new Set(ids.map(id => id.toLowerCase()))];
   const updateData = {};
   if (status) updateData.status = status;
+  if (priority) updateData.priority = priority;
+  if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
   if (isRead !== undefined) {
     updateData.isRead = isRead;
     if (isRead) updateData.readAt = new Date();

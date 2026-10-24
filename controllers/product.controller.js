@@ -1,4 +1,6 @@
-const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
+const { boundedLimit, encodeCursor, decodeCursor, cursorAfterFilter } = require("../utils/listQuery");
+const { applyCatalogListFilters, catalogPagination, catalogSort } = require("../utils/catalogListQuery");
+const { asString, asNumber, asStringList, asObjectId } = require("../utils/params");
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const catchAsync = require("../utils/catchAsync");
@@ -25,86 +27,58 @@ const parseBoolean = (value) => {
 
 // Get all products with filtering, sorting, and pagination
 exports.getAllProducts = catchAsync(async (req, res, next) => {
-  const {
-    page = 1,
-    limit = 20,
-    sort = "-createdAt",
-    category,
-    categories,
-    status,
-    style,
-    minPrice,
-    maxPrice,
-    colors,
-    materials,
-    minRating,
-    search,
-    featured,
-    newArrivals,
-    inStock,
-  } = req.query;
+  const query = req.query || {};
+  const page = query.page;
+  const limit = query.limit;
+  const sort = query.sort;
+  // CQ-A (#3): every value below is forced through utils/params
+  // before use. Arrays/objects (?style[$ne]=x, ?style=a&style=b)
+  // previously reached .split()/parseFloat() raw - a type-confusion
+  // crash/500 and NaN filters. They are now treated as absent.
+  const categoryList = asStringList(query.category);
+  const categoriesList = asStringList(query.categories);
+  const statusList = asStringList(query.status);
+  const styleList = asStringList(query.style);
+  const minPrice = asNumber(query.minPrice);
+  const maxPrice = asNumber(query.maxPrice);
+  const colorList = asStringList(query.colors);
+  const materialList = asStringList(query.materials);
+  const minRating = asNumber(query.minRating);
+  const search = asString(query.search, 200);
+  const featured = asString(query.featured, 10);
+  const newArrivals = asString(query.newArrivals, 10);
+  const inStock = asString(query.inStock, 10);
 
   // Build filter
   const filter = { deletedAt: null };
 
   // Handle category filter by ID (legacy)
-  if (category) {
-    const categoryIds = category.split(",");
-    filter.category = { $in: categoryIds };
+  if (categoryList.length > 0) {
+    filter.category = { $in: categoryList };
   }
 
   // Handle categories filter by slug (new)
-  if (categories) {
-    const categorySlugs = categories.split(",").filter(Boolean);
-    if (categorySlugs.length > 0) {
-      const categoryDocs = await Category.find({ slug: { $in: categorySlugs } }).select("_id");
-      const categoryIds = categoryDocs.map((cat) => cat._id);
-      if (categoryIds.length > 0) {
-        filter.category = { $in: categoryIds };
-      }
+  if (categoriesList.length > 0) {
+    const categoryDocs = await Category.find({ slug: { $in: categoriesList } }).select("_id");
+    const categoryIds = categoryDocs.map((cat) => cat._id);
+    if (categoryIds.length > 0) {
+      filter.category = { $in: categoryIds };
     }
   }
 
+  const statusIsAll = statusList.length === 1 && statusList[0] === "all";
   if (req.user?.role !== "admin") {
     const visible = ["active", "out_of_stock"];
-    const requested = typeof status === "string" && status !== "all" ? status.split(",") : visible;
-    filter.status = { $in: requested.filter(value => visible.includes(value)) };
-  } else if (status && status !== "all") {
-    filter.status = { $in: status.split(",") };
-  } else if (!status) {
+    const requested = statusList.length > 0 && !statusIsAll ? statusList : visible;
+    filter.status = { $in: requested.filter((value) => visible.includes(value)) };
+  } else if (statusList.length > 0 && !statusIsAll) {
+    filter.status = { $in: statusList };
+  } else if (statusList.length === 0) {
     filter.status = { $in: ["active", "out_of_stock"] };
   }
 
-  if (style) {
-    const styles = style.split(",");
-    filter.style = { $in: styles };
-  }
-
-  if (minPrice || maxPrice) {
-    filter.price = {};
-    if (minPrice) filter.price.$gte = parseFloat(minPrice);
-    if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
-  }
-
-  // Handle colors filter (case-insensitive)
-  if (colors) {
-    const colorList = colors.split(",").filter(Boolean);
-    if (colorList.length > 0) {
-      filter.colors = { $in: colorList.map((c) => new RegExp(`^${escapeRegex(c)}$`, "i")) };
-    }
-  }
-
-  // Handle materials filter (case-insensitive)
-  if (materials) {
-    const materialList = materials.split(",").filter(Boolean);
-    if (materialList.length > 0) {
-      filter.materials = { $in: materialList.map((m) => new RegExp(`^${escapeRegex(m)}$`, "i")) };
-    }
-  }
-
-  // Handle rating filter
-  if (minRating) {
-    filter["rating.average"] = { $gte: parseFloat(minRating) };
+  if (styleList.length > 0) {
+    filter.style = { $in: styleList };
   }
 
   if (featured === "true") {
@@ -120,18 +94,47 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     filter.status = "active";
   }
 
-  if (search) {
-    filter.$text = { $search: search };
-  }
+  // AR-31(b): price/colors/materials/rating/search via the shared
+  // catalog list builder (utils/catalogListQuery.js), also used by
+  // category.controller.getCategoryProducts.
+  applyCatalogListFilters(filter, {
+    search,
+    minPrice,
+    maxPrice,
+    colorValues: colorList,
+    materialValues: materialList,
+    minRating,
+  });
 
-  const pageNum = boundedPage(page);
-  const limitNum = boundedLimit(limit);
-  const skip = (pageNum - 1) * limitNum;
+  const { pageNum, limitNum, skip } = catalogPagination(page, limit);
 
-  const [products, total] = await Promise.all([
-    Product.find(filter).populate("category", "name slug").sort(sort).skip(skip).limit(limitNum),
+  // AR-19: additive cursor mode — only when ?cursor= is present
+  // (empty string = start of the walk). Keyset on the list's default
+  // sort (createdAt desc, _id desc tiebreak); the response gains a
+  // nextCursor field ONLY in this mode. Absent param = byte-identical.
+  // AR-47: .lean() on the list read (body-identical; no projection —
+  // the list response ships the full product document today and which
+  // fields the client renders cannot be proven from this repo).
+  const cursorMode = query.cursor !== undefined;
+  const cursor = cursorMode && query.cursor ? decodeCursor(query.cursor) : null;
+  const pageFilter = cursor
+    ? { ...filter, $and: [...(filter.$and || []), cursorAfterFilter(cursor)] }
+    : filter;
+
+  const [productsPage, total] = await Promise.all([
+    cursorMode
+      ? Product.find(pageFilter).populate("category", "name slug").sort({ createdAt: -1, _id: -1 }).limit(limitNum + 1).lean()
+      : Product.find(filter).populate("category", "name slug").sort(catalogSort(sort)).skip(skip).limit(limitNum).lean(),
     Product.countDocuments(filter),
   ]);
+
+  let products = productsPage;
+  let nextCursor;
+  if (cursorMode) {
+    const hasMore = productsPage.length > limitNum;
+    products = hasMore ? productsPage.slice(0, limitNum) : productsPage;
+    nextCursor = hasMore && products.length > 0 ? encodeCursor(products[products.length - 1]) : null;
+  }
 
   res.status(200).json({
     status: "success",
@@ -144,6 +147,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
         total,
         pages: Math.ceil(total / limitNum),
       },
+      ...(cursorMode ? { nextCursor } : {}),
     },
   });
 });
@@ -196,8 +200,14 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     tags,
   } = req.body;
 
-  // Verify category exists
-  const categoryExists = await Category.findById(category);
+  // Verify category exists (CQ-B: the id is forced to an ObjectId
+  // string at the point of use; a container value is a clean 400,
+  // never a query operator)
+  const categoryId = asObjectId(category);
+  if (!categoryId) {
+    return next(new AppError("Category not found", 400));
+  }
+  const categoryExists = await Category.findById(categoryId);
   if (!categoryExists) {
     return next(new AppError("Category not found", 400));
   }
@@ -314,11 +324,15 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
 
   // Verify category if being updated
   if (category) {
-    const categoryExists = await Category.findById(category);
+    const categoryId = asObjectId(category);
+    if (!categoryId) {
+      return next(new AppError("Category not found", 400));
+    }
+    const categoryExists = await Category.findById(categoryId);
     if (!categoryExists) {
       return next(new AppError("Category not found", 400));
     }
-    product.category = category;
+    product.category = categoryId;
   }
 
   // Update basic fields
@@ -348,10 +362,15 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   if (materials !== undefined) product.materials = parseJsonField(materials);
   if (tags !== undefined) product.tags = parseJsonField(tags);
 
+  // AR-21: assets are destroyed only AFTER the save below commits.
+  // The old order (delete first, save later) left the product pointing
+  // at destroyed assets whenever the save failed. Collect the doomed
+  // publicIds now, filter the arrays in memory, delete post-commit.
+  const pendingAssetDeletes = [];
   if (removeImages) {
     const imagesToRemove = parseJsonField(removeImages) || [];
     const imagesToDelete = product.images.filter((img) => imagesToRemove.includes(img.url) && img.publicId);
-    await Promise.all(imagesToDelete.map((img) => deleteFile(img.publicId)));
+    pendingAssetDeletes.push(...imagesToDelete.map((img) => [img.publicId, "image"]));
     product.images = product.images.filter((img) => !imagesToRemove.includes(img.url));
   }
 
@@ -360,7 +379,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     const modelsToDelete = product.modelFiles.filter(
       (model) => modelsToRemove.includes(model.url) && !model.isExternal && model.publicId
     );
-    await Promise.all(modelsToDelete.map((model) => deleteFile(model.publicId, "raw")));
+    pendingAssetDeletes.push(...modelsToDelete.map((model) => [model.publicId, "raw"]));
     product.modelFiles = product.modelFiles.filter((model) => !modelsToRemove.includes(model.url));
   }
 
@@ -415,6 +434,18 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   }
 
   await product.save();
+
+  // AR-21: post-commit asset cleanup. A failure here orphans the asset
+  // (nothing references it anymore) - logged as a structured,
+  // alertable asset_cleanup_pending record for later reaping;
+  // deleteFromCloudinary additionally logs cloudinary_delete_failed.
+  for (const [publicId, resourceType] of pendingAssetDeletes) {
+    const result = await deleteFile(publicId, resourceType);
+    if (result === null) {
+      console.error(JSON.stringify({ level: "error", event: "asset_cleanup_pending", publicId, resourceType, context: "product.update" }));
+    }
+  }
+
   await product.populate("category", "name slug");
 
   res.status(200).json({
@@ -449,17 +480,28 @@ exports.hardDeleteProduct = catchAsync(async (req, res, next) => {
     return next(new AppError("Product not found", 404));
   }
 
-  if (product.images && product.images.length > 0) {
-    const imagePublicIds = product.images.filter((img) => img.publicId).map((img) => img.publicId);
-    await deleteFiles(imagePublicIds);
-  }
-
-  if (product.modelFiles && product.modelFiles.length > 0) {
-    const modelPublicIds = product.modelFiles.filter((m) => m.publicId && !m.isExternal).map((m) => m.publicId);
-    await Promise.all(modelPublicIds.map((id) => deleteFile(id, "raw")));
-  }
+  // AR-21: the record is deleted FIRST; its assets are destroyed only
+  // after the delete commits (previously a failed DB delete left the
+  // live product pointing at destroyed assets).
+  const imagePublicIds = (product.images || []).filter((img) => img.publicId).map((img) => img.publicId);
+  const modelPublicIds = (product.modelFiles || []).filter((m) => m.publicId && !m.isExternal).map((m) => m.publicId);
 
   await Product.findByIdAndDelete(req.params.id);
+
+  if (imagePublicIds.length > 0) {
+    const results = await deleteFiles(imagePublicIds);
+    (Array.isArray(results) ? results : []).forEach((result, i) => {
+      if (result === null) {
+        console.error(JSON.stringify({ level: "error", event: "asset_cleanup_pending", publicId: imagePublicIds[i], resourceType: "image", context: "product.hardDelete" }));
+      }
+    });
+  }
+  await Promise.all(modelPublicIds.map(async (id) => {
+    const result = await deleteFile(id, "raw");
+    if (result === null) {
+      console.error(JSON.stringify({ level: "error", event: "asset_cleanup_pending", publicId: id, resourceType: "raw", context: "product.hardDelete" }));
+    }
+  }));
 
   res.status(200).json({
     status: "success",
@@ -519,7 +561,8 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
   let relatedProducts = await Product.find(query)
     .limit(limitNum)
     .select("name slug price originalPrice images rating category style tags")
-    .populate("category", "name slug");
+    .populate("category", "name slug")
+    .lean();
 
   // Tier 2: Same Category (if Tier 1 didn't fill limit)
   if (relatedProducts.length < limitNum) {
@@ -534,7 +577,8 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
     const tier2Products = await Product.find(tier2Query)
       .limit(limitNum - relatedProducts.length)
       .select("name slug price originalPrice images rating category style tags")
-      .populate("category", "name slug");
+      .populate("category", "name slug")
+      .lean();
 
     relatedProducts = [...relatedProducts, ...tier2Products];
   }
@@ -552,7 +596,8 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
     const tier3Products = await Product.find(tier3Query)
       .limit(limitNum - relatedProducts.length)
       .select("name slug price originalPrice images rating category style tags")
-      .populate("category", "name slug");
+      .populate("category", "name slug")
+      .lean();
 
     relatedProducts = [...relatedProducts, ...tier3Products];
   }
@@ -577,7 +622,8 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
   })
     .limit(boundedLimit(limit))
     .select("name slug price originalPrice images rating category")
-    .populate("category", "name slug");
+    .populate("category", "name slug")
+    .lean();
 
   res.status(200).json({
     status: "success",
@@ -599,7 +645,8 @@ exports.getNewArrivals = catchAsync(async (req, res, next) => {
   })
     .limit(boundedLimit(limit))
     .select("name slug price originalPrice images rating category")
-    .populate("category", "name slug");
+    .populate("category", "name slug")
+    .lean();
 
   res.status(200).json({
     status: "success",

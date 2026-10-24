@@ -1,6 +1,9 @@
 const User = require("../models/user.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const { boundedLimit, boundedPage, safeSort } = require("../utils/listQuery");
+const { literalRegExp } = require("../utils/escapeRegex");
+const { asEnum, asBoolean, asString } = require("../utils/params");
 
 // ADMIN: Get all users with filtering and pagination
 exports.getAllUsers = catchAsync(async (req, res, next) => {
@@ -13,34 +16,45 @@ exports.getAllUsers = catchAsync(async (req, res, next) => {
         sort = "-createdAt",
     } = req.query;
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = boundedPage(page);
+    const limitNum = boundedLimit(limit, 20);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build filter
+    // Build filter (FA-46: values coerced at the point of use - a raw
+    // query value, including arrays/operator objects, never reaches
+    // the filter or a field assignment)
     const filter = { deletedAt: null };
 
-    if (role) {
-        filter.role = role;
+    const roleValue = asEnum(role, ["customer", "admin"]);
+    if (roleValue) {
+        filter.role = roleValue;
     }
 
-    if (isActive !== undefined) {
-        filter.isActive = isActive === "true";
+    const isActiveValue = asBoolean(isActive);
+    if (isActiveValue !== undefined) {
+        filter.isActive = isActiveValue;
     }
 
-    if (search) {
+    const searchValue = asString(search, 100);
+    if (searchValue) {
+        const searchRegex = literalRegExp(searchValue);
         filter.$or = [
-            { firstName: new RegExp(search, "i") },
-            { lastName: new RegExp(search, "i") },
-            { email: new RegExp(search, "i") },
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { email: searchRegex },
         ];
     }
 
     const [users, total] = await Promise.all([
+        // AR-47: lean list read. No projection is added: the model's
+        // select:false fields (password, tokens, OTP) already stay out
+        // of the response, and lean does not change that — the body is
+        // identical, only hydration cost is removed.
         User.find(filter)
-            .sort(sort)
+            .sort(safeSort(sort, ["createdAt", "firstName", "lastName", "email", "lastLogin"]))
             .skip(skip)
-            .limit(limitNum),
+            .limit(limitNum)
+            .lean(),
         User.countDocuments(filter),
     ]);
 
@@ -79,8 +93,9 @@ exports.getUser = catchAsync(async (req, res, next) => {
 exports.updateUserStatus = catchAsync(async (req, res, next) => {
     const { isActive, reason } = req.body;
 
-    if (isActive === undefined) {
-        return next(new AppError("Please provide isActive status", 400));
+    // FA-46: isActive must be a real boolean before it is assigned.
+    if (typeof isActive !== "boolean") {
+        return next(new AppError("Please provide isActive as a boolean", 400));
     }
 
     const user = await User.findById(req.params.id);

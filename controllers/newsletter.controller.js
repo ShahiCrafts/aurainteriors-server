@@ -2,7 +2,7 @@ const { boundedPage, boundedLimit } = require("../utils/listQuery");
 const Newsletter = require('../models/newsletter.model');
 const crypto = require('crypto');
 const { issueNewsletterToken, verifyNewsletterToken } = require('../services/newsletterToken.service');
-const { sendNewsletterConfirmationEmail, sendNewsletterWelcomeEmail, sendNewsletterBroadcast } = require('../services/email.service');
+const { sendNewsletterConfirmationEmail, sendNewsletterBroadcast } = require('../services/email.service');
 
 /**
  * Subscribe to newsletter
@@ -14,14 +14,23 @@ exports.subscribe = async (req, res) => {
         const { email, source = 'footer' } = req.body;
         let subscriber = await Newsletter.findOne({ email });
         if (!subscriber?.isActive) {
-            const nonce = crypto.randomBytes(24).toString('hex');
-            const token = issueNewsletterToken(email, 'subscribe', nonce, 24 * 60 * 60 * 1000);
-            if (!subscriber) subscriber = new Newsletter({ email, source, isActive: false });
-            subscriber.source = source;
-            subscriber.confirmationTokenHash = crypto.createHash('sha256').update(token).digest('hex');
-            subscriber.confirmationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            await subscriber.save();
-            await sendNewsletterConfirmationEmail(email, token);
+            // FA-60: a still-valid pending confirmation is NOT re-issued or
+            // re-sent inside the resend cooldown - duplicate subscribes
+            // cannot be used to mail-bomb an address or churn its token.
+            const stillValid = subscriber?.confirmationExpiresAt && subscriber.confirmationExpiresAt > new Date();
+            const inCooldown = subscriber?.confirmationSentAt && Date.now() - new Date(subscriber.confirmationSentAt).getTime() < 5 * 60 * 1000;
+            if (!(stillValid && inCooldown)) {
+                const nonce = crypto.randomBytes(24).toString('hex');
+                const token = issueNewsletterToken(email, 'subscribe', nonce, 24 * 60 * 60 * 1000);
+                // FA-54: source attribution is set at creation only; a
+                // re-subscribe never overwrites the original source.
+                if (!subscriber) subscriber = new Newsletter({ email, source, isActive: false });
+                subscriber.confirmationTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                subscriber.confirmationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                subscriber.confirmationSentAt = new Date();
+                await subscriber.save();
+                await sendNewsletterConfirmationEmail(email, token);
+            }
         }
         res.status(200).json({ success: true, message: 'If confirmation is needed, check your email to complete your subscription.' });
     } catch (_error) {
@@ -39,7 +48,11 @@ exports.confirmSubscription = async (req, res) => {
             $unset: { confirmationTokenHash: 1, confirmationExpiresAt: 1, unsubscribedAt: 1 },
         }, { new: true });
         if (!subscriber) return res.status(400).json({ success: false, message: 'This confirmation link is invalid or expired.' });
-        sendNewsletterWelcomeEmail(email, subscriber.unsubscribeNonce).catch(() => console.error('Newsletter welcome email unavailable'));
+        // AR-20: the welcome email goes through the outbox dispatcher
+        // in both modes (fire-and-forget here - response timing is
+        // unchanged; in outbox mode the queued row is drained with
+        // retries, in direct mode the outcome is recorded).
+        require('../services/emailOutbox.service').dispatchEmail({ kind: 'newsletter-welcome', to: email, payload: { email, nonce: subscriber.unsubscribeNonce } }).catch(() => console.error('Newsletter welcome email unavailable'));
         res.status(200).json({ success: true, message: 'Your newsletter subscription is confirmed.' });
     } catch (_error) { res.status(400).json({ success: false, message: 'This confirmation link is invalid or expired.' }); }
 };
@@ -64,7 +77,7 @@ exports.getSubscribers = async (req, res) => {
             .sort({ subscribedAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
-            .select('-__v');
+            .select('-__v -unsubscribeNonce -confirmationTokenHash');
 
         const total = await Newsletter.countDocuments(query);
 
@@ -106,18 +119,23 @@ exports.sendTrend = async (req, res) => {
             });
         }
 
+        // AR-04: BROADCAST_MODE=queue enqueues the broadcast; the
+        // worker handler loads subscribers fresh, ensures nonces and
+        // sends in resumable slices. Inline (default) is unchanged.
+        const broadcastJobs = require('../services/broadcastJobs.service');
+        if (broadcastJobs.isQueueMode()) {
+            const job = await broadcastJobs.enqueueNewsletter({ subject, htmlContent, textContent });
+            return res.status(202).json({
+                success: true,
+                message: 'Trend emails queued',
+                data: { jobId: job._id, queued: true },
+            });
+        }
+
         // Get all active subscribers
         const subscribers = await Newsletter.find({ isActive: true }).select('email unsubscribeNonce');
         // Existing active subscriptions need a nonce before their next email.
-        for (const subscriber of subscribers) {
-            if (!subscriber.unsubscribeNonce) {
-                const nonce = crypto.randomBytes(24).toString('hex');
-                const updated = await Newsletter.findOneAndUpdate({ _id: subscriber._id, unsubscribeNonce: null },
-                    { $set: { unsubscribeNonce: nonce } }, { new: true });
-                const current = updated || await Newsletter.findById(subscriber._id);
-                subscriber.unsubscribeNonce = current.unsubscribeNonce;
-            }
-        }
+        await broadcastJobs.ensureSubscriberNonces(subscribers);
 
         if (subscribers.length === 0) {
             return res.status(404).json({
@@ -152,10 +170,14 @@ exports.sendTrend = async (req, res) => {
 exports.unsubscribe = async (req, res) => {
     try {
         const { email, nonce } = verifyNewsletterToken(req.body.token, 'unsubscribe');
-        await Newsletter.updateOne({ email, unsubscribeNonce: nonce }, {
-            $set: { isActive: false, unsubscribedAt: new Date() },
+        // FA-05: the nonce ROTATES on use, so a used unsubscribe link can
+        // never be replayed; and a non-matching nonce is an error, not a
+        // silent "success".
+        const result = await Newsletter.updateOne({ email, unsubscribeNonce: nonce }, {
+            $set: { isActive: false, unsubscribedAt: new Date(), unsubscribeNonce: crypto.randomBytes(24).toString('hex') },
             $unset: { confirmationTokenHash: 1, confirmationExpiresAt: 1 },
         });
+        if (!result.matchedCount) return res.status(400).json({ success: false, message: 'This unsubscribe link is invalid or expired.' });
         res.status(200).json({ success: true, message: 'Your unsubscribe request has been processed.' });
     } catch (_error) { res.status(400).json({ success: false, message: 'This unsubscribe link is invalid or expired.' }); }
 };

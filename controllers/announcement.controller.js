@@ -1,4 +1,5 @@
 const AnnouncementService = require("../services/announcementService");
+const { asEnum, asBoolean } = require("../utils/params");
 const catchAsync = require("../utils/catchAsync");
 
 // ADMIN OPERATIONS
@@ -7,15 +8,18 @@ const catchAsync = require("../utils/catchAsync");
  * Get all announcements (Admin)
  */
 exports.getAllAnnouncements = catchAsync(async (req, res, next) => {
-  const { page = 1, limit = 20, status, type, priority, isPinned } = req.query;
+  const { page = 1, limit = 20 } = req.query;
 
+  // CQ-B: the filter values are forced through the enum/boolean
+  // helpers at the point of use - an object/array (?status[$ne]=x)
+  // is treated as "no filter", never as a query operator.
   const result = await AnnouncementService.getAllAnnouncements({
     page: parseInt(page, 10),
     limit: parseInt(limit, 10),
-    status,
-    type,
-    priority,
-    isPinned: isPinned !== undefined ? isPinned === "true" : undefined,
+    status: asEnum(req.query.status, ["draft", "scheduled", "published", "archived"]),
+    type: asEnum(req.query.type, ["general", "maintenance", "update", "promotion", "policy", "event"]),
+    priority: asEnum(req.query.priority, ["low", "normal", "high", "critical"]),
+    isPinned: asBoolean(req.query.isPinned),
   });
 
   res.status(200).json({
@@ -108,15 +112,25 @@ exports.updateAnnouncement = catchAsync(async (req, res, next) => {
  * Publish announcement immediately (Admin)
  */
 exports.publishAnnouncement = catchAsync(async (req, res, next) => {
-  const announcement = await AnnouncementService.publishAnnouncement(
+  const result = await AnnouncementService.publishAnnouncement(
     req.params.id,
     req.user._id
   );
 
+  // AR-04: queue mode — the announcement is published synchronously
+  // but its notifications are queued; answer 202 with the job id.
+  if (result && result.queued) {
+    return res.status(202).json({
+      status: "success",
+      message: "Announcement published; notifications queued",
+      data: { announcement: result.announcement, jobId: result.jobId, queued: true },
+    });
+  }
+
   res.status(200).json({
     status: "success",
     message: "Announcement published successfully",
-    data: { announcement },
+    data: { announcement: result },
   });
 });
 

@@ -1,5 +1,8 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
 const express = require('express');
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
 const newsletterController = require('../controllers/newsletter.controller');
 const { subscribeSchema, unsubscribeSchema, confirmSubscriptionSchema, sendTrendSchema } = require('../validators/newsletter.validator');
 const { createAuthLimiter } = require('../middleware/authRateLimit.middleware');

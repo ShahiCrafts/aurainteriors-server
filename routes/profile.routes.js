@@ -1,5 +1,8 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
 const profileController = require("../controllers/profile.controller");
 const { protect } = require("../middleware/auth.middleware");
 const {

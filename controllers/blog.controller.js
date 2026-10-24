@@ -1,8 +1,16 @@
-const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
+const { boundedLimit, boundedPage, safeSort } = require("../utils/listQuery");
+const { escapeRegExp, literalRegExp } = require("../utils/escapeRegex");
 const Blog = require("../models/blog.model");
+const BlogEngagement = require("../models/blogEngagement.model");
+const { actorFor } = require("../utils/anonActor");
+const { asString, asEnum } = require("../utils/params");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const { fetchAllFeeds, getFeedSources, updateFeaturedArticles } = require("../services/rssFeedService");
+const { getCached, setCached } = require("../utils/ttlCache");
+// AR-17: blog stats/categories/sources share the AR-11 cache flag
+// (ANALYTICS_CACHE_TTL_MS; unset/0 = no caching = current behavior).
+const blogCacheKey = (name, req) => `blog:${name}:${JSON.stringify(req.query || {})}`;
 
 // Get all blogs with pagination and filtering
 exports.getAllBlogs = catchAsync(async (req, res, next) => {
@@ -21,39 +29,59 @@ exports.getAllBlogs = catchAsync(async (req, res, next) => {
   const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
-  // Build filter
+  // Build filter (FA-51: query values coerced to scalars/enums at the
+  // sink - an object or array value must never reach the Mongo filter)
   const filter = {};
 
-  if (category && category !== "all") {
-    filter.category = category;
+  const categoryValue = asEnum(category, ["design-tips", "styling", "sustainability", "small-spaces", "trends", "guides", "news", "inspiration"]);
+  if (categoryValue && category !== "all") {
+    filter.category = categoryValue;
   }
 
-  if (tag) {
-    filter.tags = { $in: [literalRegex(tag)] };
+  const tagValue = asString(tag, 50);
+  if (tagValue) {
+    // Exact tag match (B-31): the unanchored pattern matched any tag
+    // merely CONTAINING the text ("art" -> "artistic", "smart").
+    filter.tags = { $in: [new RegExp(`^${escapeRegExp(tagValue)}$`, "i")] };
   }
 
-  if (source) {
-    filter["source.name"] = literalRegex(source);
+  const sourceValue = asString(source, 100);
+  if (sourceValue) {
+    filter["source.name"] = literalRegExp(sourceValue);
   }
 
   if (featured === "true") {
     filter.isFeatured = true;
   }
 
+  // AR-18 (D-F): BLOG_SEARCH_MODE=text switches search to the scoped
+  // $text index (models/blog.model.js, AR-28) instead of the unanchored
+  // regex $or. Default (unset / any other value) = regex = current
+  // behavior. In text mode with no explicit sort, results are ordered
+  // by text relevance instead of -publishedAt (see CLIENT_IMPACT.md).
+  const searchValue = asString(search, 200);
+  const textMode = require("../config/appConfig").getString("BLOG_SEARCH_MODE") === "text" && !!searchValue;
   if (search) {
-    filter.$or = [
-      { title: literalRegex(search) },
-      { excerpt: literalRegex(search) },
-      { tags: { $in: [literalRegex(search)] } },
-    ];
+    if (textMode) {
+      filter.$text = { $search: searchValue };
+    } else {
+      filter.$or = [
+        { title: literalRegExp(search) },
+        { excerpt: literalRegExp(search) },
+        { tags: { $in: [literalRegExp(search)] } },
+      ];
+    }
   }
 
   const [blogs, total] = await Promise.all([
     Blog.find(filter)
-      .sort(sort)
+      .sort(textMode && req.query.sort === undefined
+        ? { score: { $meta: "textScore" } }
+        : safeSort(sort, ["createdAt", "publishedAt", "title", "views", "likes"], "-publishedAt"))
       .skip(skip)
       .limit(limitNum)
-      .select("-content"), // Exclude full content in list view
+      .select("-content") // Exclude full content in list view
+      .lean(), // AR-47
     Blog.countDocuments(filter),
   ]);
 
@@ -86,8 +114,19 @@ exports.getBlog = catchAsync(async (req, res, next) => {
     return next(new AppError("Blog post not found", 404));
   }
 
-  // Increment views (don't await to not slow down response)
-  blog.incrementViews().catch(console.error);
+  // FA-25: a view counts once per actor (authenticated id or signed
+  // anonymous cookie) - the unique engagement record is the gate, the
+  // counter only moves when a new record lands. Fire-and-forget, as
+  // before, so reads are not slowed.
+  const viewActor = actorFor(req, res);
+  (async () => {
+    try {
+      await BlogEngagement.create({ blog: blog._id, actor: viewActor, kind: "view" });
+      await blog.incrementViews();
+    } catch (error) {
+      if (error?.code !== 11000) console.error(error);
+    }
+  })();
 
   res.status(200).json({
     status: "success",
@@ -129,6 +168,8 @@ exports.getFeaturedBlogs = catchAsync(async (req, res, next) => {
 
 // Get blog categories with counts
 exports.getBlogCategories = catchAsync(async (req, res, next) => {
+  const hit = getCached(blogCacheKey("categories", req));
+  if (hit !== undefined) return res.status(200).json(hit);
   const categories = await Blog.aggregate([
     {
       $group: {
@@ -159,7 +200,7 @@ exports.getBlogCategories = catchAsync(async (req, res, next) => {
   // Add total count
   const totalCount = formattedCategories.reduce((sum, cat) => sum + cat.count, 0);
 
-  res.status(200).json({
+  const body = {
     status: "success",
     data: {
       categories: [
@@ -167,11 +208,15 @@ exports.getBlogCategories = catchAsync(async (req, res, next) => {
         ...formattedCategories,
       ],
     },
-  });
+  };
+  setCached(blogCacheKey("categories", req), body);
+  res.status(200).json(body);
 });
 
 // Get feed sources
 exports.getFeedSources = catchAsync(async (req, res, next) => {
+  const hit = getCached(blogCacheKey("sources", req));
+  if (hit !== undefined) return res.status(200).json(hit);
   const sources = getFeedSources();
 
   // Get article counts per source
@@ -194,12 +239,14 @@ exports.getFeedSources = catchAsync(async (req, res, next) => {
     articleCount: countsMap[source.name] || 0,
   }));
 
-  res.status(200).json({
+  const body = {
     status: "success",
     data: {
       sources: sourcesWithCounts,
     },
-  });
+  };
+  setCached(blogCacheKey("sources", req), body);
+  res.status(200).json(body);
 });
 
 // Get related blogs
@@ -225,7 +272,8 @@ exports.getRelatedBlogs = catchAsync(async (req, res, next) => {
   })
     .sort({ publishedAt: -1 })
     .limit(boundedLimit(limit))
-    .select("-content");
+    .select("-content")
+    .lean(); // AR-47 (related list; body-identical)
 
   res.status(200).json({
     status: "success",
@@ -236,21 +284,36 @@ exports.getRelatedBlogs = catchAsync(async (req, res, next) => {
   });
 });
 
-// Like a blog (simple increment, no user tracking)
+// Like a blog. FA-25: idempotent per actor - the unique
+// (blog, actor, "like") engagement record gates the counter, so repeat
+// likes (or scripted replays) cannot inflate it. The id/slug is resolved
+// exactly as getBlog resolves it.
 exports.likeBlog = catchAsync(async (req, res, next) => {
-  const blog = await Blog.findById(req.params.id);
+  const { id } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+  const blog = await Blog.findOne(isObjectId ? { _id: id } : { slug: id });
 
   if (!blog) {
     return next(new AppError("Blog post not found", 404));
   }
 
-  blog.likes += 1;
-  await blog.save({ validateBeforeSave: false });
+  const actor = actorFor(req, res);
+  let inserted = false;
+  try {
+    await BlogEngagement.create({ blog: blog._id, actor, kind: "like" });
+    inserted = true;
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+  }
+
+  const updated = inserted
+    ? await Blog.findByIdAndUpdate(blog._id, { $inc: { likes: 1 } }, { new: true, runValidators: false })
+    : blog;
 
   res.status(200).json({
     status: "success",
     data: {
-      likes: blog.likes,
+      likes: updated.likes,
     },
   });
 });
@@ -271,6 +334,8 @@ exports.refreshFeeds = catchAsync(async (req, res, next) => {
 
 // Get blog stats
 exports.getBlogStats = catchAsync(async (req, res, next) => {
+  const hit = getCached(blogCacheKey("stats", req));
+  if (hit !== undefined) return res.status(200).json(hit);
   const [totalBlogs, totalViews, categoryCounts, sourceCounts] = await Promise.all([
     Blog.countDocuments(),
     Blog.aggregate([{ $group: { _id: null, total: { $sum: "$views" } } }]),
@@ -278,7 +343,7 @@ exports.getBlogStats = catchAsync(async (req, res, next) => {
     Blog.aggregate([{ $group: { _id: "$source.name", count: { $sum: 1 } } }]),
   ]);
 
-  res.status(200).json({
+  const body = {
     status: "success",
     data: {
       totalBlogs,
@@ -286,5 +351,7 @@ exports.getBlogStats = catchAsync(async (req, res, next) => {
       categoryCounts,
       sourceCounts,
     },
-  });
+  };
+  setCached(blogCacheKey("stats", req), body);
+  res.status(200).json(body);
 });

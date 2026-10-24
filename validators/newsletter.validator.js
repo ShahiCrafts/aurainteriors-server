@@ -36,12 +36,14 @@ exports.sendTrendSchema = Joi.object({
         }),
     htmlContent: Joi.string()
         .required()
+        .max(200000)
         .messages({
             'string.empty': 'HTML content is required',
             'any.required': 'HTML content is required'
         }),
     textContent: Joi.string()
         .required()
+        .max(50000)
         .min(10)
         .messages({
             'string.empty': 'Text content is required',

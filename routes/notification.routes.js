@@ -1,13 +1,19 @@
+const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const { protect } = require("../middleware/auth.middleware");
 const {
   validateNotificationCreation,
   validateMarkAsRead,
   validateArchive,
+  validatePushTokenRegistration,
 } = require("../validators/notification.validator");
 const notificationController = require("../controllers/notification.controller");
 
 const router = express.Router();
+router.use(standardReadLimiter);
+router.use(standardWriteLimiter);
+router.param("id", objectIdParam);
 
 router.use(protect);
 
@@ -27,7 +33,7 @@ router.post(
   validateArchive,
   notificationController.archiveMultiple
 );
-router.post("/push-tokens/register", notificationController.registerPushToken);
+router.post("/push-tokens/register", validatePushTokenRegistration, notificationController.registerPushToken);
 router.get("/push-tokens/devices", notificationController.getUserDevices);
 router.delete(
   "/push-tokens/:deviceId",

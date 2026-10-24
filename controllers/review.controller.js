@@ -1,4 +1,4 @@
-const { boundedLimit, boundedPage, literalRegex, escapeRegex } = require("../utils/listQuery");
+const { boundedLimit, boundedPage, literalRegex, escapeRegex, safeSort } = require("../utils/listQuery");
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
@@ -44,7 +44,7 @@ exports.getProductReviews = catchAsync(async (req, res, next) => {
   const [reviews, total, breakdown] = await Promise.all([
     Review.find(filter)
       .populate("user", "firstName lastName avatar")
-      .sort(sort)
+      .sort(safeSort(sort, ["createdAt", "rating", "helpfulCount"]))
       .skip(skip)
       .limit(limitNum),
     Review.countDocuments(filter),
@@ -220,29 +220,35 @@ exports.markHelpful = catchAsync(async (req, res, next) => {
     return next(new AppError("Review not found", 404));
   }
 
-  // Check if user already voted
-  const alreadyVoted = review.helpfulVotes.includes(userId);
-
-  if (alreadyVoted) {
-    // Remove vote
-    review.helpfulVotes = review.helpfulVotes.filter(
-      (id) => id.toString() !== userId.toString()
-    );
-    review.helpfulCount = Math.max(0, review.helpfulCount - 1);
-  } else {
-    // Add vote
-    review.helpfulVotes.push(userId);
-    review.helpfulCount += 1;
+  // FA-48: authors cannot vote on their own review.
+  if (String(review.user) === String(userId)) {
+    return next(new AppError("You cannot vote on your own review", 400));
   }
 
-  await review.save();
+  // FA-48: the toggle is ONE atomic pipeline update - the votes array is
+  // the source of truth and the count is derived from its size in the
+  // same operation, so concurrent votes cannot desynchronize them (the
+  // previous read-modify-write could).
+  const updated = await Review.findOneAndUpdate(
+    { _id: review._id },
+    [
+      { $set: { helpfulVotes: { $cond: [
+        { $in: [userId, "$helpfulVotes"] },
+        { $setDifference: ["$helpfulVotes", [userId]] },
+        { $setUnion: ["$helpfulVotes", [userId]] },
+      ] } } },
+      { $set: { helpfulCount: { $size: "$helpfulVotes" } } },
+    ],
+    { new: true }
+  );
+  const voted = updated.helpfulVotes.some((id) => String(id) === String(userId));
 
   res.status(200).json({
     status: "success",
-    message: alreadyVoted ? "Vote removed" : "Marked as helpful",
+    message: voted ? "Marked as helpful" : "Vote removed",
     data: {
-      helpfulCount: review.helpfulCount,
-      voted: !alreadyVoted,
+      helpfulCount: updated.helpfulCount,
+      voted,
     },
   });
 });
@@ -352,7 +358,7 @@ exports.getAllReviews = catchAsync(async (req, res, next) => {
     Review.find(filter)
       .populate("user", "firstName lastName avatar email")
       .populate("product", "name slug images")
-      .sort(sort)
+      .sort(safeSort(sort, ["createdAt", "rating", "helpfulCount"]))
       .skip(skip)
       .limit(limitNum),
     Review.countDocuments(filter),

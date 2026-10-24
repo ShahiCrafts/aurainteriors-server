@@ -1,3 +1,4 @@
+const { buildPreferenceUpdates } = require("../utils/preferenceUpdates");
 const NotificationService = require("../services/notificationService");
 const PushTokenService = require("../services/pushTokenService");
 const User = require("../models/user.model");
@@ -58,7 +59,7 @@ exports.getNotificationDetail = async (req, res, next) => {
     }
 
     if (notification.recipient.toString() !== userId.toString()) {
-      throw new AppError("Permission denied", 403);
+      throw new AppError("Notification not found", 404); // uniform with the missing case: no existence oracle (C-13)
     }
 
     res.status(200).json({
@@ -82,10 +83,10 @@ exports.markAsRead = async (req, res, next) => {
     }
 
     if (notification.recipient.toString() !== userId.toString()) {
-      throw new AppError("Permission denied", 403);
+      throw new AppError("Notification not found", 404); // uniform with the missing case: no existence oracle (C-13)
     }
 
-    const updated = await NotificationService.markAsRead(id);
+    const updated = await NotificationService.markAsRead(id, req.user._id);
 
     res.status(200).json({
       status: "success",
@@ -187,10 +188,8 @@ exports.getPreferences = async (req, res, next) => {
 exports.updatePreferences = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const preferenceUpdates = {};
-    for (const key of ["newsletter", "smsNotifications", "orderUpdates", "promotionalEmails", "preferredCategories"]) {
-      if (req.body[key] !== undefined) preferenceUpdates[`preferences.${key}`] = req.body[key];
-    }
+    // AR-31(f): shared with profile.controller via utils/preferenceUpdates.
+    const preferenceUpdates = buildPreferenceUpdates(req.body);
     const user = await User.findByIdAndUpdate(userId, { $set: preferenceUpdates }, {
       new: true,
       runValidators: true,
