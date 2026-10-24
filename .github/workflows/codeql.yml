@@ -1,0 +1,28 @@
+# CodeQL analysis - this is the scan whose alerts AUDIT_ALERTS.md tracks.
+# After a push of the hardening branch, compare the open-alert list with
+# AUDIT_ALERTS.md: every alert marked fixed-pending-scan should close,
+# and the three proposed dismissals (#42, #192, #194) can be dismissed
+# with the evidence recorded there.
+name: CodeQL
+
+on:
+  push:
+    branches: [main, "hardening/**"]
+  pull_request:
+  schedule:
+    - cron: "30 2 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/autobuild@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+      - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3

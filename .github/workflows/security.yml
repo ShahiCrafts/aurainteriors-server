@@ -1,0 +1,60 @@
+# Ongoing security scanning + test gate.
+# FA-43: every action is pinned to a full commit SHA (verified against
+# the publishers' own repositories); Dependabot proposes the bumps.
+# Runs on pushes and PRs. Forked PRs receive no secrets; every job here
+# works without any (scans are read-only over the checked-out tree).
+name: Security scans & tests
+
+on:
+  push:
+    branches: [main, "hardening/**"]
+  pull_request:
+  schedule:
+    - cron: "0 * * * *" # hourly, mirrors the local audit cadence
+
+permissions:
+  contents: read
+
+jobs:
+  tests-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install (no install scripts)
+        run: npm ci --ignore-scripts
+      - name: Test suite (full, AR-43)
+        run: npm test
+      - name: Lint gate (no-undef errors block, AR-43)
+        run: npm run lint
+      - name: Dependency audit (fails on high/critical)
+        run: npm audit --audit-level=high
+
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Semgrep SAST
+        run: semgrep scan --config p/javascript --config p/nodejs --config p/secrets --error --json --output semgrep.json
+      - name: Upload Semgrep results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-results
+          path: semgrep.json
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Secret scan (full history)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
