@@ -1,0 +1,14 @@
+# Local pre-commit hooks (https://pre-commit.com): pip install pre-commit
+# && pre-commit install. Mirrors the CI gates that can run offline.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: audit-tests
+        name: audit + codeql regression tests
+        entry: node --test tests/audit/*.test.js tests/codeql/*.test.js
+        language: system
+        pass_filenames: false

@@ -1,0 +1,36 @@
+# Build-context exclusions for the Dockerfile (AR-46).
+# Conservative by design: everything server.js / worker.js might need
+# at runtime stays in the context. Only host artifacts, secrets, VCS
+# data and non-runtime material are excluded.
+
+# Host-installed dependencies — the image installs its own from the
+# lockfile (npm ci --omit=dev); a host node_modules could also carry
+# binaries built for the wrong platform/libc.
+node_modules
+
+# VCS data — not needed at runtime, and it would leak history into
+# every image layer.
+.git
+
+# Real environment files — secrets are runtime-only and are NEVER
+# baked into the image (see DEPLOYMENT.md "Environment"). Only the
+# placeholder example file ships.
+.env
+.env.*
+!.env.example
+
+# Tests and audit artifacts — not runtime code.
+tests
+audit
+.github
+
+# Agent / audit bookkeeping and local runtime debris.
+.audit.lock
+uploads
+*.log
+npm-debug.log*
+coverage
+
+# The container definitions themselves.
+Dockerfile
+.dockerignore
