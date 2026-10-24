@@ -1,10 +1,6 @@
 node_modules/
 .env*
 !.env.example
-!.env.development
-!.env.production
-.env.local
-.env.*.local
 postman.json
 uploads/
 .audit.lock
