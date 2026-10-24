@@ -1,0 +1,38 @@
+// AR-28 + AR-47 (blog statics): real Blog model, no DB — index
+// declarations are read off the schema and the statics' query chains
+// are captured by patching Blog.find with a recording fake.
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const Blog = require("../../models/blog.model");
+
+test("AR-28: text index is scoped to title/excerpt/tags (no $** wildcard)", () => {
+  const textIndexes = Blog.schema.indexes().filter(([, opts]) => opts && (opts.text || opts.name === "blog_search_text") )
+    .concat(Blog.schema.indexes().filter(([keys]) => Object.values(keys).includes("text")));
+  assert.ok(textIndexes.length >= 1, "a text index must be declared");
+  for (const [keys] of textIndexes) {
+    assert.deepEqual(Object.keys(keys).sort(), ["excerpt", "tags", "title"],
+      `text index must be scoped, got ${JSON.stringify(keys)} (wildcard $** = fail-before)`);
+  }
+});
+
+test("AR-47: getPopular/getFeatured are lean (shape unchanged, incl. content)", async () => {
+  const original = Blog.find;
+  const records = [];
+  Blog.find = () => {
+    const rec = {};
+    records.push(rec);
+    const q = {
+      sort() { return q; }, limit() { return q; },
+      lean() { rec.lean = true; return q; },
+      then(onF) { return Promise.resolve([{ title: "t", content: "BODY" }]).then(onF); },
+    };
+    return q;
+  };
+  try {
+    const popular = await Blog.getPopular(5);
+    const featured = await Blog.getFeatured(3);
+    assert.equal(popular[0].content, "BODY", "popular still ships content (exclusion is a pending client decision)");
+    assert.equal(featured[0].content, "BODY");
+    assert.ok(records.every((r) => r.lean), "both statics must be lean");
+  } finally { Blog.find = original; }
+});
