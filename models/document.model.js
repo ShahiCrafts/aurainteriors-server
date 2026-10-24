@@ -35,6 +35,14 @@ const documentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // AR-05: how many times the ingestion recovery sweep has
+    // re-queued this document after it stalled in "processing"
+    // (services/ingestionJobs.service.js). At INGEST_MAX_RECOVERIES
+    // the sweep marks it "failed" instead of re-queueing forever.
+    ingestRecoveries: {
+      type: Number,
+      default: 0,
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -112,7 +112,14 @@ blogSchema.index({ publishedAt: -1 });
 blogSchema.index({ isFeatured: 1, publishedAt: -1 });
 blogSchema.index({ "source.name": 1 });
 blogSchema.index({ tags: 1 });
-blogSchema.index({ "$**": "text" });
+// AR-28: scoped text index (was { "$**": "text" } — a wildcard over
+// every string field incl. full article HTML). Only the fields blog
+// search reads are indexed. Production keeps its existing wildcard
+// index until the owner runs MIGRATIONS.md M-4 (never auto-run).
+blogSchema.index(
+  { title: "text", excerpt: "text", tags: "text" },
+  { name: "blog_search_text", weights: { title: 10, excerpt: 5, tags: 3 } }
+);
 
 // Generate slug from title
 blogSchema.pre("save", function () {
@@ -150,21 +157,27 @@ blogSchema.virtual("categoryName").get(function () {
 });
 
 // Static method to get popular blogs
+// AR-47: lean only — these still return full docs incl. content
+// (unlike the blog LIST, which selects -content). Aligning them to
+// -content would change the response body and is recorded as a
+// pending client decision in CLIENT_IMPACT.md, not done here.
 blogSchema.statics.getPopular = async function (limit = 5) {
   return this.find()
     .sort({ views: -1, likes: -1, publishedAt: -1 })
-    .limit(limit);
+    .limit(limit)
+    .lean();
 };
 
 // Static method to get featured blogs
 blogSchema.statics.getFeatured = async function (limit = 3) {
-  return this.find({ isFeatured: true }).sort({ publishedAt: -1 }).limit(limit);
+  return this.find({ isFeatured: true }).sort({ publishedAt: -1 }).limit(limit).lean();
 };
 
 // Instance method to increment views
 blogSchema.methods.incrementViews = async function () {
-  this.views += 1;
-  return this.save({ validateBeforeSave: false });
+  // Atomic increment (B-28): the read-modify-write save() lost
+  // concurrent view counts and could clobber unrelated edits.
+  return this.updateOne({ $inc: { views: 1 } });
 };
 
 const Blog = mongoose.model("Blog", blogSchema);

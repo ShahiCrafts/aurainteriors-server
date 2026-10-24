@@ -101,8 +101,31 @@ discountSchema.methods.calculateDiscount = function (subtotal) {
 };
 
 discountSchema.methods.incrementUsage = async function () {
-  this.currentUsageCount += 1;
-  return this.save();
+  // AR-23: a single atomic findOneAndUpdate with the limit predicate
+  // INSIDE the filter (the same $expr guard as findValidByCode below
+  // and services/discountUsage.service.js, which is what checkout
+  // actually uses) - the old read-modify-write save() let parallel
+  // calls all "succeed" past maxUsageLimit. Caller audit: NO live
+  // callers anywhere in the repo; checkout consumes usage through
+  // discountUsage.service. Return contract (for any future caller):
+  // resolves to the UPDATED discount document, or null when the
+  // usage limit has been reached (or the document no longer exists).
+  const updated = await this.constructor.findOneAndUpdate(
+    {
+      _id: this._id,
+      $or: [
+        { maxUsageLimit: null },
+        { $expr: { $lt: ["$currentUsageCount", "$maxUsageLimit"] } },
+      ],
+    },
+    { $inc: { currentUsageCount: 1 } },
+    { new: true }
+  );
+  if (updated) {
+    // Mirror without dirtying this copy.
+    this._doc.currentUsageCount = updated.currentUsageCount;
+  }
+  return updated;
 };
 
 discountSchema.statics.findValidByCode = async function (code) {

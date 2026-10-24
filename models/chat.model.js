@@ -202,8 +202,10 @@ chatSchema.statics.getAllChats = async function (options = {}) {
     query.priority = priority;
   }
 
-  const sortOptions = {};
-  sortOptions[sortBy] = -1;
+  // sortBy is client input: allowlist it (it previously became a sort
+  // key verbatim). Direction stays descending, as before.
+  const { safeSort } = require("../utils/listQuery");
+  const sortOptions = safeSort(`-${sortBy}`, ["lastMessageAt", "createdAt", "updatedAt", "priority", "status"], "-lastMessageAt");
 
   const [chats, total] = await Promise.all([
     this.find(query)

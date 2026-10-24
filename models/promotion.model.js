@@ -157,8 +157,21 @@ promotionSchema.methods.updateMetrics = async function (field, increment = 1) {
     throw new Error(`Invalid metric field: ${field}`);
   }
 
-  this.metrics[field] += increment;
-  await this.save();
+  // AR-23: atomic $inc instead of read-modify-write save() of the
+  // whole document (which lost concurrent increments - 100 parallel
+  // events landed +1 - and rewrote the embedded userIds array on
+  // every event). Caller audit: no live callers (promotionService
+  // .trackEngagement already does its own atomic $inc, C-09); the
+  // method is kept safe for future callers. The in-memory copy is
+  // mirrored via _doc so it reflects this call's increment without
+  // dirtying the document.
+  await this.constructor.updateOne(
+    { _id: this._id },
+    { $inc: { [`metrics.${field}`]: increment } }
+  );
+  if (this._doc.metrics) {
+    this._doc.metrics[field] = (this._doc.metrics[field] || 0) + increment;
+  }
 };
 
 promotionSchema.statics.getScheduledCampaignsToSend = function () {

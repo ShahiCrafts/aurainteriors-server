@@ -72,14 +72,24 @@ const addressSchema = new mongoose.Schema(
 
 addressSchema.index({ user: 1 });
 
-addressSchema.pre("save", async function () {
-  if (this.isDefault && (this.isNew || this.isModified("isDefault") || this.isModified("user"))) {
-    await this.constructor.updateMany(
-      { user: this.user, _id: { $ne: this._id } },
-      { isDefault: false }
-    );
-  }
-});
+// AR-42: switching the default is ONE atomic pipeline update - every
+// address of the user is rewritten in a single operation, so exactly
+// one default exists when it lands, however many switches race. This
+// replaces the pre-save hook, whose check-then-updateMany was two
+// separate operations: two concurrent saves with isDefault=true could
+// both pass before either unset landed, leaving two defaults (and the
+// hook also fired a write as a side effect of unrelated saves). All
+// controller paths that choose a default go through this static. The
+// database-level guarantee (a partial unique index) is MIGRATIONS.md
+// M-3, owner-run, never automatic.
+addressSchema.statics.switchDefault = function (userId, addressId) {
+  const target = new mongoose.Types.ObjectId(addressId);
+  return this.updateMany(
+    { user: userId },
+    [{ $set: { isDefault: { $eq: ["$_id", target] } } }],
+    { updatePipeline: true }
+  );
+};
 
 const Address = mongoose.model("Address", addressSchema);
 

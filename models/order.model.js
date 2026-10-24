@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 
 const orderAddressSchema = new mongoose.Schema(
@@ -151,14 +152,31 @@ orderSchema.index({ "guestInfo.email": 1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ createdAt: -1 });
-orderSchema.index({ idempotencyKey: 1 });
+// AR-03: idempotencyKey is indexed ONCE, by its field declaration above
+// (unique + sparse). A duplicate schema.index({ idempotencyKey: 1 }) here
+// made index creation throw IndexKeySpecsConflict and left which
+// definition survived to chance (measured: unique+sparse in 2 of 3 runs,
+// plain in 1). Do not re-add a second declaration.
+
+// CQ-F (#194 class): the order id is a lookup key (guest order
+// tracking, eSewa transaction_uuid), so its random suffix must come
+// from a CSPRNG - Math.random is predictable and its base36 output
+// is not uniform. Format and length are unchanged: AU + base36
+// timestamp + 4 chars from [0-9A-Z].
+const ORDER_SUFFIX_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+orderSchema.statics.generateOrderSuffix = function () {
+  let suffix = "";
+  for (let i = 0; i < 4; i++) {
+    suffix += ORDER_SUFFIX_ALPHABET[crypto.randomInt(ORDER_SUFFIX_ALPHABET.length)];
+  }
+  return suffix;
+};
 
 orderSchema.pre("save", function () {
   if (this.isNew && !this.orderId) {
     const prefix = "AU";
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    this.orderId = `${prefix}${timestamp}${random}`;
+    this.orderId = `${prefix}${timestamp}${this.constructor.generateOrderSuffix()}`;
   }
 });
 

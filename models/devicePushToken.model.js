@@ -76,6 +76,14 @@ const devicePushTokenSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// FA-69: uniqueness of (user, deviceId) is enforced by a REAL compound
+// unique index - previously it depended on a pre-save hook maintaining
+// the _userDeviceIndex shadow field, so any write path that skipped the
+// hook (bulk updates, upserts) could create duplicates. Creating this
+// index on an existing collection with duplicate pairs will fail the
+// index build; see OWNER_DECISIONS.md (FA-69) for the dedupe-first
+// rollout.
+devicePushTokenSchema.index({ user: 1, deviceId: 1 }, { unique: true });
 devicePushTokenSchema.index({ user: 1, isActive: 1 });
 devicePushTokenSchema.index({ lastUsedAt: 1 });
 devicePushTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

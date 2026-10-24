@@ -96,6 +96,12 @@ const chatMessageSchema = new mongoose.Schema(
 );
 
 chatMessageSchema.index({ chat: 1, createdAt: -1 });
+// AR-16: getChatStats' response-time aggregation is supported by a
+// { senderRole: 1, chat: 1, createdAt: 1 } index — deliberately NOT
+// declared here (per the AR-42 precedent: new indexes ship as owner-run
+// migrations, never auto-built at boot). The pipeline is correct
+// without it (the {chat, createdAt} index serves the sort; the planner
+// examines more keys) and fast with it — see MIGRATIONS.md M-5.
 chatMessageSchema.index(
   { chat: 1, clientMessageId: 1 },
   { unique: true, partialFilterExpression: { clientMessageId: { $type: "string" } } }
@@ -133,7 +139,9 @@ chatMessageSchema.statics.getChatMessages = async function (
       .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("sender", "firstName lastName email role avatar")
+      // FA-58: sender email is staff-only; history for customers/guests
+      // must not disclose participants' email addresses.
+      .populate("sender", options.includeSenderEmail === true ? "firstName lastName email role avatar" : "firstName lastName role avatar")
       .lean(),
     this.countDocuments(query),
   ]);

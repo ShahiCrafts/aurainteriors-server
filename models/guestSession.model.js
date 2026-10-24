@@ -7,6 +7,12 @@ const guestSessionSchema = new mongoose.Schema(
       unique: true,
       required: true,
       index: true,
+      // FA-88: the id is a bearer credential minted by the server as
+      // guest_ + 32 random bytes hex (chat.controller) - pin the format
+      // so a malformed or attacker-shaped id can never be stored.
+      match: [/^guest_[a-f0-9]{64}$/, "Invalid guest session id format"],
+      minlength: 70,
+      maxlength: 70,
     },
     email: {
       type: String,

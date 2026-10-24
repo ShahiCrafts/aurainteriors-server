@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const validator = require("validator");
 
 const contactSchema = new mongoose.Schema(
   {
@@ -13,7 +14,11 @@ const contactSchema = new mongoose.Schema(
       required: [true, "Email is required"],
       trim: true,
       lowercase: true,
-      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email"],
+      maxlength: [254, "Email cannot exceed 254 characters"],
+      validate: {
+        validator: (value) => validator.isEmail(String(value || "")),
+        message: "Please provide a valid email",
+      },
     },
     phone: {
       type: String,

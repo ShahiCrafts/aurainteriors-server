@@ -68,6 +68,19 @@ const productSchema = new mongoose.Schema(
       min: [0, "Stock cannot be negative"],
       default: 0,
     },
+    // AR-25 (D-D): units currently held by active guest stock
+    // reservations (services/stockReservation.service.js). Internal
+    // bookkeeping only — select:false so it never rides product
+    // payloads; every mutation is an atomic updateOne ($inc behind
+    // an $expr/$gte guard), which select:false does not affect.
+    // Legacy documents lack the field; all guards treat a missing
+    // value as 0 ($ifNull in the reservation gate).
+    reservedStock: {
+      type: Number,
+      default: 0,
+      min: [0, "Reserved stock cannot be negative"],
+      select: false,
+    },
     sku: {
       type: String,
       unique: true,
@@ -184,6 +197,24 @@ const productSchema = new mongoose.Schema(
         type: Number,
         default: 0,
         min: 0,
+      },
+      // AR-24: internal bookkeeping for exact incremental rating
+      // maintenance - the sum of all APPROVED review ratings, kept
+      // in lockstep with count so average = round1(sum / count) is
+      // derivable atomically at write time (the rounded average
+      // alone cannot be inverted into a sum). select:false (coordinator
+      // correction during Phase 2 verification): the field is internal
+      // and must never ride product payloads - average/count values
+      // and the response shape are unchanged. Maintenance reads/writes
+      // it via update filters/pipelines, which select:false does not
+      // affect. Legacy products have no sum until their first tracked
+      // review write initializes it from a from-scratch aggregation
+      // (see review.model.js) - no migration.
+      sum: {
+        type: Number,
+        default: 0,
+        min: 0,
+        select: false,
       },
     },
     // For featured/promotional products
@@ -312,13 +343,15 @@ productSchema.methods.softDelete = async function () {
 
 // Static method to get products by category
 productSchema.statics.getByCategory = function (categoryId, options = {}) {
+  // NOTE: no callers in the current codebase (dead code) - kept safe anyway.
   const { page = 1, limit = 20, sort = "-createdAt" } = options;
+  const { safeSort } = require("../utils/listQuery");
   return this.find({
     category: categoryId,
     deletedAt: null,
     status: { $in: ["active", "out_of_stock"] },
   })
-    .sort(sort)
+    .sort(safeSort(sort, ["createdAt", "price", "originalPrice", "name", "stock", "rating.average"]))
     .skip((page - 1) * limit)
     .limit(limit)
     .populate("category", "name slug");

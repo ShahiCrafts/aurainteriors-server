@@ -56,6 +56,13 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       select: false,
+      // FA-86: the length floor lives in the schema so every path that
+      // sets a password (registration, reset, seeders, scripts) is held
+      // to it - not just the validated HTTP handlers. Validation runs
+      // on the plaintext BEFORE the pre-save bcrypt hook, and accounts
+      // without a password (magic-link / Google) are unaffected because
+      // the field stays optional.
+      minlength: [8, "Password must be at least 8 characters long"],
     },
 
     loginOtp: {
@@ -88,7 +95,11 @@ const userSchema = new mongoose.Schema(
       ],
     },
 
-    googleId: { type: String, sparse: true },
+    // Unique + sparse: one Google identity (sub) maps to at most one
+    // account, while users without Google sign-in stay out of the index.
+    // Deploy note: if duplicates somehow exist, index creation fails at
+    // startup - check with a db.users group-by on googleId before deploy.
+    googleId: { type: String, sparse: true, unique: true },
 
     lastLogin: Date,
     loginCount: { type: Number, default: 0 },
@@ -127,7 +138,7 @@ userSchema.methods.comparePassword = async function (candidatePassword, userPass
 // Create OTP
 userSchema.methods.createOtp = function () {
   const otp = crypto.randomInt(100000, 1000000).toString(); // 6 digit string
-  this.loginOtp = crypto.createHash("sha256").update(otp).digest("hex");
+  this.loginOtp = require("../utils/otpHash").hashOtp(otp); // HMAC, not bare SHA-256 (A-12)
   this.loginOtpChallenge = crypto.randomBytes(32).toString("hex");
   this.loginOtpAttempts = 0;
   this.loginOtpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
@@ -143,9 +154,30 @@ userSchema.methods.createMagicLinkToken = function () {
 
 
 
-userSchema.methods.updateLoginActivity = function () {
-  this.lastLogin = Date.now();
-  this.loginCount += 1;
+userSchema.methods.updateLoginActivity = async function () {
+  const now = new Date();
+  if (this.isNew) {
+    // Not persisted yet: keep the values in memory - the caller's
+    // save() persists them with the rest of the document.
+    this.lastLogin = now;
+    this.loginCount = (this.loginCount || 0) + 1;
+    return;
+  }
+  // AR-23: persist with ONE atomic updateOne ($set lastLogin, $inc
+  // loginCount) instead of mutating the loaded document and relying
+  // on the caller to save() the whole user - that rewrote every field
+  // the copy carried and raced concurrent profile mutations. The
+  // resulting values are mirrored via _doc (NOT the setters), so the
+  // in-memory document reflects them without being dirtied: a later
+  // caller save() cannot rewrite loginCount as a stale absolute
+  // value. Callers: config/passport.js Google paths (updated to
+  // simply await this).
+  await this.constructor.updateOne(
+    { _id: this._id },
+    { $set: { lastLogin: now }, $inc: { loginCount: 1 } }
+  );
+  this._doc.lastLogin = now;
+  this._doc.loginCount = (this.loginCount || 0) + 1;
 };
 
 userSchema.statics.findActive = function () {
