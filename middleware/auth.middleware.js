@@ -12,7 +12,20 @@ exports.protect = catchAsync(async (req, res, next) => {
 
   const decoded = await authToken.verify(token);
 
-  const user = await User.findById(decoded.id);
+  // AR-10: lean + select, mirroring protectOptional below. The field
+  // set is the consumer audit, not a guess: across controllers,
+  // services and middleware, protect's req.user is read ONLY for
+  // _id, id, role, firstName, lastName, email, phone, isActive and
+  // deletedAt (order checkout reads phone; review creation reads the
+  // name; signToken(req.user) reads _id/email/role). No consumer calls
+  // a document method (.save/.comparePassword/...) on it - handlers
+  // that need the full document (profile) re-fetch by req.user.id -
+  // so no hydrated variant is kept. Every security check is unchanged:
+  // revocation still runs inside authToken.verify above, and the
+  // isActive/deletedAt rejection below is verbatim.
+  const user = await User.findById(decoded.id)
+    .select("_id role isActive deletedAt email firstName lastName avatar phone")
+    .lean();
   if (!user) {
     return next(new AppError("The user belonging to this token no longer exists.", 401));
   }
@@ -21,7 +34,11 @@ exports.protect = catchAsync(async (req, res, next) => {
     return next(new AppError("This account has been deactivated.", 401));
   }
 
-  req.user = user;
+  // `id` is the string virtual consumers read (absent on lean
+  // results); `iat` is a token claim, not a user field - profile
+  // deleteAccount reads req.user.iat for its fresh-auth check
+  // (FA-64), which under full hydration silently read undefined.
+  req.user = { ...user, id: user._id.toString(), iat: decoded.iat };
   req.isAuthenticated = true;
   next();
 });

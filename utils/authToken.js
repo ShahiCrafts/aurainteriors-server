@@ -10,7 +10,20 @@ const extract = req => {
   try { return cookie ? decodeURIComponent(cookie.slice(4)) : null; } catch { return null; }
 };
 const verify = async token => {
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  // Pin the algorithm: tokens are issued HS256-only (see signToken).
+  // Without this, verification accepts any algorithm the library
+  // supports for the key type (A-10).
+  // FA-18: issuer/audience are issued on all new tokens and are
+  // ENFORCED by default (owner-approved 2026-10-23). Tokens minted
+  // before the claims existed therefore stop verifying - one forced
+  // re-login. JWT_REQUIRE_ISS_AUD=0 restores the migration-window
+  // behavior if it is ever needed as an escape hatch.
+  const options = { algorithms: ["HS256"] };
+  if (require("../config/appConfig").getString("JWT_REQUIRE_ISS_AUD") !== "0") {
+    options.issuer = "aura-interiors";
+    options.audience = "aura-interiors-api";
+  }
+  const decoded = jwt.verify(token, process.env.JWT_SECRET, options);
   if (await RevokedToken.exists({ _id: hash(token) })) throw new Error("Session revoked");
   return decoded;
 };

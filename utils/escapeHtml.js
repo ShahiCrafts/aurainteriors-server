@@ -10,4 +10,10 @@ const escapeEmailData = value => {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
     typeof item === "string" && ["image", "imageUrl", "url"].includes(key) ? safeUrl(item) : escapeEmailData(item)]));
 };
-module.exports = { escapeHtml, safeUrl, escapeEmailData };
+// FA-11/FA-12: plain-text fields (contact form, promotion copy) are stored
+// and later shown in admin UIs / notifications. Strip markup at the
+// boundary so a stored payload cannot become script anywhere it is
+// rendered; legitimate text is unaffected.
+const stripHtmlTags = value => String(value ?? "").replace(/<[^>]*>/g, "");
+
+module.exports = { escapeHtml, safeUrl, escapeEmailData, stripHtmlTags };

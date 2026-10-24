@@ -7,13 +7,21 @@ const handleCastErrorDB = (err) => {
 };
 
 const handleDuplicateFieldsDB = (err) => {
-  const field = Object.keys(err.keyPattern)[0];
-  const message = `Duplicate field value for '${field}'. Please use another value.`;
+  // keyPattern/keyValue are not present on every duplicate-key error
+  // (e.g. write-concern or index-build variants). Reading [0] of an
+  // undefined pattern crashed the error handler itself, turning a
+  // clean 400 into an unhandled 500 (B-17).
+  const field =
+    (err.keyPattern && Object.keys(err.keyPattern)[0]) ||
+    (err.keyValue && Object.keys(err.keyValue)[0]);
+  const message = field
+    ? `Duplicate field value for '${field}'. Please use another value.`
+    : "Duplicate field value. Please use another value.";
   return new AppError(message, 400);
 };
 
 const handleValidationErrorDB = (err) => {
-  const errors = Object.values(err.errors).map((el) => el.message);
+  const errors = Object.values(err.errors || {}).map((el) => el.message);
   const message = `Invalid input data. ${errors.join(". ")}`;
   return new AppError(message, 400);
 };
@@ -24,7 +32,9 @@ const handleJWTExpiredError = () => new AppError("Your token has expired. Please
 
 const handleMulterError = (err) => {
   if (err.code === "LIMIT_FILE_SIZE") {
-    return new AppError("File too large. Maximum size is 5MB.", 400);
+    // The limit differs per route (10-50MB); quoting a single number
+    // here sent users chasing a limit that does not exist (B-17).
+    return new AppError("File too large. The upload exceeds the size limit for this endpoint.", 400);
   }
   if (err.code === "LIMIT_FILE_COUNT") {
     return new AppError("Too many files. Maximum is 10 files.", 400);
