@@ -109,6 +109,23 @@ stubModule("models/user.model.js", {
   findById: () => fixed(null),
 });
 stubModule("models/category.model.js", { find: () => Q(() => []), findById: () => fixed(null) });
+// Phase 1 (catalog): product.controller now also requires the Room
+// registry model (roomSlugs write validation). The harness's fake
+// mongoose cannot load the real model; this stub provides the only
+// surface the controller touches (find().select().lean(), and only
+// when a write carries roomSlugs — none of these tests send any).
+stubModule("models/room.model.js", { find: () => Q(() => []) });
+// Phase 2 (catalog): product.controller now also reaches the
+// attribute engine (services/productAttributes.service.js ->
+// services/attributeResolution.service.js), which requires the
+// AttributeDefinition and ProductType registry models. Same
+// disposition as Room above: the fake mongoose cannot load the
+// real models, and these tests exercise no attribute writes (the
+// stubbed Category.findById returns null, so resolution is never
+// reached with a category). The stubs provide the surfaces the
+// services touch if they ever are.
+stubModule("models/attributeDefinition.model.js", { find: () => Q(() => []) });
+stubModule("models/productType.model.js", { find: () => Q(() => []), findOne: () => fixed(null) });
 const prepProducts = [{ _id: oid(5), name: "P5", price: 105, stock: 10, status: "active", images: [{ url: "img5", isPrimary: true }] }];
 stubModule("models/cart.model.js", {
   findOne: () => { const rec = {}; return Q(() => {

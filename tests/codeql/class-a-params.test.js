@@ -76,7 +76,17 @@ test("CQ-A: ordinary string parameters behave exactly as before (characterizatio
     { role: "admin" },
   );
   assert.deepEqual(filter.style, { $in: ["Modern", "Classic"] });
-  assert.deepEqual(filter.price, { $gte: 100, $lte: 500 });
+  // Phase 5 (catalog): minPrice/maxPrice no longer land on
+  // filter.price — getAllProducts replaces the fragment with the
+  // effective-price clause (Product.price for non-variant
+  // products; any enabled variant's price for variant products).
+  // The coerced bounds themselves are unchanged and still applied,
+  // now inside the clause's product branch.
+  assert.equal(filter.price, undefined);
+  assert.deepEqual(filter.$and[0].$or[0], {
+    hasVariants: { $ne: true },
+    price: { $gte: 100, $lte: 500 },
+  });
   assert.deepEqual(filter.$text, { $search: "sofa" });
   assert.equal(filter.isFeatured, true);
   assert.deepEqual(filter.status, { $in: ["draft"] });

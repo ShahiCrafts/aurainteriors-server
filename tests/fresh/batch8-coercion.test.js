@@ -38,7 +38,33 @@ test("FA-61: sanitizer fails closed beyond the depth cap and covers params", () 
 });
 
 test("FA-49: getCategoryProducts survives repeated-param arrays", async () => {
-  stub("models/category.model.js", { findOne: async () => ({ _id: "c1", name: "Chairs", slug: "chairs" }) });
+  // Phase 0.5 (Cluster A): getCategoryProducts now calls
+  // Category.getDescendantIds (owner change; models/category.model.js:93).
+  // Faithful port of the model's BFS over this harness's fixture
+  // universe (one root category, no children), read through the same
+  // find({}, '_id parent').lean() access pattern.
+  stub("models/category.model.js", {
+    findOne: async () => ({ _id: "c1", name: "Chairs", slug: "chairs" }),
+    find: () => chain([{ _id: "c1", parent: null }]),
+    getDescendantIds: async function (id) {
+      const categories = await this.find({}, "_id parent").lean();
+      const children = new Map();
+      for (const category of categories) {
+        const key = String(category.parent || "");
+        if (!children.has(key)) children.set(key, []);
+        children.get(key).push(String(category._id));
+      }
+      const seen = new Set();
+      const queue = [String(id)];
+      while (queue.length) {
+        const current = queue.shift();
+        if (seen.has(current)) continue;
+        seen.add(current);
+        queue.push(...(children.get(current) || []));
+      }
+      return [...seen];
+    },
+  });
   stub("models/product.model.js", { find: () => chain([]), countDocuments: async () => 0 });
   const ctrl = require(path.join(repo, "controllers/category.controller.js"));
   const res = mkRes(); let nextErr = null;

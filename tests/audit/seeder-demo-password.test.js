@@ -24,6 +24,11 @@ stubModule("models/category.model", {
 });
 stubModule("models/product.model", { countDocuments: async () => 0 });
 stubModule("models/order.model", {});
+// Phase 8 (harness only): the boot path now also ensures the
+// catalog registries after user seeding; stub the bootstrap so
+// this password-focused test never touches a real mongoose
+// connection. Assertions below are unchanged.
+stubModule("services/catalogBootstrap.service", { ensureCatalogRegistry: async () => ({}) });
 
 const seeder = require("../../services/databaseSeeder");
 

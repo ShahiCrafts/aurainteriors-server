@@ -18,6 +18,12 @@
 //       style/featured/newArrivals/inStock filters; getCategoryProducts
 //       always pins status to [active, out_of_stock] and has none of the
 //       extra filters. Response shape: category adds data.category.
+//   D6. (Phase 5, catalog) price semantics: getAllProducts replaces the
+//       shared builder's Product.price fragment with effective-price
+//       branches (variant products match through any enabled variant's
+//       price); getCategoryProducts keeps the legacy fragment. The
+//       'price' key therefore no longer agrees across endpoints and is
+//       pinned per endpoint below instead of in the shared loop.
 // This file must pass byte-identically BEFORE and AFTER the AR-31(b)
 // extraction of the shared list-filter builder.
 const test = require("node:test");
@@ -51,6 +57,28 @@ stubModule("models/product.model", {
 stubModule("models/category.model", {
   find: (filter) => { calls.categoryFind.push(filter); return recordingQuery([{ _id: "cat-id-1" }], {}); },
   findOne: () => recordingQuery({ _id: "cat-id-1", name: "Chairs", slug: "chairs" }, {}),
+  // Phase 0.5 (Cluster A): faithful port of the model's getDescendantIds
+  // BFS (models/category.model.js:93) over this harness's fixture
+  // universe (one root category, no children), read through the same
+  // find({}, '_id parent').lean() access pattern.
+  getDescendantIds: async function (id) {
+    const categories = await this.find({}, "_id parent").lean();
+    const children = new Map();
+    for (const category of categories) {
+      const key = String(category.parent || "");
+      if (!children.has(key)) children.set(key, []);
+      children.get(key).push(String(category._id));
+    }
+    const seen = new Set();
+    const queue = [String(id)];
+    while (queue.length) {
+      const current = queue.shift();
+      if (seen.has(current)) continue;
+      seen.add(current);
+      queue.push(...(children.get(current) || []));
+    }
+    return [...seen];
+  },
 });
 stubModule("middleware/upload.middleware", {
   deleteFile: async () => {},
@@ -108,8 +136,11 @@ for (const c of SHARED_CASES) {
     const cn = normalize(cat.filter);
     // Keys the shared builder owns must be identical (modulo the pinned
     // per-endpoint base keys: category adds `category`, and the status
-    // key is endpoint-owned).
-    for (const key of ["price", "colors", "materials", "rating.average", "$text"]) {
+    // key is endpoint-owned). 'price' left this loop in Phase 5 (D6):
+    // getAllProducts post-processes the builder's fragment into its
+    // effective-price clause, so the fragment itself is pinned per
+    // endpoint in the D1/D6 test below.
+    for (const key of ["colors", "materials", "rating.average", "$text"]) {
       assert.deepEqual(cn[key], pn[key], `shared key '${key}' diverged in case '${c.name}'`);
     }
     assert.deepEqual(
@@ -126,7 +157,13 @@ test("AR-31b base filters are pinned per endpoint", async () => {
   assert.equal(p.record.lean, true); // getAllProducts leans (AR-47)
   const cat = await runCategory({});
   assert.deepEqual(normalize(cat.filter), {
-    category: "cat-id-1",
+    // Phase 0.5 (Cluster A): the owner's subtree-inclusive
+    // getCategoryProducts filters category: { $in: getDescendantIds(id) }
+    // (controllers/category.controller.js) where the delivered controller
+    // used the scalar id. Pinned at the same whole-filter deepEqual
+    // strictness; for this single-category fixture the descendant set
+    // is exactly ["cat-id-1"].
+    category: { $in: ["cat-id-1"] },
     deletedAt: null,
     status: { $in: ["active", "out_of_stock"] },
   });
@@ -140,7 +177,15 @@ test("AR-31b base filters are pinned per endpoint", async () => {
 // ---------- Pinned divergences (must NOT be silently unified) ----------
 test("AR-31b D1 pinned: minPrice=0 / minRating=0 applied by getAllProducts, skipped by getCategoryProducts", async () => {
   const p = await runProducts({ minPrice: "0", minRating: "0" }, undefined);
-  assert.deepEqual(normalize(p.filter).price, { $gte: 0 });
+  // Phase 5 (D6): the 0 bound is still applied by getAllProducts
+  // (D1's point) but no longer lands on filter.price — it now sits
+  // inside the effective-price clause's product branch (non-variant
+  // products on Product.price, variant products via variant prices).
+  assert.equal(normalize(p.filter).price, undefined);
+  assert.deepEqual(normalize(p.filter).$and[0].$or[0], {
+    hasVariants: { $ne: true },
+    price: { $gte: 0 },
+  });
   assert.deepEqual(normalize(p.filter)["rating.average"], { $gte: 0 });
   const cat = await runCategory({ minPrice: "0", minRating: "0" });
   assert.equal(normalize(cat.filter).price, undefined);
@@ -197,5 +242,9 @@ test("AR-31b admin status handling stays in getAllProducts only", async () => {
 test("AR-31b categories-by-slug resolution stays in getAllProducts", async () => {
   const p = await runProducts({ categories: "chairs" }, undefined);
   assert.deepEqual(normalize(p.filter).category, { $in: ["cat-id-1"] });
-  assert.equal(calls.categoryFind.length, 1);
+  // Phase 0.5: descendant expansion adds a second Category.find — the
+  // one inside the real getDescendantIds (find({}, '_id parent')) that
+  // runs after the controller's slug-resolution find. Exact count
+  // still pinned, now at the new correct value.
+  assert.equal(calls.categoryFind.length, 2);
 });

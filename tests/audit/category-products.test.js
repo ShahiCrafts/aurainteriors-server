@@ -8,8 +8,35 @@ const assert = require("node:assert/strict");
 const { stubModule, makeQuery, mockRes, mockNext, until } = require("./helpers");
 
 let productRecord; let lastFilter;
+// Phase 0.5 (Cluster A): getCategoryProducts now calls
+// Category.getDescendantIds (owner change; models/category.model.js:93).
+// The stub below carries a faithful port of the model's BFS, reading
+// this harness's fixture universe (one root category, no children)
+// through the same find({}, '_id parent').lean() access pattern, so the
+// descendant set it returns is exactly what the real model returns for
+// this fixture: the category itself.
+const CATEGORY_FIXTURE = [{ _id: "aaaaaaaaaaaaaaaaaaaaaaaa", parent: null }];
 stubModule("models/category.model.js", {
   findOne: () => makeQuery({ _id: "aaaaaaaaaaaaaaaaaaaaaaaa", name: "Chairs", slug: "chairs" }),
+  find: () => makeQuery(CATEGORY_FIXTURE),
+  getDescendantIds: async function (id) {
+    const categories = await this.find({}, "_id parent").lean();
+    const children = new Map();
+    for (const category of categories) {
+      const key = String(category.parent || "");
+      if (!children.has(key)) children.set(key, []);
+      children.get(key).push(String(category._id));
+    }
+    const seen = new Set();
+    const queue = [String(id)];
+    while (queue.length) {
+      const current = queue.shift();
+      if (seen.has(current)) continue;
+      seen.add(current);
+      queue.push(...(children.get(current) || []));
+    }
+    return [...seen];
+  },
 });
 stubModule("models/product.model.js", {
   find: (filter) => { lastFilter = filter; return makeQuery([], productRecord); },

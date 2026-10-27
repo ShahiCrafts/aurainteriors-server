@@ -136,6 +136,17 @@ stubModule("models/product.model", {
   create: async (data) => ({ _id: PROD_ID, ...data }),
 });
 
+// Phase 2 (catalog): product writes now consult the attribute
+// engine (services/productAttributes.service.js -> resolution ->
+// AttributeDefinition). This harness's categories carry no
+// productType and no assignments, so an EMPTY definition registry
+// is the faithful stub: resolution yields no required attributes
+// and the pre-Phase-2 behavior is preserved exactly.
+stubModule("models/attributeDefinition.model", {
+  find: () => makeQuery([]),
+  findOne: () => makeQuery(null),
+});
+
 // ---------------------------------------------------------------------------
 // Stubs — blog cluster
 // ---------------------------------------------------------------------------
@@ -423,7 +434,10 @@ test("GET /products/new-arrivals — getNewArrivals returns 200 with the new arr
 
 test("GET /products/:id/related — getRelatedProducts returns 200 with related products", async () => {
   currentProduct = freshProduct();
-  const req = baseReq({ params: { id: PROD_ID }, query: { limit: "2" } });
+  // SR-8 (Phase 0.5): the route binds the related product as
+  // :productId (strict ObjectId guard), so the handler reads
+  // req.params.productId; the direct invocation follows the route.
+  const req = baseReq({ params: { productId: PROD_ID }, query: { limit: "2" } });
   const { res, next } = await invoke(productCtrl.getRelatedProducts, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, productList.length);
