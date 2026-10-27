@@ -15,7 +15,7 @@ test("AR-28: text index is scoped to title/excerpt/tags (no $** wildcard)", () =
   }
 });
 
-test("AR-47: getPopular/getFeatured are lean (shape unchanged, incl. content)", async () => {
+test("AR-47 + PERF-B-08: both statics are lean; getPopular excludes content, getFeatured unchanged", async () => {
   const original = Blog.find;
   const records = [];
   Blog.find = () => {
@@ -23,16 +23,22 @@ test("AR-47: getPopular/getFeatured are lean (shape unchanged, incl. content)", 
     records.push(rec);
     const q = {
       sort() { return q; }, limit() { return q; },
+      select(s) { rec.select = s; return q; },
       lean() { rec.lean = true; return q; },
-      then(onF) { return Promise.resolve([{ title: "t", content: "BODY" }]).then(onF); },
+      then(onF) {
+        // Simulate the -content projection the way MongoDB would.
+        const doc = rec.select === "-content" ? { title: "t" } : { title: "t", content: "BODY" };
+        return Promise.resolve([doc]).then(onF);
+      },
     };
     return q;
   };
   try {
     const popular = await Blog.getPopular(5);
     const featured = await Blog.getFeatured(3);
-    assert.equal(popular[0].content, "BODY", "popular still ships content (exclusion is a pending client decision)");
-    assert.equal(featured[0].content, "BODY");
+    assert.equal(popular[0].content, undefined, "PERF-B-08: popular no longer ships the article body");
+    assert.equal(records[0].select, "-content", "getPopular must select -content");
+    assert.equal(featured[0].content, "BODY", "getFeatured shape is unchanged");
     assert.ok(records.every((r) => r.lean), "both statics must be lean");
   } finally { Blog.find = original; }
 });

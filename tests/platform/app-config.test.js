@@ -59,9 +59,10 @@ const PROD_OK = {
   BACKEND_URL: "https://api.example.com", EMAIL_FROM: "Aura <noreply@example.com>",
   SUPPORT_EMAIL: "support@example.com", JWT_SECRET: "x".repeat(40),
   MONGO_URI: "mongodb+srv://cluster.example/db", ESEWA_MERCHANT_ID: "M1", ESEWA_SECRET_KEY: "s3cret",
+  OTP_PEPPER: "pepper-value", // VULN-007: requiredProd since the Phase 1 remediation
 };
 test("production gate: each required missing in turn errors naming it; all present passes", () => {
-  for (const k of ["FRONTEND_URL", "ADMIN_URL", "BACKEND_URL", "EMAIL_FROM", "SUPPORT_EMAIL", "JWT_SECRET", "MONGO_URI", "ESEWA_MERCHANT_ID", "ESEWA_SECRET_KEY"]) {
+  for (const k of ["FRONTEND_URL", "ADMIN_URL", "BACKEND_URL", "EMAIL_FROM", "SUPPORT_EMAIL", "JWT_SECRET", "MONGO_URI", "ESEWA_MERCHANT_ID", "ESEWA_SECRET_KEY", "OTP_PEPPER"]) {
     const env = { ...PROD_OK }; delete env[k];
     const { errors } = cfg.validateEnv(env);
     assert.ok(errors.some((e) => e.includes(k)), `${k}: ${errors.join(";")}`);

@@ -4,8 +4,10 @@
 // only byte limits were per-file (theoretical aggregate ~15 x 25 MB).
 // Fix: an in-repo promise pool caps concurrent file pipelines at 3
 // (default-on, behavior-preserving — same outputs), and an aggregate
-// per-request budget applies ONLY when UPLOAD_MAX_TOTAL_BYTES is set
-// (unset = today's per-file limits only = today's acceptance).
+// per-request budget applies when UPLOAD_MAX_TOTAL_BYTES is set —
+// and, since the VULN-006 remediation, also by registry default
+// (50 MB) when it is unset; small requests keep today's acceptance,
+// which is what the AR-12 (b) "unset" test below still pins.
 // sharp and Cloudinary are stubbed via require.cache (the
 // upload-security.test.js pattern); the stubs carry artificial latency
 // and count how many pipelines are in flight at once.

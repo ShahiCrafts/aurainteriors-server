@@ -100,6 +100,10 @@ function normalize(value) {
 
 async function runProducts(query, user) {
   calls.productFind = []; calls.productCount = []; calls.categoryFind = []; findRecord = {};
+  // PERF-B-01: anonymous list responses are TTL-cached in-process;
+  // isolate each scenario from the cache the way a fresh deploy
+  // would be (these tests pin filter construction, not caching).
+  require("../../utils/catalogCache").invalidateCatalogCache();
   const res = mockRes(); const next = mockNext();
   productCtrl.getAllProducts({ query, user }, res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
