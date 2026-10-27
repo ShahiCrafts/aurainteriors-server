@@ -17,6 +17,20 @@
 // its own productsData (built from the shared furnitureImages below)
 // until the owner picks the canonical catalog. See the AR-31 report.
 //
+// Phase 8 (catalog) UPDATE — the canonical catalog is now chosen:
+// scripts/seed.js (the owner's self-contained 36-category /
+// 324-product dataset) is the ONE catalog seed path, and the boot
+// path no longer seeds a catalog at all (demo accounts + the
+// registry bootstrap only — see databaseSeeder.js). Consequences
+// for this module:
+//   - ensureSeedAdmin / ensureSeedCustomer remain LIVE (the boot
+//     path's account provisioning, FA-41 semantics unchanged);
+//   - furnitureImages / categoriesData / createSeedCategories /
+//     buildSampleOrders have NO production consumer anymore. They
+//     are retained as the AR-31 record (and their characterization
+//     tests) pending an owner decision on removal — nothing in the
+//     running app reads them. See docs/catalog/PHASE8_NOTES.md.
+//
 // Log shape: callers pass their own message strings via `messages`,
 // so each entry point's console output is byte-identical to before.
 const { getAdminCredentials } = require("../utils/adminCredentials");
