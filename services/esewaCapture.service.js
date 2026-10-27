@@ -37,15 +37,28 @@ exports.captureEsewaPayment = async (orderId, merchantId, response) => {
     const reason = reviewReason || (!eligible ? "Payment received after order state changed; reconcile manually" : null);
     if (!reason) {
       await consumeDiscountUsage(order, session);
+      // Phase 4: quantities aggregate per purchasable unit —
+      // (product, variantId) for variant lines, product for legacy
+      // lines — and each unit deducts through its own guarded
+      // update (the variant service's, with this path's sellable
+      // conditions, for variants). Any shortfall is the existing
+      // PAYMENT_OUT_OF_STOCK -> review_required outcome.
       const quantities = new Map();
       for (const item of order.items) {
         if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) throw new Error("PAYMENT_ITEMS_INVALID");
-        const id = String(item.product);
-        quantities.set(id, (quantities.get(id) || 0) + item.quantity);
+        const key = item.variantId ? `variant:${item.product}:${item.variantId}` : `product:${item.product}`;
+        const entry = quantities.get(key) || { product: item.product, variantId: item.variantId || null, quantity: 0 };
+        entry.quantity += item.quantity;
+        quantities.set(key, entry);
       }
-      for (const [product, quantity] of quantities) {
-        const changed = await Product.updateOne({ _id: product, deletedAt: null, status: "active", stock: { $gte: quantity } },
-          { $inc: { stock: -quantity } }, { session });
+      let variantService = null;
+      const getVariantService = () => (variantService ??= require("./productVariant.service"));
+      const mirrored = new Set();
+      for (const entry of quantities.values()) {
+        const changed = entry.variantId
+          ? await getVariantService().deductVariantStock(entry.product, entry.variantId, entry.quantity, { session, sellableOnly: true })
+          : await Product.updateOne({ _id: entry.product, deletedAt: null, status: "active", stock: { $gte: entry.quantity } },
+            { $inc: { stock: -entry.quantity } }, { session });
         if (changed.modifiedCount !== 1) {
           // AR-25 (always-on): a GUEST capture failing on stock —
           // money moved, fulfillment impossible — is counted +
@@ -59,6 +72,10 @@ exports.captureEsewaPayment = async (orderId, merchantId, response) => {
           }
           throw new Error("PAYMENT_OUT_OF_STOCK");
         }
+        if (entry.variantId) mirrored.add(String(entry.product));
+      }
+      for (const productId of mirrored) {
+        await getVariantService().refreshStockMirror(productId, { session });
       }
       // AR-25: stock is now committed for real, so any reservation
       // holds this order carried are consumed. (The review_required

@@ -3,6 +3,14 @@
 // exactly as before: stock validates at placement and commits at
 // confirmation/capture, the FA-09 model).
 //
+// Phase 4 (catalog): a hold may target a VARIANT (order line
+// carries variantId + sku). Aggregation, gating and settlement
+// then run on the variant's counters via productVariant.service
+// — the variant is authoritative and Product.reservedStock is
+// its mirror — with the same conditional-flip exactly-once point
+// and the same flag gating. Legacy (variant-less) holds are
+// byte-identical to the AR-25 behavior.
+//
 // Design:
 //   reserveForOrder(order, session) — per product (quantities
 //   aggregated across repeated lines), FIRST the atomic gate: an
@@ -68,16 +76,53 @@ const logDrift = (hold, toStatus) => {
 async function reserveForOrder(order, session) {
   const Product = loadProduct();
   const StockReservation = loadStockReservation();
-  // Aggregate repeated lines of the same product (the capture
-  // service's aggregation pattern) — one gate + one hold per product.
+  // Lazy AND conditional, like the models above: the variant
+  // service pulls in the catalog model chain, which stub
+  // harnesses forbid — and legacy-only orders never need it.
+  let variantService = null;
+  const getVariantService = () => (variantService ??= require("./productVariant.service"));
+  // Aggregate repeated lines of the same purchasable unit (the
+  // capture service's aggregation pattern) — one gate + one hold
+  // per unit. Phase 4: the unit is (product, variantId) for
+  // variant lines and the product alone for legacy lines.
   const quantities = new Map();
   for (const item of order.items || []) {
-    const id = String(item.product);
-    quantities.set(id, (quantities.get(id) || 0) + item.quantity);
+    const key = `${item.product}|${item.variantId || ""}`;
+    const entry = quantities.get(key) || {
+      product: item.product,
+      variantId: item.variantId || null,
+      sku: item.sku,
+      quantity: 0,
+    };
+    entry.quantity += item.quantity;
+    if (!entry.sku && item.sku) entry.sku = item.sku;
+    quantities.set(key, entry);
   }
   const expiresAt = new Date(Date.now() + ttlMs());
   const opts = session ? { session } : {};
-  for (const [productId, quantity] of quantities) {
+  const mirrored = new Set();
+  for (const entry of quantities.values()) {
+    if (entry.variantId) {
+      // Variant unit: the guarded gate runs on the VARIANT's
+      // counters (authoritative); the product mirror follows.
+      const gate = await getVariantService().reserveVariantStock(
+        entry.product, entry.variantId, entry.quantity, { session }
+      );
+      if (gate.matchedCount !== 1) {
+        throw new AppError("Insufficient stock to reserve this order", 400);
+      }
+      await StockReservation.create(
+        [{
+          order: order._id, product: entry.product, variantId: entry.variantId,
+          sku: entry.sku, quantity: entry.quantity, status: "active", expiresAt,
+        }],
+        opts
+      );
+      mirrored.add(String(entry.product));
+      continue;
+    }
+    const productId = entry.product;
+    const quantity = entry.quantity;
     const gate = await Product.updateOne(
       {
         _id: productId,
@@ -96,14 +141,20 @@ async function reserveForOrder(order, session) {
       opts
     );
   }
+  for (const productId of mirrored) {
+    await getVariantService().refreshStockMirror(productId, { session });
+  }
 }
 
 // Shared conditional-flip settlement behind consume/release. The
 // flip is the exactly-once point: only the caller that flips a hold
 // out of "active" decrements the counter for it.
 async function settleHolds(holds, toStatus, session, Product, StockReservation) {
+  let variantService = null;
+  const getVariantService = () => (variantService ??= require("./productVariant.service"));
   const opts = session ? { session } : {};
   let settled = 0;
+  const mirrored = new Set();
   for (const hold of holds) {
     const flip = await StockReservation.updateOne(
       { _id: hold._id, status: "active" },
@@ -112,12 +163,28 @@ async function settleHolds(holds, toStatus, session, Product, StockReservation) 
     );
     if (flip.matchedCount !== 1) continue;
     settled += 1;
+    if (hold.variantId) {
+      // Variant hold: the exactly-once flip above gates a guarded
+      // decrement of the VARIANT's reservedStock (same $gte floor
+      // discipline; a miss logs drift and leaves the counter
+      // untouched). The product counter is only a mirror for
+      // variant products, so it re-converges from the variants.
+      const decremented = await getVariantService().releaseVariantReserved(
+        hold.product, hold.variantId, hold.quantity, { session }
+      );
+      if (decremented.modifiedCount !== 1) logDrift(hold, toStatus);
+      mirrored.add(String(hold.product));
+      continue;
+    }
     const decremented = await Product.updateOne(
       { _id: hold.product, reservedStock: { $gte: hold.quantity } },
       { $inc: { reservedStock: -hold.quantity } },
       opts
     );
     if (decremented.matchedCount !== 1) logDrift(hold, toStatus);
+  }
+  for (const productId of mirrored) {
+    await getVariantService().refreshStockMirror(productId, { session });
   }
   return settled;
 }

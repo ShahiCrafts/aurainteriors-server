@@ -19,6 +19,16 @@ const cartItemSchema = new mongoose.Schema(
       size: String,
       material: String,
     },
+    // Phase 4 (catalog): a line for a variant product names the
+    // EXACT purchasable unit — the catalogVariants subdocument id —
+    // plus its SKU denormalized at add time (revalidated against
+    // the variant at checkout; SKUs are immutable, so a mismatch
+    // means the line is stale or forged). Legacy lines leave both
+    // unset and keep the {color,size,material} triple above.
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId,
+    },
+    sku: String,
     addedAt: {
       type: Date,
       default: Date.now,
@@ -49,19 +59,22 @@ cartSchema.virtual("totalItems").get(function () {
 cartSchema.methods.addItem = async function (
   productId,
   quantity = 1,
-  variant = {}
+  variant = {},
+  variantId = null,
+  sku = undefined
 ) {
   if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error("Quantity must be a positive integer");
   const existingItem = this.items.find(
     (item) =>
       item.product.toString() === productId.toString() &&
+      String(item.variantId || "") === String(variantId || "") &&
       ["color", "size", "material"].every(key => (item.variant?.[key] || "") === (variant?.[key] || ""))
   );
 
   if (existingItem) {
     existingItem.quantity += quantity;
   } else {
-    this.items.push({ product: productId, quantity, variant });
+    this.items.push({ product: productId, quantity, variant, ...(variantId ? { variantId, sku } : {}) });
   }
 
   return this.save();

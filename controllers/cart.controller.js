@@ -8,6 +8,55 @@ const validVariant = variant => variant && typeof variant === "object" && !Array
     typeof variant[key] === "string" && variant[key].length <= 100);
 const visibleItems = cart => cart.items.filter(item => item.product);
 
+// Phase 4 (catalog): variant lines. A line for a variant product
+// names the exact catalogVariants subdocument (variantId) and
+// denormalizes its SKU; the helpers below resolve a stored line
+// back to its variant on the populated product for the response
+// snapshot and price authority (cart totals price variant lines
+// from the VARIANT, matching checkout).
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+const CART_PRODUCT_SELECT = "name slug price originalPrice images category stock catalogVariants hasVariants";
+const findLineVariant = (product, variantId) =>
+  ((product && product.catalogVariants) || []).find((v) => String(v._id) === String(variantId)) || null;
+const variantDetailsFor = (item) => {
+  if (!item || !item.variantId || !item.product || typeof item.product !== "object") return null;
+  const variant = findLineVariant(item.product, item.variantId);
+  if (!variant) return null;
+  const options = variant.options instanceof Map
+    ? Object.fromEntries(variant.options)
+    : { ...(variant.options || {}) };
+  return {
+    sku: variant.sku,
+    options,
+    price: variant.price,
+    ...(variant.compareAtPrice !== undefined && variant.compareAtPrice !== null
+      ? { compareAtPrice: variant.compareAtPrice }
+      : {}),
+    stock: variant.stock || 0,
+    available: variant.enabled !== false && (variant.stock || 0) - (variant.reservedStock || 0) > 0,
+  };
+};
+const serializeCart = (cart) => {
+  const visible = visibleItems(cart);
+  const items = visible.map((item) => {
+    const plain = typeof item.toObject === "function" ? item.toObject() : { ...item };
+    const details = variantDetailsFor(item);
+    if (details) plain.variantDetails = details;
+    return plain;
+  });
+  let subtotal = 0;
+  for (const item of visible) {
+    const details = item.variantId ? variantDetailsFor(item) : null;
+    subtotal += (details ? details.price : item.product.price) * item.quantity;
+  }
+  return {
+    _id: cart._id,
+    items,
+    totalItems: visible.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal,
+  };
+};
+
 // FA-47 / AR-26: ONE guarded-write helper for every cart mutation. The
 // update only lands if the cart has not changed since it was read
 // (optimistic concurrency on __v): two racing mutations can no longer
@@ -36,7 +85,7 @@ exports.getCart = catchAsync(async (req, res, next) => {
   let cart = await Cart.findOne({ user: req.user._id }).populate({
     path: "items.product",
     match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
-    select: "name slug price originalPrice images category stock",
+    select: CART_PRODUCT_SELECT,
     populate: {
       path: "category",
       select: "name slug",
@@ -54,16 +103,7 @@ exports.getCart = catchAsync(async (req, res, next) => {
     cart = await Cart.create({ user: req.user._id, items: [] });
   }
 
-  // Calculate totals
-  let subtotal = 0;
-  const validItems = [];
-
-  for (const item of cart.items) {
-    if (item.product) {
-      subtotal += item.product.price * item.quantity;
-      validItems.push(item);
-    }
-  }
+  const validItems = cart.items.filter((item) => item.product);
 
   // Remove invalid items if any were found. AR-26: with
   // CART_GET_READONLY=on the prune is response-only (visibleItems below
@@ -75,20 +115,13 @@ exports.getCart = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    data: {
-      cart: {
-        _id: cart._id,
-        items: visibleItems(cart),
-        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
-        subtotal,
-      },
-    },
+    data: { cart: serializeCart(cart) },
   });
 });
 
 // Add item to cart
 exports.addToCart = catchAsync(async (req, res, next) => {
-  const { productId, quantity = 1, variant = {} } = req.body;
+  const { productId, quantity = 1, variant = {}, variantId } = req.body;
 
   if (!productId) {
     return next(new AppError("Product ID is required", 400));
@@ -99,6 +132,9 @@ exports.addToCart = catchAsync(async (req, res, next) => {
   }
   if (!validVariant(variant)) return next(new AppError("Invalid product variant", 400));
   if (!/^[a-f0-9]{24}$/i.test(productId)) return next(new AppError("Invalid product ID", 400));
+  if (variantId !== undefined && variantId !== null && variantId !== "" && !OBJECT_ID_RE.test(String(variantId))) {
+    return next(new AppError("Invalid variant ID", 400, "VARIANT_NOT_FOUND"));
+  }
 
   // Check if product exists
   const product = await Product.findOne({ _id: productId, deletedAt: null, status: "active" });
@@ -106,9 +142,35 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     return next(new AppError("Product not found", 404));
   }
 
+  // Phase 4: resolve the purchasable unit. A variant product
+  // REQUIRES the line to name one of its variants (stable codes
+  // let the client react — prompt a selection, drop the line);
+  // a variantId on a variant-less product names nothing.
+  const productVariants = product.catalogVariants || [];
+  let lineVariant = null;
+  if (productVariants.length > 0) {
+    if (!variantId) {
+      return next(new AppError("Please select a variant for this product", 400, "VARIANT_REQUIRED"));
+    }
+    lineVariant = findLineVariant(product, variantId);
+    if (!lineVariant) {
+      return next(new AppError("Variant not found", 400, "VARIANT_NOT_FOUND"));
+    }
+    if (lineVariant.enabled === false) {
+      return next(new AppError("This variant is unavailable", 409, "VARIANT_UNAVAILABLE"));
+    }
+  } else if (variantId) {
+    return next(new AppError("This product has no variants", 400, "VARIANT_NOT_FOUND"));
+  }
+  // All three stock layers below read the UNIT's stock — the
+  // variant's for a variant line, the product's for a legacy line
+  // (reservations ignored, exactly the pre-Phase-4 cart posture;
+  // the binding availability check happens at checkout).
+  const lineStock = lineVariant ? (lineVariant.stock || 0) : product.stock;
+
   // Check stock
-  if (product.stock < quantity) {
-    return next(new AppError("Insufficient stock", 400));
+  if (lineStock < quantity) {
+    return next(new AppError("Insufficient stock", 400, lineVariant ? "VARIANT_OUT_OF_STOCK" : undefined));
   }
 
   let cart = await Cart.findOne({ user: req.user._id });
@@ -117,24 +179,37 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     cart = await Cart.create({ user: req.user._id, items: [] });
   }
 
+  // Combined quantity is per purchasable UNIT: variant lines of
+  // one product buy different units and must not crowd each
+  // other out; legacy lines keep combining across the product.
+  const sameUnit = (item) =>
+    String(item.product) === String(product._id) &&
+    (lineVariant
+      ? String(item.variantId || "") === String(lineVariant._id)
+      : !item.variantId);
   const existingQuantity = cart.items.reduce((total, item) =>
-    total + (String(item.product) === String(product._id) ? item.quantity : 0), 0);
-  if (!Number.isSafeInteger(existingQuantity + quantity) || existingQuantity + quantity > product.stock) {
-    return next(new AppError("Insufficient combined product stock", 400));
+    total + (sameUnit(item) ? item.quantity : 0), 0);
+  if (!Number.isSafeInteger(existingQuantity + quantity) || existingQuantity + quantity > lineStock) {
+    return next(new AppError("Insufficient combined product stock", 400, lineVariant ? "VARIANT_OUT_OF_STOCK" : undefined));
   }
 
-  // Check if item already exists with same variant
+  // Check if item already exists with the same variant identity:
+  // (product + variantId) for variant lines — the combination
+  // lives in the variant, never in the legacy triple — and
+  // (product + triple) for legacy lines, as before.
   const existingItemIndex = cart.items.findIndex(
     (item) =>
       item.product.toString() === String(product._id) &&
-      variantKey(item.variant) === variantKey(variant)
+      (lineVariant
+        ? String(item.variantId || "") === String(lineVariant._id)
+        : !item.variantId && variantKey(item.variant) === variantKey(variant))
   );
 
   if (existingItemIndex > -1) {
     // Update quantity
     const newQuantity = cart.items[existingItemIndex].quantity + quantity;
-    if (newQuantity > product.stock) {
-      return next(new AppError("Insufficient stock", 400));
+    if (newQuantity > lineStock) {
+      return next(new AppError("Insufficient stock", 400, lineVariant ? "VARIANT_OUT_OF_STOCK" : undefined));
     }
     cart.items[existingItemIndex].quantity = newQuantity;
   } else {
@@ -142,7 +217,8 @@ exports.addToCart = catchAsync(async (req, res, next) => {
     cart.items.push({
       product: productId,
       quantity,
-      variant,
+      variant: lineVariant ? {} : variant,
+      ...(lineVariant ? { variantId: lineVariant._id, sku: lineVariant.sku } : {}),
       addedAt: new Date(),
     });
   }
@@ -156,31 +232,17 @@ exports.addToCart = catchAsync(async (req, res, next) => {
   await cart.populate({
     path: "items.product",
     match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
-    select: "name slug price originalPrice images category stock",
+    select: CART_PRODUCT_SELECT,
     populate: {
       path: "category",
       select: "name slug",
     },
   });
 
-  let subtotal = 0;
-  for (const item of cart.items) {
-    if (item.product) {
-      subtotal += item.product.price * item.quantity;
-    }
-  }
-
   res.status(200).json({
     success: true,
     message: "Item added to cart",
-    data: {
-      cart: {
-        _id: cart._id,
-        items: visibleItems(cart),
-        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
-        subtotal,
-      },
-    },
+    data: { cart: serializeCart(cart) },
   });
 });
 
@@ -211,11 +273,25 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
     return next(new AppError("Product not found", 404));
   }
 
+  // Phase 4: a variant line's stock is its variant's; the other
+  // lines it combines with are the ones buying the SAME unit.
+  let lineStock = product.stock;
+  if (item.variantId) {
+    const variant = findLineVariant(product, item.variantId);
+    if (!variant) {
+      return next(new AppError("This variant is no longer available", 400, "VARIANT_NOT_FOUND"));
+    }
+    if (variant.enabled === false) {
+      return next(new AppError("This variant is unavailable", 409, "VARIANT_UNAVAILABLE"));
+    }
+    lineStock = variant.stock || 0;
+  }
   const otherQuantity = cart.items.reduce((total, cartItem) => total +
-    (String(cartItem._id) !== String(item._id) && String(cartItem.product) === String(product._id)
+    (String(cartItem._id) !== String(item._id) && String(cartItem.product) === String(product._id) &&
+     String(cartItem.variantId || "") === String(item.variantId || "")
       ? cartItem.quantity : 0), 0);
-  if (!Number.isSafeInteger(otherQuantity + quantity) || otherQuantity + quantity > product.stock) {
-    return next(new AppError("Insufficient stock", 400));
+  if (!Number.isSafeInteger(otherQuantity + quantity) || otherQuantity + quantity > lineStock) {
+    return next(new AppError("Insufficient stock", 400, item.variantId ? "VARIANT_OUT_OF_STOCK" : undefined));
   }
 
   item.quantity = quantity;
@@ -228,31 +304,17 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   await cart.populate({
     path: "items.product",
     match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
-    select: "name slug price originalPrice images category stock",
+    select: CART_PRODUCT_SELECT,
     populate: {
       path: "category",
       select: "name slug",
     },
   });
 
-  let subtotal = 0;
-  for (const cartItem of cart.items) {
-    if (cartItem.product) {
-      subtotal += cartItem.product.price * cartItem.quantity;
-    }
-  }
-
   res.status(200).json({
     success: true,
     message: "Cart updated",
-    data: {
-      cart: {
-        _id: cart._id,
-        items: visibleItems(cart),
-        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
-        subtotal,
-      },
-    },
+    data: { cart: serializeCart(cart) },
   });
 });
 
@@ -285,31 +347,17 @@ exports.removeFromCart = catchAsync(async (req, res, next) => {
   await cart.populate({
     path: "items.product",
     match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
-    select: "name slug price originalPrice images category stock",
+    select: CART_PRODUCT_SELECT,
     populate: {
       path: "category",
       select: "name slug",
     },
   });
 
-  let subtotal = 0;
-  for (const item of cart.items) {
-    if (item.product) {
-      subtotal += item.product.price * item.quantity;
-    }
-  }
-
   res.status(200).json({
     success: true,
     message: "Item removed from cart",
-    data: {
-      cart: {
-        _id: cart._id,
-        items: visibleItems(cart),
-        totalItems: visibleItems(cart).reduce((sum, item) => sum + item.quantity, 0),
-        subtotal,
-      },
-    },
+    data: { cart: serializeCart(cart) },
   });
 });
 

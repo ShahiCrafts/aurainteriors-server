@@ -12,8 +12,20 @@ const stockReservation = require("./stockReservation.service");
 // confirmation (commit-audit C-2: checkout IS the confirmation point
 // for guest COD, so without this call the stock was never deducted).
 exports.commitGuestCodStock = async (order, session) => {
+  // Required only when a variant line exists (see the
+  // stockReservation.service lazy-load precedent: load-time model
+  // requires on commerce paths break stub-based harnesses).
+  let variantService = null;
+  const getVariantService = () => (variantService ??= require("./productVariant.service"));
+  const mirrored = new Set();
   for (const item of order.items) {
-    const deducted = await Product.updateOne({ _id: item.product, stock: { $gte: item.quantity } }, { $inc: { stock: -item.quantity } }, { session });
+    // Phase 4: a variant line deducts from its VARIANT through
+    // the same guarded pattern (the variant service's $elemMatch
+    // guard is this function's per-item guard, one level down);
+    // legacy lines keep the product-level guard byte-identical.
+    const deducted = item.variantId
+      ? await getVariantService().deductVariantStock(item.product, item.variantId, item.quantity, { session })
+      : await Product.updateOne({ _id: item.product, stock: { $gte: item.quantity } }, { $inc: { stock: -item.quantity } }, { session });
     if (deducted.matchedCount !== 1) {
       // AR-25 (always-on, both flag states): a guest confirmation
       // that fails on stock is counted + logged BEFORE the existing
@@ -25,6 +37,10 @@ exports.commitGuestCodStock = async (order, session) => {
       });
       throw new AppError("Insufficient stock to confirm this order", 409);
     }
+    if (item.variantId) mirrored.add(String(item.product));
+  }
+  for (const productId of mirrored) {
+    await getVariantService().refreshStockMirror(productId, { session });
   }
 };
 exports.transitionOrder = async (filter, status, note, customer = false) => {
@@ -57,9 +73,31 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
       if (status === "cancelled") {
         const hadDeductedStock = order.stockDeducted;
         if (order.stockDeducted === true) {
+          let variantService = null;
+          const getVariantService = () => (variantService ??= require("./productVariant.service"));
+          const mirrored = new Set();
           for (const item of order.items) {
+            if (item.variantId) {
+              // Phase 4: restore the units to the variant they
+              // were deducted from, and refresh the product
+              // mirror. If that variant has been deleted since
+              // placement there is nothing to restore INTO — flag
+              // the order for inventory review (the same mechanism
+              // legacy-undeducted orders use below) rather than
+              // failing a cancellation the customer is owed.
+              const restored = await getVariantService().restoreVariantStock(item.product, item.variantId, item.quantity, { session });
+              if (restored.modifiedCount !== 1) {
+                order.inventoryReviewRequired = true;
+              } else {
+                mirrored.add(String(item.product));
+              }
+              continue;
+            }
             const restored = await Product.updateOne({ _id: item.product }, { $inc: { stock: item.quantity } }, { session });
             if (restored.matchedCount !== 1) throw new AppError("Inventory reconciliation required", 409);
+          }
+          for (const productId of mirrored) {
+            await getVariantService().refreshStockMirror(productId, { session });
           }
           order.stockDeducted = false;
         } else if (order.stockDeducted === undefined) {

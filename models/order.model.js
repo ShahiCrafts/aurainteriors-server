@@ -31,6 +31,23 @@ const orderItemSchema = new mongoose.Schema(
       size: String,
       material: String,
     },
+    // Phase 4 (catalog): immutable snapshot of the purchased
+    // variant — its id, its SKU and its option combination with
+    // labels resolved from the attribute definitions AT PLACEMENT
+    // TIME. `price` above is the variant's price actually charged
+    // for variant lines. Later variant edits/deletes never mutate
+    // these fields; cancel/restock reads variantId to find the
+    // unit to restore. Legacy lines leave all three unset.
+    variantId: { type: mongoose.Schema.Types.ObjectId },
+    sku: String,
+    variantOptions: [
+      {
+        _id: false,
+        key: { type: String, required: true },
+        label: String,
+        value: String,
+      },
+    ],
     image: String,
   },
   { _id: true }

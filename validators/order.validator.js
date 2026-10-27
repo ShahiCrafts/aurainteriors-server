@@ -41,6 +41,11 @@ exports.guestCheckoutSchema = Joi.object({
       Joi.object({
         productId: Joi.string().required(),
         quantity: Joi.number().integer().min(1).max(99).required(),
+        // Phase 4 (catalog): guests name the exact variant the
+        // same way carts do. Without these keys the validate
+        // middleware's stripUnknown would silently drop them.
+        variantId: Joi.string().pattern(/^[a-f0-9]{24}$/i),
+        sku: Joi.string().trim().max(64).allow(""),
         variant: Joi.object({
           color: Joi.string().allow(""),
           size: Joi.string().allow(""),

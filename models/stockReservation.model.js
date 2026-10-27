@@ -23,6 +23,13 @@ const stockReservationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Phase 4 (catalog): a hold may target one variant of the
+    // product (the catalogVariants subdocument id) — quantities in
+    // the service aggregate per (product, variantId). variantId is
+    // unset for legacy product-level holds; sku is the purchased
+    // unit's SKU snapshot for the ledger record.
+    variantId: { type: mongoose.Schema.Types.ObjectId },
+    sku: String,
     quantity: { type: Number, required: true, min: 1 },
     status: {
       type: String,

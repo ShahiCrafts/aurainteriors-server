@@ -432,6 +432,10 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
       productId: item.product?._id || item.product,
       quantity: item.quantity,
       variant: item.variant,
+      // Phase 4: the cart line's variant identity flows into
+      // prepareOrderItems, which resolves + revalidates it.
+      variantId: item.variantId,
+      sku: item.sku,
     }));
 
     const orderItems = await prepareOrderItems(items, session);
@@ -537,7 +541,22 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
     // Update stock within transaction (only for non-eSewa orders like COD)
     if (paymentMethod !== "esewa") {
       // FIX: Batch update all products with bulkWrite instead of individual updates (N+1 prevention)
-      const bulkOps = orderItems.map((item) => ({
+      // Phase 4: a variant line's op guards + deducts the VARIANT
+      // subdoc (the $elemMatch makes the op match only while the
+      // variant holds enough stock); legacy ops are unchanged.
+      const bulkOps = orderItems.map((item) => item.variantId ? {
+        updateOne: {
+          filter: {
+            _id: item.product,
+            deletedAt: null, status: "active",
+            catalogVariants: { $elemMatch: { _id: item.variantId, stock: { $gte: item.quantity } } },
+          },
+          update: {
+            $inc: { "catalogVariants.$[v].stock": -item.quantity },
+          },
+          arrayFilters: [{ "v._id": item.variantId }],
+        },
+      } : {
         updateOne: {
           filter: {
             _id: item.product,
@@ -548,7 +567,7 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
             $inc: { stock: -item.quantity },
           },
         },
-      }));
+      });
 
       if (bulkOps.length > 0) {
         const result = await Product.bulkWrite(bulkOps, {
@@ -561,6 +580,22 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
             "Insufficient stock for one or more products in your cart. Please review.",
             400
           );
+        }
+
+        // Phase 4: the variant deductions moved variant counters;
+        // each affected product's stock mirror follows inside the
+        // same transaction. The variant service is required only
+        // when a variant line exists (load-time model requires on
+        // the checkout path break stub-based harnesses — the
+        // stockReservation.service precedent).
+        const mirroredProducts = new Set(
+          orderItems.filter((item) => item.variantId).map((item) => String(item.product))
+        );
+        if (mirroredProducts.size > 0) {
+          const { refreshStockMirror } = require("../services/productVariant.service");
+          for (const productId of mirroredProducts) {
+            await refreshStockMirror(productId, { session });
+          }
         }
       }
     }
