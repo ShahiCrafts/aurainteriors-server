@@ -5,12 +5,29 @@ const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 
+// The product fields every wishlist response carries. This list is
+// the contract with the shared ProductCard the wishlist page
+// renders: name/slug/price/originalPrice/images/category/rating/
+// stock for the basics, shortDescription for the one-line
+// description, isNewArrival/isFeatured for the badge,
+// arAvailable for the AR pill, colors for the swatch dots, and
+// hasVariants/priceFrom/catalogVariants for variant detection and
+// "From" pricing. (discountPercentage needs no entry — it is a
+// schema virtual computed from price/originalPrice and serializes
+// automatically.) Trimming this list silently removes card
+// features, as the missing shortDescription did — extend the card
+// and this list together.
+const WISHLIST_PRODUCT_FIELDS =
+  "name slug price originalPrice images category rating stock " +
+  "shortDescription arAvailable colors isFeatured isNewArrival " +
+  "hasVariants priceFrom catalogVariants";
+
 // Get user's wishlist
 exports.getWishlist = catchAsync(async (req, res, next) => {
   let wishlist = await Wishlist.findOne({ user: req.user._id }).populate({
     path: "products.product",
     match: { deletedAt: null, status: { $in: ["active", "out_of_stock"] } },
-    select: "name slug price originalPrice images category rating stock",
+    select: WISHLIST_PRODUCT_FIELDS,
     populate: {
       path: "category",
       select: "name slug",
@@ -54,7 +71,7 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
   const lookupStart = performance.now();
   const product = await Product.findOne({ _id: productId, deletedAt: null,
     status: { $in: ["active", "out_of_stock"] } })
-    .select("name slug price originalPrice images category rating stock").lean();
+    .select(WISHLIST_PRODUCT_FIELDS).lean();
   req.wishlistTimings?.push(`product;dur=${(performance.now() - lookupStart).toFixed(1)}`);
   if (!product) return next(new AppError("Product not found", 404));
 
