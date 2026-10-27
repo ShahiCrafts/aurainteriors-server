@@ -23,6 +23,42 @@ const dimensionsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Phase 3 (catalog) — purchasable variant subdocument. Promoted
+// from the dormant inline shape (sku/options/price/stock/images/
+// modelUrl/enabled) into the real variant system: every variant
+// write goes through services/productVariant.service.js, which
+// enforces the invariants (globally unique SKU, unique option
+// combination per product, engine-validated option values).
+// `options` stays the precursor's Map of String — normalized
+// option values are stored stringified. `combinationKey` is the
+// server-computed canonical encoding of the options (sorted
+// key=value pairs) that combination uniqueness is checked
+// against. `reservedStock` is Phase 4's bookkeeping (the field
+// lands now; checkout/reservation code drives it). sku carries
+// no schema-level `required`: the service enforces it on every
+// write path, and a schema requirement would break document
+// saves for any legacy row carrying a sku-less dormant subdoc.
+const catalogVariantSchema = new mongoose.Schema(
+  {
+    sku: { type: String, trim: true, uppercase: true },
+    options: { type: Map, of: String, default: {} },
+    combinationKey: { type: String, trim: true },
+    price: { type: Number, min: 0 },
+    compareAtPrice: { type: Number, min: 0 },
+    stock: { type: Number, min: 0, default: 0 },
+    reservedStock: { type: Number, min: 0, default: 0 },
+    images: [{ type: String }],
+    weight: {
+      value: { type: Number, min: 0 },
+      unit: { type: String, enum: ["kg", "lb", "g"], default: "kg" },
+    },
+    dimensions: dimensionsSchema,
+    modelUrl: { type: String, trim: true },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: {
@@ -144,6 +180,28 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    productType: { type: String, lowercase: true, trim: true, index: true },
+    roomSlugs: [{ type: String, lowercase: true, trim: true }],
+    collectionSlugs: [{ type: String, lowercase: true, trim: true }],
+    catalogAttributes: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+    catalogVariants: [catalogVariantSchema],
+    // Phase 3 (catalog): the attribute keys that define this
+    // product's variant combinations (each variant's option key
+    // set must equal this list exactly). Case-sensitive attribute
+    // keys — no lowercase normalization here (Phase 2 lesson).
+    // Written only via the product update path, which locks the
+    // list while variants exist (services/productVariant.service).
+    variantOptionKeys: [{ type: String, trim: true }],
+    // Phase 3 (catalog): derived variant summary, maintained by
+    // services/productVariant.service.js on every variant write so
+    // list queries stay cheap. hasVariants = at least one variant
+    // exists; priceFrom = the minimum price across ENABLED
+    // variants (null when none) — a DISPLAY floor only; checkout
+    // price authority is Phase 4's decision. Product.price and
+    // Product.stock keep their legacy meaning and are NOT
+    // rewritten by variant writes.
+    hasVariants: { type: Boolean, default: false, index: true },
+    priceFrom: { type: Number, min: 0, default: null },
     // Physical specifications
     dimensions: dimensionsSchema,
     weight: {
@@ -273,6 +331,31 @@ productSchema.index({ status: 1, category: 1 }); // Home page products filtered 
 productSchema.index({ isFeatured: 1, createdAt: -1 }); // Featured products sort
 productSchema.index({ isNewArrival: 1, createdAt: -1 }); // New arrivals sort
 productSchema.index({ deletedAt: 1, status: 1 }); // Soft delete + status filters
+
+// Phase 3 (catalog): variant SKU uniqueness is enforced by the
+// service AND this sparse unique multikey index (the service
+// check alone races; the index alone cannot see duplicates
+// within one product's array — together they close both holes).
+// Sparse: products without variants contribute no entries.
+// combinationKey gets a plain index (per-product uniqueness is
+// the service's guarded write — a global unique index would
+// wrongly collide identical combinations across products).
+productSchema.index({ "catalogVariants.sku": 1 }, { unique: true, sparse: true });
+productSchema.index({ "catalogVariants.combinationKey": 1 });
+// Phase 5 (catalog): the facet engine and the list filters run
+// their pools over the visible-status set. Room filtering and the
+// room facet read roomSlugs within that set; the rating filter
+// (minRating) and rating sorts read rating.average the same way.
+// Deliberately NOT declared (see docs/catalog/PHASE5_NOTES.md):
+// { status, hasVariants } and { status, priceFrom } — variant
+// matching runs through $expr/$filter, which cannot exploit them
+// for the branch that matters, and the effective-price sort key
+// is a computed coalesce (priceFrom ?? price), not an indexable
+// field path. Per the no-surprise-index-build rule these are
+// schema-declared only; production builds them explicitly
+// (commands in PHASE5_NOTES.md).
+productSchema.index({ status: 1, roomSlugs: 1 });
+productSchema.index({ status: 1, "rating.average": -1 });
 
 // Virtual for discount percentage
 productSchema.virtual("discountPercentage").get(function () {
