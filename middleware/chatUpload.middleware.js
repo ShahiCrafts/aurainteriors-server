@@ -5,8 +5,13 @@ const { actorKey } = require("../services/chatUpload.service");
 const { MAX_ATTACHMENT_BYTES, MIME_TYPES } = require("../utils/chatAttachmentPolicy");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const { getGuestSessionId } = require("../utils/guestSession");
 exports.authorizeUpload = catchAsync(async (req, res, next) => {
-  const guest = req.query.guestSessionId;
+  // VULN-001: use the shared gated extractor (utils/guestSession.js).
+  // The query-string source is honoured only when
+  // GUEST_SESSION_ALLOW_QUERY=1, exactly like every other chat path;
+  // this middleware previously read req.query.guestSessionId directly.
+  const guest = getGuestSessionId(req);
   if (!/^[a-f0-9]{24}$/i.test(req.params.id) ||
       !await ChatService.authorizeChat(req.params.id, req.user?._id, req.user?.role || "customer", guest)) {
     return next(new AppError("Chat not found or access denied", 403));

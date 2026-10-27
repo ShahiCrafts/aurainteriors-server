@@ -3,6 +3,7 @@ const { runDocumentIngestion } = require("../services/backgroundTasks");
 const { deleteFile } = require("../middleware/upload.middleware");
 const AppError = require("../utils/AppError");
 const { boundedLimit, boundedPage } = require("../utils/listQuery");
+const auditLog = require("../services/auditLog.service"); // VULN-004
 
 // OA-1 -9: Qdrant client is created LAZILY at first use via the shared
 // resolver (config/appConfig.createQdrantClient). Import/construction
@@ -189,6 +190,14 @@ exports.updateVisibility = async (req, res, next) => {
     if (!["private", "public"].includes(req.body.visibility)) return next(new AppError("Invalid document visibility", 400));
     const doc = await Document.findByIdAndUpdate(req.params.id, { visibility: req.body.visibility }, { new: true, runValidators: true });
     if (!doc) return next(new AppError("Document not found", 404));
+    await auditLog.record({ // VULN-004 (never throws; after-state only — findByIdAndUpdate does not load the prior state)
+      actor: req.user?._id,
+      action: "document.visibility.update",
+      targetType: "Document",
+      targetId: doc._id,
+      after: { visibility: doc.visibility },
+      ip: req.ip,
+    });
     // Mongo restriction takes effect immediately for private documents; public
     // publishing requires ingestion to update vector payloads as well.
     runDocumentIngestion(String(doc._id));

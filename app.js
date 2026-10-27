@@ -101,7 +101,8 @@ function createApp() {
     next();
   });
 
-  // Enable response compression (gzip/brotli) for all responses
+  // Enable response compression (gzip/deflate — the `compression`
+  // package does not negotiate brotli) for all responses.
   // Reduces typical JSON payload by 5-8x (15KB → 3KB)
   app.use(compression({ level: 6, threshold: 1024 }));
 

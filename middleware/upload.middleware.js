@@ -17,11 +17,11 @@ const { mapWithConcurrency } = require("../utils/promisePool");
 // same files are processed to the same results, just bounded).
 const UPLOAD_PIPELINE_CONCURRENCY = 3;
 
-// AR-12: aggregate per-request byte budget. UNSET (or not a positive
-// number) = no aggregate enforcement — today's per-file multer limits
-// are the only limits and today's acceptance is preserved exactly.
-// When set and the request's files total more than the budget, the
-// request is rejected with a 400 BEFORE any processing runs.
+// AR-12: aggregate per-request byte budget. When the request's files
+// total more than the budget, the request is rejected with a 400
+// BEFORE any processing runs. VULN-006: the registry default is now
+// 50 MB (52428800), so a budget applies even when the env var is
+// unset; only a non-positive resolved value disables enforcement.
 const getUploadMaxTotalBytes = (env = process.env) => {
   const n = Number(require("../config/appConfig").getInt("UPLOAD_MAX_TOTAL_BYTES", env));
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -175,15 +175,18 @@ exports.resizeCategoryImage = async (req, res, next) => {
     // active content. CATEGORY_SVG_POLICY (owner-approved 2026-10-23):
     //   reencode (default) - rasterize to PNG via sharp before upload
     //   reject             - refuse SVG uploads on this path
-    //   allow              - legacy behavior: store as-is (not advised)
+    // VULN-002: there is no third branch. The registry now validates
+    // the value as an enum at boot, and ANY value that is not
+    // "reencode" is rejected here — the policy fails CLOSED, so a
+    // raw script-capable SVG can never fall through to Cloudinary
+    // (the legacy "allow: store as-is" behaviour is removed).
     let uploadBuffer = req.file.buffer;
     if (detectImageType(req.file.buffer) === "svg") {
       const policy = String(require("../config/appConfig").getString("CATEGORY_SVG_POLICY") || "reencode").toLowerCase();
-      if (policy === "reject") {
-        return next(new AppError("SVG images are not accepted for categories", 400));
-      }
       if (policy === "reencode") {
         uploadBuffer = await sharp(req.file.buffer).png().toBuffer();
+      } else {
+        return next(new AppError("SVG images are not accepted for categories", 400));
       }
     }
 

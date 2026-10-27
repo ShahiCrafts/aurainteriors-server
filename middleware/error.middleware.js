@@ -97,12 +97,21 @@ const sendErrorProd = (err, res) => {
   }
 };
 
-module.exports = (err, req, res, next) => {
+// VULN-003: normalise NODE_ENV before comparing, exactly like the
+// rest of the codebase (auth.controller isProduction, appConfig
+// validateEnv). A raw `=== "development"` compare meant values like
+// "Development" or " development " silently took a different branch
+// here than everywhere else. Normalised, they mean development —
+// consistently — and never leak stacks in the production branch.
+const isDevelopment = (value = process.env.NODE_ENV) =>
+  String(value || "").trim().toLowerCase() === "development";
+
+const errorHandler = (err, req, res, next) => {
   console.error(err); // Always log error for debugging
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
-  if (process.env.NODE_ENV === "development") {
+  if (isDevelopment()) {
     sendErrorDev(err, res);
   } else {
     let error = { ...err };
@@ -122,3 +131,6 @@ module.exports = (err, req, res, next) => {
     sendErrorProd(error, res);
   }
 };
+
+module.exports = errorHandler;
+module.exports.isDevelopment = isDevelopment; // exported for tests

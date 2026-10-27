@@ -1,4 +1,5 @@
 const PromotionService = require("../services/promotionService");
+const auditLog = require("../services/auditLog.service"); // VULN-004
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 
@@ -61,6 +62,15 @@ exports.createPromotion = catchAsync(async (req, res, next) => {
     req.user._id
   );
 
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "promotion.create",
+    targetType: "Promotion",
+    targetId: promotion._id,
+    after: { title: promotion.title, status: promotion.status },
+    ip: req.ip,
+  });
+
   res.status(201).json({
     status: "success",
     message: "Promotion campaign created successfully",
@@ -73,6 +83,15 @@ exports.updatePromotion = catchAsync(async (req, res, next) => {
     req.params.id,
     req.body
   );
+
+  await auditLog.record({ // VULN-004 (never throws; after-state only — this handler does not load the prior state)
+    actor: req.user?._id,
+    action: "promotion.update",
+    targetType: "Promotion",
+    targetId: promotion._id,
+    after: { title: promotion.title, status: promotion.status },
+    ip: req.ip,
+  });
 
   res.status(200).json({
     status: "success",
@@ -132,6 +151,14 @@ exports.cancelPromotion = catchAsync(async (req, res, next) => {
 
 exports.deletePromotion = catchAsync(async (req, res, next) => {
   await PromotionService.deletePromotion(req.params.id);
+
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "promotion.delete",
+    targetType: "Promotion",
+    targetId: req.params.id,
+    ip: req.ip,
+  });
 
   res.status(200).json({
     status: "success",

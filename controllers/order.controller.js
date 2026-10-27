@@ -15,6 +15,7 @@ const emailOutbox = require("../services/emailOutbox.service");
 const stockReservation = require("../services/stockReservation.service");
 const { captureEsewaPayment } = require("../services/esewaCapture.service");
 const notificationEventEmitter = require("../services/notificationEventEmitter");
+const auditLog = require("../services/auditLog.service"); // VULN-004
 const { boundedLimit, boundedPage, encodeCursor, decodeCursor, cursorAfterFilter } = require("../utils/listQuery");
 const { getCached, setCached } = require("../utils/ttlCache");
 
@@ -753,8 +754,16 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   const limit = boundedLimit(req.query.limit, 20);
 
   const filter = {};
-  if (status) filter.orderStatus = status;
-  if (paymentStatus) filter.paymentStatus = paymentStatus;
+  // VULN-008: coerce at the point of use (same pattern as getMyOrders
+  // above), so this handler is safe regardless of routing — it must
+  // not depend solely on the route's Joi validator to keep raw or
+  // object-shaped query values out of the Mongo filter. The enum sets
+  // match validators/order.validator.js getOrdersQuerySchema exactly.
+  const { asEnum } = require("../utils/params");
+  const statusValue = asEnum(status, ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]);
+  if (statusValue) filter.orderStatus = statusValue;
+  const paymentStatusValue = asEnum(paymentStatus, ["pending", "paid", "failed", "refunded"]);
+  if (paymentStatusValue) filter.paymentStatus = paymentStatusValue;
   if (search) {
     // Literal substring search: the raw value must never reach Mongo's
     // regex engine unescaped (metacharacters changed semantics, and
@@ -907,6 +916,16 @@ exports.getOrderAdmin = catchAsync(async (req, res, next) => {
 exports.updateOrderStatus = catchAsync(async (req, res, next) => {
   const { status, note } = req.body;
   const { order, previousStatus } = await transitionOrder({ _id: req.params.id }, status, note || `Status updated to ${status}`);
+
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "order.status.update",
+    targetType: "Order",
+    targetId: order._id,
+    before: { orderStatus: previousStatus },
+    after: { orderStatus: status },
+    ip: req.ip,
+  });
 
   // Emit order:statusChanged notification event
   try {
@@ -1272,5 +1291,14 @@ exports.reconcileRefund = catchAsync(async (req, res, next) => {
       "refundRequest.completedAt": new Date(), "refundRequest.processedBy": req.user._id },
   }, { new: true, runValidators: true });
   if (!settled) return next(new AppError("Refund state changed; reload the order", 409));
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "order.refund.reconcile",
+    targetType: "Order",
+    targetId: settled._id,
+    before: { paymentStatus: "paid", refundStatus: "pending" },
+    after: { paymentStatus: settled.paymentStatus, refundStatus: settled.refundRequest?.status },
+    ip: req.ip,
+  });
   res.status(200).json({ success: true, message: "Refund settlement recorded", data: { order: settled } });
 });

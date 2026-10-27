@@ -4,6 +4,7 @@ const AppError = require("../utils/AppError");
 const { boundedLimit, boundedPage, safeSort } = require("../utils/listQuery");
 const { literalRegExp } = require("../utils/escapeRegex");
 const { asEnum, asBoolean, asString } = require("../utils/params");
+const auditLog = require("../services/auditLog.service"); // VULN-004
 
 // ADMIN: Get all users with filtering and pagination
 exports.getAllUsers = catchAsync(async (req, res, next) => {
@@ -109,6 +110,7 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
         return next(new AppError("You cannot deactivate your own account", 400));
     }
 
+    const previousIsActive = user.isActive; // VULN-004: before-snapshot
     user.isActive = isActive;
 
     if (!isActive) {
@@ -120,6 +122,16 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
     }
 
     await user.save({ validateBeforeSave: false });
+
+    await auditLog.record({ // VULN-004 (never throws)
+        actor: req.user?._id,
+        action: isActive ? "user.activate" : "user.deactivate",
+        targetType: "User",
+        targetId: user._id,
+        before: { isActive: previousIsActive },
+        after: { isActive: user.isActive },
+        ip: req.ip,
+    });
 
     res.status(200).json({
         status: "success",
@@ -142,9 +154,20 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
         return next(new AppError("You cannot delete your own account", 400));
     }
 
+    const previousIsActive = user.isActive; // VULN-004: before-snapshot
     user.deletedAt = Date.now();
     user.isActive = false;
     await user.save({ validateBeforeSave: false });
+
+    await auditLog.record({ // VULN-004 (never throws)
+        actor: req.user?._id,
+        action: "user.delete",
+        targetType: "User",
+        targetId: user._id,
+        before: { isActive: previousIsActive, deletedAt: null },
+        after: { isActive: false, deletedAt: user.deletedAt },
+        ip: req.ip,
+    });
 
     res.status(200).json({
         status: "success",

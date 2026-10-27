@@ -10,6 +10,7 @@ const Cart = require("../models/cart.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const { boundedLimit, boundedPage } = require("../utils/listQuery");
+const auditLog = require("../services/auditLog.service"); // VULN-004
 
 exports.getAllDiscounts = catchAsync(async (req, res, next) => {
   const { status, page = 1, limit = 20 } = req.query;
@@ -97,6 +98,15 @@ exports.createDiscount = catchAsync(async (req, res, next) => {
     createdBy: req.user._id,
   });
 
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "discount.create",
+    targetType: "Discount",
+    targetId: discount._id,
+    after: { code: discount.code, discountPercentage: discount.discountPercentage, isActive: discount.isActive },
+    ip: req.ip,
+  });
+
   res.status(201).json({
     status: "success",
     data: {
@@ -122,6 +132,15 @@ exports.updateDiscount = catchAsync(async (req, res, next) => {
     return next(new AppError("Discount code not found", 404));
   }
 
+  // VULN-004: before-snapshot of the fields this handler can change.
+  const beforeDiscount = {
+    code: discount.code,
+    discountPercentage: discount.discountPercentage,
+    minimumOrderAmount: discount.minimumOrderAmount,
+    maxUsageLimit: discount.maxUsageLimit,
+    isActive: discount.isActive,
+  };
+
   if (code && code.toUpperCase() !== discount.code) {
     const existingDiscount = await Discount.findOne({
       code: code.toUpperCase(),
@@ -146,6 +165,22 @@ exports.updateDiscount = catchAsync(async (req, res, next) => {
 
   await discount.save();
 
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "discount.update",
+    targetType: "Discount",
+    targetId: discount._id,
+    before: beforeDiscount,
+    after: {
+      code: discount.code,
+      discountPercentage: discount.discountPercentage,
+      minimumOrderAmount: discount.minimumOrderAmount,
+      maxUsageLimit: discount.maxUsageLimit,
+      isActive: discount.isActive,
+    },
+    ip: req.ip,
+  });
+
   res.status(200).json({
     status: "success",
     data: {
@@ -160,6 +195,15 @@ exports.deleteDiscount = catchAsync(async (req, res, next) => {
   if (!discount) {
     return next(new AppError("Discount code not found", 404));
   }
+
+  await auditLog.record({ // VULN-004 (never throws)
+    actor: req.user?._id,
+    action: "discount.delete",
+    targetType: "Discount",
+    targetId: discount._id,
+    before: { code: discount.code, discountPercentage: discount.discountPercentage, isActive: discount.isActive },
+    ip: req.ip,
+  });
 
   res.status(200).json({
     status: "success",

@@ -43,7 +43,7 @@ const REGISTRY = {
   JWT_EXPIRES_IN: { type: "string", def: "7d", semantics: "live" },
   JWT_COOKIE_EXPIRES_IN: { type: "int", def: 7, semantics: "live" },
   JWT_REQUIRE_ISS_AUD: { type: "string", def: null, semantics: "live" }, // off only when exactly "0"
-  OTP_PEPPER: { type: "string", def: null, secret: true, semantics: "live" },
+  OTP_PEPPER: { type: "string", def: null, secret: true, requiredProd: true, semantics: "live" }, // VULN-007: required in production like JWT_SECRET — the OTP HMAC must not silently fall back to the JWT secret (key separation)
   NEWSLETTER_TOKEN_SECRET: { type: "string", def: null, secret: true, semantics: "live" },
   FRONTEND_URL: { type: "url", def: null, requiredProd: true, removedFallback: true, semantics: "live" },
   ADMIN_URL: { type: "url", def: null, requiredProd: true, semantics: "live" },
@@ -104,10 +104,10 @@ const REGISTRY = {
   GUEST_STOCK_RESERVATION: { type: "string", def: null, semantics: "live" }, // on only when exactly "on"
   GUEST_STOCK_RESERVATION_TTL_MINUTES: { type: "int", def: 30, semantics: "live" },
   GUEST_COD_HOLD_RELEASE_HOURS: { type: "int", def: 0, semantics: "live" },
-  CATEGORY_SVG_POLICY: { type: "string", def: "reencode", semantics: "live" },
+  CATEGORY_SVG_POLICY: { type: "enum", values: ["reencode", "reject"], def: "reencode", semantics: "live" }, // VULN-002: enum so a typo'd value fails boot validation instead of failing open in upload.middleware (values are lowercase; the consumer lowercases before comparing, and validateEnv compares enums case-sensitively)
   BLOG_SEARCH_MODE: { type: "enum", values: ["regex", "text"], def: "regex", semantics: "live" },
   ANALYTICS_CACHE_TTL_MS: { type: "int", def: 0, semantics: "live" },
-  UPLOAD_MAX_TOTAL_BYTES: { type: "int", def: null, semantics: "live" },
+  UPLOAD_MAX_TOTAL_BYTES: { type: "int", def: 52428800, semantics: "live" }, // VULN-006: 50 MB aggregate per-request default (was def:null = no aggregate enforcement); an explicit env value still overrides
   SOCKET_REVALIDATE_INTERVAL_MS: { type: "int", def: 0, semantics: "live" },
   SOCKET_ADAPTER: { type: "enum", values: ["none", "mongo"], def: "none", semantics: "frozen" },
   RATE_LIMIT_STORE: { type: "enum", values: ["memory", "mongo"], def: "memory", semantics: "live" },
@@ -270,6 +270,26 @@ function validateEnv(env = process.env) {
     }
     // Preserve today's combined eSewa message shape as individual named errors
     // (both variables are already covered by requiredProd above).
+    // VULN-005 / VULN-007: production posture warnings. These settings
+    // are legal owner decisions, so they WARN (not error) — but until
+    // now nothing surfaced them at boot, so a weakened posture was
+    // silent. OTP_PEPPER is the exception: it is requiredProd above
+    // and therefore already an error when missing.
+    if ((rawOf("RATE_LIMIT_STORE", env) || "memory").trim() !== "mongo") {
+      warnings.push("RATE_LIMIT_STORE: not \"mongo\" — rate limits are per-process memory and multiply by instance count in production");
+    }
+    if (rawOf("TRUST_PROXY", env) === undefined) {
+      warnings.push("TRUST_PROXY: not set — behind a load balancer req.ip is the proxy address (shared limiter buckets); set it explicitly to the deployment's proxy topology");
+    }
+    if ((rawOf("RETURN_TOKEN_IN_BODY", env) || "").trim() === "1") {
+      warnings.push("RETURN_TOKEN_IN_BODY=1: the session JWT is returned in response bodies (readable by page scripts) — the httpOnly-cookie design is weakened");
+    }
+    if ((rawOf("JWT_REQUIRE_ISS_AUD", env) || "").trim() === "0") {
+      warnings.push("JWT_REQUIRE_ISS_AUD=0: JWT issuer/audience enforcement is disabled");
+    }
+    if (rawOf("UPLOAD_MAX_TOTAL_BYTES", env) === undefined) {
+      warnings.push("UPLOAD_MAX_TOTAL_BYTES: not set — the registry default (50 MB aggregate per request) applies");
+    }
   }
   for (const key of Object.keys(env || {})) {
     if (REMOVED_KEYS[key]) { warnings.push(`${key}: ${REMOVED_KEYS[key]}`); continue; }
