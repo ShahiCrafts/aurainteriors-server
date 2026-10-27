@@ -193,6 +193,7 @@ function createApp() {
   app.use("/api/v1/auth", require("./routes/auth.routes"));
   app.use("/api/v1/addresses", require("./routes/address.routes"));
   app.use("/api/v1/profile", require("./routes/profile.routes"));
+  app.use("/api/v1/catalog", require("./routes/catalog.routes"));
   app.use("/api/v1/categories", require("./routes/category.routes"));
   app.use("/api/v1/products", require("./routes/product.routes"));
   app.use("/api/v1/wishlist", require("./routes/wishlist.routes"));

@@ -77,10 +77,15 @@ const sendErrorProd = (err, res) => {
       });
     }
 
-    // Standard operational error
+    // Standard operational error. SR-P7-1 (Phase 9+10): when the
+    // AppError carries a stable machine-readable code (e.g.
+    // VARIANT_REQUIRED), include it so clients can branch on the
+    // code instead of matching message text. Uncoded errors keep
+    // the exact legacy { status, message } shape.
     res.status(err.statusCode).json({
       status: err.status,
       message: err.message,
+      ...(typeof err.code === "string" && err.code ? { code: err.code } : {}),
     });
   } else {
     console.error("ERROR:", err);
