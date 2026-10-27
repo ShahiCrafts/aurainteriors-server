@@ -16,6 +16,11 @@ const { resolveCollectionProducts } = require("../services/collection.service");
 const { resolveForCategory, resolveForProductType } = require("../services/attributeResolution.service");
 const { computeFacets } = require("../services/catalogFacets.service");
 const { definitions: staticDefinitions, productTypes: staticProductTypes, rooms: staticRooms } = require("../config/catalogTaxonomy");
+const catalogCache = require("../utils/catalogCache");
+const {
+  getAttributeDefinitionsCached,
+  invalidateAttributeRegistryCache,
+} = require("../services/attributeRegistryCache");
 
 // SR-P6-1: registry list filter — active-only for the public; an
 // authenticated admin (req.user populated by protectOptional on
@@ -97,6 +102,7 @@ exports.getProductType = catchAsync(async (req, res, next) => {
 });
 
 exports.createProductType = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const { key, label, description, categoryKey, attributeKeys, attributeAssignments, active, sortOrder } = req.body;
 
   const existing = await ProductType.findOne({ key });
@@ -126,6 +132,7 @@ exports.createProductType = catchAsync(async (req, res, next) => {
 });
 
 exports.updateProductType = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const key = String(req.params.key).toLowerCase();
   const { label, description, categoryKey, attributeKeys, attributeAssignments, active, sortOrder } = req.body;
 
@@ -163,6 +170,7 @@ exports.updateProductType = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteProductType = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const key = String(req.params.key).toLowerCase();
 
   const productType = await ProductType.findOne({ key });
@@ -254,6 +262,7 @@ exports.getRoom = catchAsync(async (req, res, next) => {
 });
 
 exports.createRoom = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const { slug, label, description, image, active, sortOrder } = req.body;
 
   const existing = await Room.findOne({ slug });
@@ -279,6 +288,7 @@ exports.createRoom = catchAsync(async (req, res, next) => {
 });
 
 exports.updateRoom = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const slug = String(req.params.slug).toLowerCase();
   const { label, description, image, active, sortOrder } = req.body;
 
@@ -310,6 +320,7 @@ exports.updateRoom = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteRoom = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const slug = String(req.params.slug).toLowerCase();
 
   const room = await Room.findOne({ slug });
@@ -420,6 +431,7 @@ exports.getCollection = catchAsync(async (req, res, next) => {
 });
 
 exports.createCollection = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const { slug, label, description, image, kind, productIds, rule, active, sortOrder } = req.body;
   const effectiveKind = kind || "manual";
 
@@ -455,6 +467,7 @@ exports.createCollection = catchAsync(async (req, res, next) => {
 });
 
 exports.updateCollection = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const slug = String(req.params.slug).toLowerCase();
   const { label, description, image, kind, productIds, rule, active, sortOrder } = req.body;
 
@@ -498,6 +511,7 @@ exports.updateCollection = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteCollection = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a registry write makes cached lists stale
   const slug = String(req.params.slug).toLowerCase();
 
   const collection = await Collection.findOne({ slug });
@@ -564,9 +578,11 @@ function assertSaneBounds(body, current) {
 }
 
 exports.listAttributeDefinitions = catchAsync(async (req, res, next) => {
-  const attributeDefinitions = await AttributeDefinition.find({})
-    .sort({ sortOrder: 1, key: 1 })
-    .lean();
+  // PERF-B-05 (U-2): registry cached in-process (60s), invalidated
+  // by the attribute write handlers above.
+  const attributeDefinitions = await getAttributeDefinitionsCached("all:sorted", () =>
+    AttributeDefinition.find({}).sort({ sortOrder: 1, key: 1 }).lean()
+  );
 
   res.status(200).json({
     status: "success",
@@ -595,6 +611,7 @@ exports.getAttributeDefinition = catchAsync(async (req, res, next) => {
 });
 
 exports.createAttributeDefinition = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); invalidateAttributeRegistryCache(); // PERF-B-01/B-05: registry writes invalidate both caches
   const { key } = req.body;
 
   const existing = await AttributeDefinition.findOne({ key });
@@ -618,6 +635,7 @@ exports.createAttributeDefinition = catchAsync(async (req, res, next) => {
 });
 
 exports.updateAttributeDefinition = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); invalidateAttributeRegistryCache(); // PERF-B-01/B-05: registry writes invalidate both caches
   const key = String(req.params.key);
 
   // Keys are referenced by string from products, types and
@@ -661,6 +679,7 @@ exports.updateAttributeDefinition = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteAttributeDefinition = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); invalidateAttributeRegistryCache(); // PERF-B-01/B-05: registry writes invalidate both caches
   const key = String(req.params.key);
 
   const attributeDefinition = await AttributeDefinition.findOne({ key });

@@ -180,9 +180,5 @@ userSchema.methods.updateLoginActivity = async function () {
   this._doc.loginCount = (this.loginCount || 0) + 1;
 };
 
-userSchema.statics.findActive = function () {
-  return this.find({ isActive: true, deletedAt: null });
-};
-
 const User = mongoose.model("User", userSchema);
 module.exports = User;

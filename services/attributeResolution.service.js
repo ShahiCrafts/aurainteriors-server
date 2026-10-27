@@ -44,7 +44,14 @@ const Category = require("../models/category.model");
 const { ancestorsForParent } = require("./categoryHierarchy.service");
 
 async function loadActiveDefinitions() {
-  const definitions = await AttributeDefinition.find({ active: true }).lean();
+  // PERF-B-05 (U-4): registry cached in-process (60s) — this loader
+  // also serves catalogFacets; attribute writes invalidate it.
+  const {
+    getAttributeDefinitionsCached,
+  } = require("./attributeRegistryCache");
+  const definitions = await getAttributeDefinitionsCached("active", () =>
+    AttributeDefinition.find({ active: true }).lean()
+  );
   return new Map(definitions.map((definition) => [definition.key, definition]));
 }
 

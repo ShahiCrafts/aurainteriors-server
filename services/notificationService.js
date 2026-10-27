@@ -26,21 +26,74 @@ class NotificationService {
   }
 
   async broadcastNotification(data, userIds) {
+    // PERF-B-04: chunked insertMany (500/batch, ordered:false)
+    // instead of one serial create per recipient. The contract is
+    // unchanged — same { sentCount, failedCount, notificationId }
+    // result, same per-recipient payload (sanitized actionUrl,
+    // per-recipient idempotency key and its deterministic _id,
+    // see createNotification) and the same realtime emit per
+    // persisted notification. Any document a bulk insert rejects
+    // (e.g. an idempotency duplicate) falls back to the original
+    // per-document createNotification path, which resolves
+    // duplicates to the existing record and counts it as sent —
+    // so bulk failure semantics match the old loop exactly.
     let sentCount = 0, failedCount = 0, notificationId = null;
-    for (const recipient of userIds) {
+    const emitNew = (notification) => {
+      // Offline delivery is persisted; socket availability cannot mark it failed.
+      try { runtimeContext.getIo()?.to(String(notification.recipient)).emit("notification:new", notification); } // AR-33: registry, not global.io
+      catch (_error) { console.error("Notification realtime delivery unavailable"); }
+    };
+    const inputFor = (recipient) => ({
+      recipient, type: data.type, title: data.title,
+      message: data.message || data.description, actionUrl: data.actionUrl,
+      data: data.data || {}, expiresAt: data.expiresAt || null,
+      ...(data.idempotencyKey ? { idempotencyKey: `${data.idempotencyKey}:${recipient}` } : {}),
+    });
+    const docFor = (input) => {
+      const payload = { ...input };
+      if ("actionUrl" in payload) payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
+      if (payload.idempotencyKey) {
+        payload._id = crypto.createHash("sha256").update(`${payload.recipient}:${payload.idempotencyKey}`).digest("hex").slice(0, 24);
+      }
+      return payload;
+    };
+    const BATCH_SIZE = 500;
+    const recipients = Array.isArray(userIds) ? userIds : [];
+    for (let start = 0; start < recipients.length; start += BATCH_SIZE) {
+      const batch = recipients.slice(start, start + BATCH_SIZE);
+      const inputs = batch.map(inputFor);
+      const docs = inputs.map(docFor);
+      let inserted = [];
+      const failedIndexes = new Set();
       try {
-        const notification = await this.createNotification({
-          recipient, type: data.type, title: data.title,
-          message: data.message || data.description, actionUrl: data.actionUrl,
-          data: data.data || {}, expiresAt: data.expiresAt || null,
-          ...(data.idempotencyKey ? { idempotencyKey: `${data.idempotencyKey}:${recipient}` } : {}),
-        });
+        inserted = await Notification.insertMany(docs, { ordered: false });
+      } catch (error) {
+        inserted = Array.isArray(error.insertedDocs) ? error.insertedDocs : [];
+        const writeErrors = error.writeErrors || (error.result && error.result.writeErrors) || [];
+        if (writeErrors.length > 0) {
+          for (const we of writeErrors) {
+            if (Number.isInteger(we.index)) failedIndexes.add(we.index);
+          }
+        } else {
+          // Not a bulk-write result (e.g. connection error): nothing
+          // is known to be inserted — every doc takes the fallback.
+          inserted = [];
+          docs.forEach((_, i) => failedIndexes.add(i));
+        }
+      }
+      for (const notification of inserted) {
         notificationId ||= notification._id;
         sentCount++;
-        // Offline delivery is persisted; socket availability cannot mark it failed.
-        try { runtimeContext.getIo()?.to(String(recipient)).emit("notification:new", notification); } // AR-33: registry, not global.io
-        catch (_error) { console.error("Notification realtime delivery unavailable"); }
-      } catch (_error) { failedCount++; }
+        emitNew(notification);
+      }
+      for (const i of failedIndexes) {
+        try {
+          const notification = await this.createNotification(inputs[i]);
+          notificationId ||= notification._id;
+          sentCount++;
+          emitNew(notification);
+        } catch (_error) { failedCount++; }
+      }
     }
     return { sentCount, failedCount, notificationId };
   }
@@ -78,12 +131,17 @@ class NotificationService {
     if (categories[filters.category]) query.type = categories[filters.category];
     const skip = (page - 1) * limit;
 
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Notification.countDocuments(query);
+    // PERF-B-09: page + count in parallel (the pattern every other
+    // list handler in this codebase uses) and lean — callers render
+    // these, they never mutate them.
+    const [notifications, total] = await Promise.all([
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Notification.countDocuments(query),
+    ]);
 
     return {
       notifications,

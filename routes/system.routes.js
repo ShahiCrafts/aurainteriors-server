@@ -1,7 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const { protect, restrictTo } = require("../middleware/auth.middleware");
+const { standardReadLimiter } = require("../middleware/rateLimit.middleware");
 const runtimeContext = require("../services/runtimeContext"); // AR-33: explicit registry, not globals
+
+// VULN-005: this router previously had no tier limiter, unlike every
+// other router. It is GET-only, so the read tier applies.
+router.use(standardReadLimiter);
 
 // System health and monitoring endpoints.
 // keep-alive-status exposes internal service state, so it is

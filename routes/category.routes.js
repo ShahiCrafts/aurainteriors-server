@@ -9,6 +9,7 @@ router.use(standardWriteLimiter);
 // through; mutations stay strict).
 router.param("id", objectIdParam.slugOrObjectIdParam);
 const categoryController = require("../controllers/category.controller");
+const publicCache = require("../middleware/publicCache.middleware");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 const { uploadCategoryImage, resizeCategoryImage } = require("../middleware/upload.middleware");
 const validate = require("../middleware/validate.middleware");
@@ -20,9 +21,9 @@ const {
   setCategoryAttributeAssignmentsSchema,
 } = require("../validators/category.validator");
 
-router.get("/", validate(getCategoriesQuerySchema, "query"), categoryController.getAllCategories);
-router.get("/:id", categoryController.getCategory);
-router.get("/:id/products", categoryController.getCategoryProducts);
+router.get("/", publicCache, validate(getCategoriesQuerySchema, "query"), categoryController.getAllCategories);
+router.get("/:id", publicCache, categoryController.getCategory);
+router.get("/:id/products", publicCache, categoryController.getCategoryProducts);
 
 router.use(protect, restrictTo("admin"));
 

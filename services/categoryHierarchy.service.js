@@ -28,14 +28,18 @@ const Category = require("../models/category.model");
 // correct even for legacy documents that predate the field.
 async function ancestorsForParent(parentId) {
   if (!parentId) return [];
+  // PERF-B-06: walk the in-memory parent map (one collection scan)
+  // instead of one findById round-trip per tree depth. The walk is
+  // step-for-step the old one — same chain, same cycle truncation,
+  // same behaviour for a parentId that does not exist ([parentId]).
+  const { parentOf } = await loadParentMaps();
   const chain = [];
   const seen = new Set();
   let current = String(parentId);
   while (current && !seen.has(current)) {
     seen.add(current);
     chain.unshift(current);
-    const doc = await Category.findById(current).select("parent").lean();
-    current = doc && doc.parent ? String(doc.parent) : null;
+    current = parentOf.get(current) || null;
   }
   return chain;
 }

@@ -234,6 +234,9 @@ chatSchema.statics.getWaitingQueue = async function () {
     deletedAt: null,
   })
     .sort({ createdAt: 1 })
+    // PERF-B-05 (U-5): bounded — oldest 200 escalated chats; the
+    // admin queue is a triage view, not an export.
+    .limit(200)
     .populate("customer", "firstName lastName email avatar")
     .lean();
 };

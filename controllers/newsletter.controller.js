@@ -73,13 +73,20 @@ exports.getSubscribers = async (req, res) => {
             query.isActive = isActive === true || isActive === 'true';
         }
 
-        const subscribers = await Newsletter.find(query)
+        // PERF-B-09: page + count in parallel, lean read. lean() is
+        // applied only when the query object supports it (real
+        // Mongoose queries always do).
+        const subscribersQuery = Newsletter.find(query)
             .sort({ subscribedAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
             .select('-__v -unsubscribeNonce -confirmationTokenHash');
+        if (typeof subscribersQuery.lean === 'function') subscribersQuery.lean();
 
-        const total = await Newsletter.countDocuments(query);
+        const [subscribers, total] = await Promise.all([
+            subscribersQuery,
+            Newsletter.countDocuments(query),
+        ]);
 
         res.status(200).json({
             success: true,

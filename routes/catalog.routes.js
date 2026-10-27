@@ -4,6 +4,7 @@ const Category = require('../models/category.model');
 const { rooms } = require('../config/catalogTaxonomy');
 const { standardReadLimiter } = require('../middleware/rateLimit.middleware');
 const catalogController = require('../controllers/catalog.controller');
+const publicCache = require('../middleware/publicCache.middleware');
 const { protect, protectOptional, restrictTo } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const {
@@ -20,8 +21,8 @@ router.use(standardReadLimiter);
 // Phase 2: /schema is served from the DB registries (attribute
 // definitions + product types + rooms) by the controller, with the
 // static config as the never-bootstrapped fallback.
-router.get('/schema', catalogController.getSchema);
-router.get('/navigation', async (_req, res, next) => {
+router.get('/schema', publicCache, catalogController.getSchema);
+router.get('/navigation', publicCache, async (_req, res, next) => {
   try { res.json({ status: 'success', data: { categories: await Category.getCategoryTree(), rooms } }); }
   catch (error) { next(error); }
 });
@@ -30,7 +31,7 @@ router.get('/navigation', async (_req, res, next) => {
 // services/catalogFacets.service.js). The precursor's inline
 // in-JS counting over a <=5,000-product sample is removed — one
 // faceting implementation remains.
-router.get('/categories/:slug/facets', catalogController.getCategoryFacets);
+router.get('/categories/:slug/facets', publicCache, catalogController.getCategoryFacets);
 
 // Phase 1: DB-backed registries (controllers/catalog.controller.js).
 // Public reads — product types. SR-P6-1: the three LIST routes run
@@ -38,24 +39,24 @@ router.get('/categories/:slug/facets', catalogController.getCategoryFacets);
 // can be honored by the controllers; guests and non-admins see the
 // unchanged active-only lists and the parameter is never
 // acknowledged to them. Detail reads stay public-active.
-router.get('/product-types', protectOptional, catalogController.listProductTypes);
-router.get('/product-types/:key', catalogController.getProductType);
+router.get('/product-types', publicCache, protectOptional, catalogController.listProductTypes);
+router.get('/product-types/:key', publicCache, catalogController.getProductType);
 
 // Public reads — rooms (detail includes the room's published
 // products, paginated).
-router.get('/rooms', protectOptional, catalogController.listRooms);
-router.get('/rooms/:slug', catalogController.getRoom);
+router.get('/rooms', publicCache, protectOptional, catalogController.listRooms);
+router.get('/rooms/:slug', publicCache, catalogController.getRoom);
 
 // Public reads — collections (detail resolves the collection's
 // products at read time: manual order or rule evaluation).
-router.get('/collections', protectOptional, catalogController.listCollections);
-router.get('/collections/:slug', catalogController.getCollection);
+router.get('/collections', publicCache, protectOptional, catalogController.listCollections);
+router.get('/collections/:slug', publicCache, catalogController.getCollection);
 
 // Phase 2: attribute resolution reads — the applicable attribute
 // set (global + type + inherited category assignments) for a
 // category (slug or ObjectId) or a product type.
-router.get('/categories/:ref/attributes', catalogController.getCategoryAttributes);
-router.get('/product-types/:key/attributes', catalogController.getProductTypeAttributes);
+router.get('/categories/:ref/attributes', publicCache, catalogController.getCategoryAttributes);
+router.get('/product-types/:key/attributes', publicCache, catalogController.getProductTypeAttributes);
 
 // Phase 1: registry administration. Everything below is admin-only,
 // behind the same protect + restrictTo("admin") gate as the product

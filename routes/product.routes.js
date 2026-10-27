@@ -28,22 +28,25 @@ const {
   updateVariantSchema,
 } = require("../validators/product.validator");
 
+const publicCache = require("../middleware/publicCache.middleware");
+
 const reviewRoutes = require("./review.routes");
 
 router.use("/:productId/reviews", reviewRoutes);
 
 router.get(
   "/",
+  publicCache,
   protectOptional,
   validate(getProductsQuerySchema, "query"),
   productController.getAllProducts
 );
-router.get("/featured", productController.getFeaturedProducts);
-router.get("/new-arrivals", productController.getNewArrivals);
-router.get("/:id", protectOptional, productController.getProduct);
+router.get("/featured", publicCache, productController.getFeaturedProducts);
+router.get("/new-arrivals", publicCache, productController.getNewArrivals);
+router.get("/:id", publicCache, protectOptional, productController.getProduct);
 // Related stays on the strict :productId guard: getRelatedProducts
 // has no slug branch and genuinely requires an ObjectId (SR-8 scope).
-router.get("/:productId/related", productController.getRelatedProducts);
+router.get("/:productId/related", publicCache, productController.getRelatedProducts);
 
 router.use(protect, restrictTo("admin"));
 

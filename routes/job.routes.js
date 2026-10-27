@@ -2,7 +2,12 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
+const { standardReadLimiter } = require("../middleware/rateLimit.middleware");
 const Job = require("../models/job.model");
+
+// VULN-005: this router previously had no tier limiter, unlike every
+// other router. It is GET-only (status polling), so the read tier applies.
+router.use(standardReadLimiter);
 
 // Phase 3 (AR-04): job-status endpoint. When BROADCAST_MODE=queue,
 // admin broadcast requests return 202 with a job id; this endpoint

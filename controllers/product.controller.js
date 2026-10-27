@@ -13,6 +13,11 @@ const {
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const { deleteFile, deleteFiles } = require("../middleware/upload.middleware");
+const catalogCache = require("../utils/catalogCache");
+const { applyMaxTime } = require("../utils/queryTimeout");
+const {
+  getAttributeDefinitionsCached,
+} = require("../services/attributeRegistryCache");
 
 const parseJsonField = (field) => {
   if (!field) return undefined;
@@ -72,6 +77,20 @@ const resolveProductType = async (raw) => {
 // Get all products with filtering, sorting, and pagination
 exports.getAllProducts = catchAsync(async (req, res, next) => {
   const query = req.query || {};
+  // PERF-B-01: anonymous list responses are served from the
+  // in-process catalog TTL cache (utils/catalogCache.js) when an
+  // identical canonical query was computed within the TTL. Any
+  // credential (req.user, Authorization header, jwt cookie) bypasses
+  // the cache in both directions — the handler personalises
+  // visibility by user, so an authed response must never be stored
+  // for, or served to, anyone else.
+  const listCacheKey = catalogCache.isAnonymousRequest(req)
+    ? catalogCache.keyFor(query)
+    : null;
+  if (listCacheKey) {
+    const cachedHit = catalogCache.get(listCacheKey);
+    if (cachedHit) return res.status(200).json(cachedHit);
+  }
   const page = query.page;
   const limit = query.limit;
   const sort = query.sort;
@@ -105,13 +124,30 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   // empty). Expansion reuses the model's getDescendantIds BFS, the
   // same helper the category-products endpoint uses; the response
   // shape is unchanged.
+  // PERF-B-06: one parent-map scan for ALL roots instead of one
+  // full scan per root (the model's getDescendantIds loads every
+  // category on each call). Semantics are identical to
+  // getDescendantIds: the BFS walks the same parent links (never
+  // the stored `ancestors` materialization, which legacy documents
+  // may lack), seeds every requested id, and is cycle-safe.
   const expandToSubtree = async (ids) => {
-    const expanded = new Set();
-    for (const id of ids) {
-      const subtreeIds = await Category.getDescendantIds(id);
-      for (const subtreeId of subtreeIds) expanded.add(String(subtreeId));
+    if (ids.length === 0) return [];
+    const all = await Category.find({}, "_id parent").lean();
+    const children = new Map();
+    for (const category of all) {
+      const key = String(category.parent || "");
+      if (!children.has(key)) children.set(key, []);
+      children.get(key).push(String(category._id));
     }
-    return [...expanded];
+    const seen = new Set();
+    const queue = ids.map(String);
+    while (queue.length) {
+      const current = queue.shift();
+      if (seen.has(current)) continue;
+      seen.add(current);
+      queue.push(...(children.get(current) || []));
+    }
+    return [...seen];
   };
 
   // Handle category filter by ID (legacy)
@@ -225,7 +261,11 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   if (hasAttrParams) {
     const AttributeDefinition = require("../models/attributeDefinition.model");
     const { parseAttributeFilters } = require("../services/catalogFilter.service");
-    const definitionDocs = await AttributeDefinition.find({}).lean();
+    // PERF-B-05 (U-3): the registry is cached in-process (60s);
+    // attribute writes in catalog.controller invalidate it.
+    const definitionDocs = await getAttributeDefinitionsCached("all", () =>
+      AttributeDefinition.find({}).lean()
+    );
     const definitionsByKey = new Map(definitionDocs.map((doc) => [doc.key, doc]));
     attrConditions = parseAttributeFilters(query, definitionsByKey);
   }
@@ -308,7 +348,9 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   const effectiveSort = cursorMode ? null : parseEffectiveSort(sort);
 
   const [productsPage, total] = await Promise.all([
-    effectiveSort
+    // PERF-B-11: bound the list/aggregation queries with maxTimeMS.
+    applyMaxTime(
+      effectiveSort
       ? Product.aggregate([
           { $match: filter },
           { $addFields: { effectivePrice: EFFECTIVE_PRICE_EXPR } },
@@ -347,7 +389,9 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
       : cursorMode
         ? Product.find(pageFilter).populate("category", "name slug").sort({ createdAt: -1, _id: -1 }).limit(limitNum + 1).lean()
         : Product.find(filter).populate("category", "name slug").sort(catalogSort(sort)).skip(skip).limit(limitNum).lean(),
-    Product.countDocuments(filter),
+      effectiveSort ? "agg" : "list"
+    ),
+    applyMaxTime(Product.countDocuments(filter), "list"),
   ]);
 
   let products = productsPage;
@@ -383,7 +427,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     }));
   }
 
-  res.status(200).json({
+  const listPayload = {
     status: "success",
     results: products.length,
     data: {
@@ -397,7 +441,10 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
       ...(cursorMode ? { nextCursor } : {}),
       ...(wantsFacets ? { facets } : {}),
     },
-  });
+  };
+  // PERF-B-01: store the anonymous response for the TTL window.
+  if (listCacheKey) catalogCache.set(listCacheKey, listPayload);
+  res.status(200).json(listPayload);
 });
 
 // Get single product by ID or slug
@@ -424,6 +471,7 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 
 // Create new product (Admin only)
 exports.createProduct = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const {
     name,
     description,
@@ -565,6 +613,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 
 // Update product (Admin only)
 exports.updateProduct = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const product = await Product.findOne({ _id: req.params.id, deletedAt: null });
 
   if (!product) {
@@ -779,6 +828,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
 
 // Delete product - soft delete (Admin only)
 exports.deleteProduct = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const product = await Product.findOne({ _id: req.params.id, deletedAt: null });
 
   if (!product) {
@@ -795,6 +845,7 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
 
 // Hard delete product (Admin only)
 exports.hardDeleteProduct = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -832,6 +883,7 @@ exports.hardDeleteProduct = catchAsync(async (req, res, next) => {
 
 // Set primary image (Admin only)
 exports.setPrimaryImage = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const { imageId } = req.body;
   const product = await Product.findOne({ _id: req.params.id, deletedAt: null });
 
@@ -986,6 +1038,7 @@ exports.getNewArrivals = catchAsync(async (req, res, next) => {
 
 // Update product stock (Admin only)
 exports.updateStock = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a product write makes cached lists stale
   const { stock } = req.body;
   const product = await Product.findOne({ _id: req.params.id, deletedAt: null });
 

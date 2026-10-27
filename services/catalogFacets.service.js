@@ -191,16 +191,21 @@ function unionResolved(entryLists) {
 async function applicableAttributeFacets({ categoryRoots, scopeMatch, definitions }) {
   let resolved;
   if (categoryRoots.length > 0) {
-    const lists = [];
-    for (const rootId of categoryRoots) {
-      // resolveForCategory takes a category DOCUMENT (an id alone
-      // silently resolves globals-only — the chain walk needs the
-      // document), and returns the resolved entries array.
-      const doc = await Category.findById(rootId).lean();
-      if (!doc) continue;
-      const entries = await resolveForCategory(doc);
-      if (Array.isArray(entries)) lists.push(entries);
-    }
+    // PERF-B-06: roots are independent — resolve them in parallel.
+    // Promise.all preserves root order, so unionResolved sees the
+    // lists in exactly the old sequence.
+    const perRoot = await Promise.all(
+      categoryRoots.map(async (rootId) => {
+        // resolveForCategory takes a category DOCUMENT (an id alone
+        // silently resolves globals-only — the chain walk needs the
+        // document), and returns the resolved entries array.
+        const doc = await Category.findById(rootId).lean();
+        if (!doc) return null;
+        const entries = await resolveForCategory(doc);
+        return Array.isArray(entries) ? entries : null;
+      })
+    );
+    const lists = perRoot.filter(Boolean);
     resolved = unionResolved(lists);
   } else {
     // No category selected: attributes applicable to ANY product
@@ -224,11 +229,15 @@ async function applicableAttributeFacets({ categoryRoots, scopeMatch, definition
         if (cat.productType) types.add(cat.productType);
       }
     }
-    const lists = [];
-    for (const typeKey of types) {
-      const result = await resolveForProductType(typeKey);
-      if (result) lists.push(result.attributes);
-    }
+    // PERF-B-06: types are independent — resolve in parallel,
+    // preserving the Set's iteration order in the resulting lists.
+    const perType = await Promise.all(
+      [...types].map(async (typeKey) => {
+        const result = await resolveForProductType(typeKey);
+        return result ? result.attributes : null;
+      })
+    );
+    const lists = perType.filter(Boolean);
     // Globals (appliesTo "all") always apply, even when the scope
     // carries no typed products at all.
     lists.push(

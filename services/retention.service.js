@@ -64,13 +64,30 @@ async function runRetention({ dryRun = false, batchSize = 1000, maxBatches = 10,
     results.notifications = await apply(Notification, { createdAt: { $lt: cutoff(pol.notifications) } });
   }
   if (pol.chatMessages !== null) {
-    // Load the closed/resolved chat ids ONCE (ids only) — the
-    // message predicate then stays a flat indexed filter.
-    const terminalChats = await Chat.find({ status: { $in: ["closed", "resolved"] } }).select("_id").lean();
-    results.chatMessages = await apply(ChatMessage, {
-      createdAt: { $lt: cutoff(pol.chatMessages) },
-      chat: { $in: terminalChats.map((c) => c._id) },
-    });
+    // PERF-B-05 (U-9): load the closed/resolved chat ids in bounded
+    // batches (the same batchSize discipline as deleteBatched above)
+    // instead of one unbounded find, applying the message predicate
+    // per batch — the predicate stays a flat indexed filter and the
+    // end result is identical; only the peak ID-array size changes.
+    let chatMessagesTotal = 0;
+    let lastChatId = null;
+    for (;;) {
+      const idQuery = { status: { $in: ["closed", "resolved"] } };
+      if (lastChatId !== null) idQuery._id = { $gt: lastChatId };
+      const batch = await Chat.find(idQuery)
+        .select("_id")
+        .sort({ _id: 1 })
+        .limit(batchSize)
+        .lean();
+      if (!batch.length) break;
+      chatMessagesTotal += await apply(ChatMessage, {
+        createdAt: { $lt: cutoff(pol.chatMessages) },
+        chat: { $in: batch.map((c) => c._id) },
+      });
+      if (batch.length < batchSize) break;
+      lastChatId = batch[batch.length - 1]._id;
+    }
+    results.chatMessages = chatMessagesTotal;
   }
   if (pol.blogEngagements !== null) {
     results.blogEngagements = await apply(BlogEngagement, {

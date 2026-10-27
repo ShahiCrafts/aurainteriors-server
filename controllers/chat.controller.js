@@ -5,18 +5,13 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const runtimeContext = require("../services/runtimeContext"); // AR-33: explicit registry, not globals
 
-// Helper to extract guest session ID from request. FA-33: bearer
-// credentials do not belong in URLs (they leak into logs, history and
-// Referer headers). Owner-approved 2026-10-23: the query-string
-// source is OFF by default and accepted only when
-// GUEST_SESSION_ALLOW_QUERY=1 (a legacy escape hatch for a client
-// that provably needs it). Header/cookie/body are always accepted
-// and take precedence. See OWNER_DECISIONS.md (D-3, decided).
-const getGuestSessionId = (req) => {
-  const fromQuery = require("../config/appConfig").getString("GUEST_SESSION_ALLOW_QUERY") === "1" ? req.query?.guestSessionId : undefined;
-  return req.headers?.['x-guest-session-id'] || req.cookies?.guestSessionId || req.body?.guestSessionId || fromQuery;
-};
-exports._getGuestSessionId = getGuestSessionId; // exported for tests
+// Guest-session extraction lives in utils/guestSession.js (VULN-001:
+// ONE gated policy shared with middleware/chatUpload.middleware.js,
+// which previously read req.query.guestSessionId directly and bypassed
+// the FA-33 gate). The server also sets the httpOnly guest cookie on
+// startChat (VULN-009). See utils/guestSession.js for the policy text.
+const { getGuestSessionId, setGuestSessionCookie } = require("../utils/guestSession");
+exports._getGuestSessionId = getGuestSessionId; // exported for tests (re-export)
 
 // ==================== CUSTOMER OPERATIONS ====================
 
@@ -78,6 +73,12 @@ exports.startChat = catchAsync(async (req, res, next) => {
       subject,
       metadata,
     });
+
+    // VULN-009: the server sets the guest-session cookie itself
+    // (httpOnly) so the credential survives reloads without ever
+    // being persisted by page script (no localStorage, no
+    // script-set cookie on the client).
+    setGuestSessionCookie(res, guestSession.sessionId);
 
     res.status(201).json({
       status: "success",

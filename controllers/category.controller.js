@@ -59,6 +59,8 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const { deleteFile } = require("../middleware/upload.middleware");
 const { applyCatalogListFilters, catalogPagination, catalogSort } = require("../utils/catalogListQuery");
+const catalogCache = require("../utils/catalogCache");
+const { applyMaxTime } = require("../utils/queryTimeout");
 const { asString, asNumber } = require("../utils/params");
 
 exports.getAllCategories = catchAsync(async (req, res, next) => {
@@ -83,10 +85,20 @@ exports.getAllCategories = catchAsync(async (req, res, next) => {
     filter.parent = parent;
   }
 
-  const categories = await Category.find(filter)
-    .populate("subcategories", "name slug status")
-    .populate("productCount")
-    .sort({ sortOrder: 1, name: 1 });
+  // PERF-B-05 (U-1): lean + bounded + internal-field projection.
+  // The bound (500) sits far above any realistic category count for
+  // this store; the response shape is unchanged (only __v is
+  // projected out) and both virtual populates stay.
+  const categories = await applyMaxTime(
+    Category.find(filter)
+      .populate("subcategories", "name slug status")
+      .populate("productCount")
+      .sort({ sortOrder: 1, name: 1 })
+      .limit(500)
+      .select("-__v")
+      .lean(),
+    "list"
+  );
 
   res.status(200).json({
     status: "success",
@@ -122,6 +134,7 @@ exports.getCategory = catchAsync(async (req, res, next) => {
 
 // Create new category (Admin only)
 exports.createCategory = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a category write makes cached lists stale
   const { name, description, parent, status, sortOrder, productType, roomSlugs } = req.body;
 
   // Check if parent category exists
@@ -170,6 +183,7 @@ exports.createCategory = catchAsync(async (req, res, next) => {
 
 // Update category (Admin only)
 exports.updateCategory = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a category write makes cached lists stale
   const { name, description, parent, status, sortOrder, productType, roomSlugs } = req.body;
 
   const category = await Category.findById(req.params.id);
@@ -258,6 +272,7 @@ exports.updateCategory = catchAsync(async (req, res, next) => {
 
 // Delete category (Admin only)
 exports.deleteCategory = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a category write makes cached lists stale
   const category = await Category.findById(req.params.id);
 
   if (!category) {
@@ -317,6 +332,7 @@ exports.deleteCategory = catchAsync(async (req, res, next) => {
 // meaningless). sortOrder does not affect ancestry, so no hierarchy
 // rewrite is needed.
 exports.reorderCategories = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a category write makes cached lists stale
   const { ids } = req.body;
 
   const found = await Category.find({ _id: { $in: ids } }).select("_id parent").lean();
@@ -464,6 +480,7 @@ exports.getCategoryAttributeAssignments = catchAsync(async (req, res, next) => {
 // against its definition. The response includes the resolved
 // (inherited) set so the admin sees the effective result.
 exports.setCategoryAttributeAssignments = catchAsync(async (req, res, next) => {
+  catalogCache.invalidateCatalogCache(); // PERF-B-01: a category write makes cached lists stale
   const category = await findCategoryByRef(req.params.id);
   if (!category) {
     return next(new AppError("Category not found", 404));

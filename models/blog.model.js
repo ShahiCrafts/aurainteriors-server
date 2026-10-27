@@ -157,14 +157,18 @@ blogSchema.virtual("categoryName").get(function () {
 });
 
 // Static method to get popular blogs
-// AR-47: lean only — these still return full docs incl. content
-// (unlike the blog LIST, which selects -content). Aligning them to
-// -content would change the response body and is recorded as a
-// pending client decision in CLIENT_IMPACT.md, not done here.
+// AR-47: lean. PERF-B-08 (remediation): getPopular now also selects
+// -content like the blog LIST — the popular-blogs widget never
+// renders the body. This supersedes the AR-47 "pending client
+// decision" note: the remediation tasking directs the change, and
+// tests/perf/blog-model-scope.test.js pins the new shape.
 blogSchema.statics.getPopular = async function (limit = 5) {
   return this.find()
     .sort({ views: -1, likes: -1, publishedAt: -1 })
     .limit(limit)
+    // PERF-B-08: the popular-blogs widget never renders the body;
+    // stop transferring full article content for it.
+    .select("-content")
     .lean();
 };
 
