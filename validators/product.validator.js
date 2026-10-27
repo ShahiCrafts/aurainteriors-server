@@ -18,6 +18,51 @@ const jsonArray = schema => Joi.any().custom((value, helpers) => {
   return result.value;
 });
 
+// Phase 1 (catalog): room assignment. Slugs are validated against
+// the Room registry in the controller (a Joi schema cannot see the
+// database); here we pin the shape — slug strings, max 20 rooms, as
+// an array or a JSON-string array from multipart form-data.
+const roomSlugsSchema = Joi.alternatives().try(
+  Joi.array()
+    .items(
+      Joi.string()
+        .trim()
+        .lowercase()
+        .pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+        .max(60)
+    )
+    .max(20),
+  Joi.string()
+);
+
+// Phase 2 (catalog): catalogAttributes pass through as an object
+// (JSON requests) or a JSON string (multipart form-data). Shape
+// pinning stops here by design — keys and values are validated
+// against the DB attribute definitions by the engine in the
+// controller (services/productAttributes.service.js), which names
+// the offending key; a Joi schema cannot see the registry.
+const catalogAttributesSchema = Joi.alternatives().try(
+  Joi.object().unknown(true),
+  Joi.string()
+);
+
+// Phase 3 (catalog): Product.productType — a key in the ProductType
+// registry. Shape pinned here (lowercased like the model's field);
+// registry membership is validated in the controller (a Joi schema
+// cannot see the database). ""/null clears the assignment.
+const productTypeSchema = Joi.string().trim().lowercase().max(60).allow("", null);
+
+// Phase 3 (catalog): variantOptionKeys — the attribute keys that
+// define a product's variants. Keys are CASE-SENSITIVE (Phase 2
+// lesson: frameMaterial must not be lowercased), so items are
+// trimmed only. Registry/type suitability is validated by
+// services/productVariant.service.js; an array or a JSON-string
+// array (multipart form-data) is accepted here.
+const variantOptionKeysSchema = Joi.alternatives().try(
+  Joi.array().items(Joi.string().trim().min(1).max(60)).max(20),
+  Joi.string()
+);
+
 const dimensionsSchema = Joi.object({
   width: Joi.number().min(0).messages({
     "number.min": "Width cannot be negative",
@@ -79,6 +124,9 @@ exports.createProductSchema = Joi.object({
     "string.uri": "Model URL must be a valid URL",
   }),
   modelUrls: jsonArray(modelUrlsSchema),
+  productType: productTypeSchema,
+  roomSlugs: roomSlugsSchema,
+  catalogAttributes: catalogAttributesSchema,
   dimensions: Joi.alternatives().try(dimensionsSchema, Joi.string()),
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
@@ -158,6 +206,10 @@ exports.updateProductSchema = Joi.object({
     "string.uri": "Model URL must be a valid URL",
   }),
   modelUrls: jsonArray(modelUrlsSchema),
+  productType: productTypeSchema,
+  variantOptionKeys: variantOptionKeysSchema,
+  roomSlugs: roomSlugsSchema,
+  catalogAttributes: catalogAttributesSchema,
   dimensions: Joi.alternatives().try(dimensionsSchema, Joi.string()),
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
@@ -214,6 +266,7 @@ exports.getProductsQuerySchema = Joi.object({
   sort: Joi.string().default("-createdAt"),
   category: Joi.string(),
   categories: Joi.string().max(500),
+  room: Joi.string().max(500),
   colors: Joi.string().max(500),
   materials: Joi.string().max(500),
   minRating: Joi.number().min(0).max(5),
@@ -225,7 +278,20 @@ exports.getProductsQuerySchema = Joi.object({
   featured: Joi.string().valid("true", "false"),
   newArrivals: Joi.string().valid("true", "false"),
   inStock: Joi.string().valid("true", "false"),
-});
+  // Phase 5 (catalog): faceted filtering surface. `collection`
+  // resolves a Phase 1 collection slug as a list dimension;
+  // `facets=1` asks for the disjunctive facet counts.
+  collection: Joi.string().trim().max(120),
+  facets: Joi.string().valid("1", "true", "0", "false"),
+}).pattern(/^attr\./, Joi.string().max(2000));
+// Phase 5: `attr.*` keys (attr.<key>, attr.<key>.min/.max) ride
+// the pattern above as plain strings — Joi pins only the shape
+// (string values only, so ?attr.color[$ne]=x fails validation as
+// a container instead of reaching Mongo). The strict grammar,
+// registry membership and per-type value parsing live in
+// services/catalogFilter.service.js, which 400s anything outside
+// the grammar; keys that do not start with `attr.` keep the
+// standing stripUnknown posture.
 
 exports.updateStockSchema = Joi.object({
   stock: Joi.number().integer().min(0).required().messages({
@@ -240,3 +306,67 @@ exports.setPrimaryImageSchema = Joi.object({
     "string.pattern.name": "Invalid image ID",
   }),
 });
+
+// Phase 3 (catalog): variant payloads for
+// POST/PATCH /products/:id/variants. Joi pins the SHAPE; the
+// invariants that need the database or the product (option key
+// set, engine value validation, SKU/combination uniqueness, SKU
+// immutability) live in services/productVariant.service.js. The
+// options object passes through with unknown keys so the service
+// can name extra/missing keys precisely. Price may be 0 (a free
+// variant is legitimate) — unlike product price, which the
+// product schemas require to be positive.
+const variantSkuSchema = Joi.string()
+  .trim()
+  .max(64)
+  .pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+  .messages({
+    "string.pattern.base":
+      "Variant SKU must start with a letter or digit and contain only letters, digits, '.', '_' or '-'",
+    "string.max": "Variant SKU cannot exceed 64 characters",
+  });
+
+const variantOptionsSchema = Joi.alternatives().try(
+  Joi.object().unknown(true),
+  Joi.string()
+);
+
+const variantWeightSchema = Joi.object({
+  value: Joi.number().min(0).required(),
+  unit: Joi.string().valid("kg", "lb", "g").default("kg"),
+});
+
+const variantFields = {
+  options: variantOptionsSchema,
+  compareAtPrice: Joi.number().min(0).allow(null),
+  stock: Joi.number().integer().min(0),
+  enabled: Joi.boolean(),
+  images: Joi.array().items(Joi.string().trim().min(1).max(2048)).max(20),
+  weight: variantWeightSchema,
+  dimensions: dimensionsSchema,
+  modelUrl: Joi.string().uri().allow("", null),
+};
+
+exports.createVariantSchema = Joi.object({
+  sku: variantSkuSchema.required().messages({
+    "any.required": "Variant SKU is required",
+  }),
+  price: Joi.number().min(0).required().messages({
+    "number.min": "Variant price cannot be negative",
+    "any.required": "Variant price is required",
+  }),
+  ...variantFields,
+  stock: Joi.number().integer().min(0).default(0),
+  enabled: Joi.boolean().default(true),
+});
+
+// sku is listed on update ON PURPOSE: validate() strips unknown
+// keys, so an unlisted sku would vanish silently — the service
+// must see it to enforce immutability with a precise 400.
+exports.updateVariantSchema = Joi.object({
+  sku: variantSkuSchema,
+  price: Joi.number().min(0).messages({
+    "number.min": "Variant price cannot be negative",
+  }),
+  ...variantFields,
+}).min(1);

@@ -4,7 +4,10 @@ const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
 router.use(standardWriteLimiter);
-router.param("id", objectIdParam);
+// SR-8: public GET /:id and /:id/products resolve slug-or-id in the
+// controller, so the id guard is method-aware here (GET passes
+// through; mutations stay strict).
+router.param("id", objectIdParam.slugOrObjectIdParam);
 const categoryController = require("../controllers/category.controller");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 const { uploadCategoryImage, resizeCategoryImage } = require("../middleware/upload.middleware");
@@ -13,6 +16,8 @@ const {
   createCategorySchema,
   updateCategorySchema,
   getCategoriesQuerySchema,
+  reorderCategoriesSchema,
+  setCategoryAttributeAssignmentsSchema,
 } = require("../validators/category.validator");
 
 router.get("/", validate(getCategoriesQuerySchema, "query"), categoryController.getAllCategories);
@@ -29,6 +34,13 @@ router.post(
   categoryController.createCategory
 );
 
+// Phase 1: sibling reorder (same-parent ids, position = sortOrder).
+router.post(
+  "/reorder",
+  validate(reorderCategoriesSchema),
+  categoryController.reorderCategories
+);
+
 router.patch(
   "/:id",
   uploadCategoryImage,
@@ -38,5 +50,15 @@ router.patch(
 );
 
 router.delete("/:id", categoryController.deleteCategory);
+
+// Phase 2: attribute assignment management for this category
+// (own list; the resolved/inherited view is the public
+// GET /catalog/categories/:ref/attributes).
+router.get("/:id/attributes", categoryController.getCategoryAttributeAssignments);
+router.put(
+  "/:id/attributes",
+  validate(setCategoryAttributeAssignmentsSchema),
+  categoryController.setCategoryAttributeAssignments
+);
 
 module.exports = router;

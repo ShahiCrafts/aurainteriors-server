@@ -3,6 +3,13 @@ const { applyCatalogListFilters, catalogPagination, catalogSort } = require("../
 const { asString, asNumber, asStringList, asObjectId } = require("../utils/params");
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
+const Room = require("../models/room.model");
+const ProductType = require("../models/productType.model");
+const { applyVariantOptionKeys } = require("../services/productVariant.service");
+const {
+  prepareCatalogAttributes,
+  assertRequiredForStoredAttributes,
+} = require("../services/productAttributes.service");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const { deleteFile, deleteFiles } = require("../middleware/upload.middleware");
@@ -25,6 +32,43 @@ const parseBoolean = (value) => {
   return undefined;
 };
 
+// Phase 1 (catalog): normalize a roomSlugs payload (array, or a
+// JSON-string array from multipart form-data) and validate every
+// slug against the Room registry — an unregistered room is a 400,
+// never a silently stored dangling reference. Returns the normalized
+// slug list (possibly empty, which clears the assignment).
+const resolveRoomSlugs = async (raw) => {
+  const parsed = parseJsonField(raw);
+  if (!Array.isArray(parsed)) {
+    throw new AppError("roomSlugs must be an array of room slugs", 400);
+  }
+  const slugs = [...new Set(parsed.map((s) => String(s).trim().toLowerCase()).filter(Boolean))];
+  if (slugs.length > 0) {
+    const known = await Room.find({ slug: { $in: slugs }, active: true }).select("slug").lean();
+    const knownSlugs = new Set(known.map((room) => room.slug));
+    const unknown = slugs.filter((slug) => !knownSlugs.has(slug));
+    if (unknown.length > 0) {
+      throw new AppError(`Unknown room slug(s): ${unknown.join(", ")}`, 400);
+    }
+  }
+  return slugs;
+};
+
+// Phase 3 (catalog): the product's own productType must be a key
+// in the ProductType registry (active) — same contract as the
+// category write path (Phase 1). ""/null clears the assignment
+// (returns null); absent leaves it untouched (returns undefined).
+const resolveProductType = async (raw) => {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === "") return null;
+  const key = String(raw).trim().toLowerCase();
+  const type = await ProductType.findOne({ key, active: true }).select("key").lean();
+  if (!type) {
+    throw new AppError(`Unknown product type: ${key}`, 400);
+  }
+  return key;
+};
+
 // Get all products with filtering, sorting, and pagination
 exports.getAllProducts = catchAsync(async (req, res, next) => {
   const query = req.query || {};
@@ -37,6 +81,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   // crash/500 and NaN filters. They are now treated as absent.
   const categoryList = asStringList(query.category);
   const categoriesList = asStringList(query.categories);
+  const roomList = asStringList(query.room);
   const statusList = asStringList(query.status);
   const styleList = asStringList(query.style);
   const minPrice = asNumber(query.minPrice);
@@ -52,9 +97,31 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   // Build filter
   const filter = { deletedAt: null };
 
+  // Phase 0.5 (catalog Q1): category filters include DESCENDANT
+  // categories, converging this endpoint on getCategoryProducts'
+  // subtree semantics — a parent category lists the products of its
+  // whole subtree, not only products assigned directly to it (with
+  // the seed's leaf-only product placement, parent listings were
+  // empty). Expansion reuses the model's getDescendantIds BFS, the
+  // same helper the category-products endpoint uses; the response
+  // shape is unchanged.
+  const expandToSubtree = async (ids) => {
+    const expanded = new Set();
+    for (const id of ids) {
+      const subtreeIds = await Category.getDescendantIds(id);
+      for (const subtreeId of subtreeIds) expanded.add(String(subtreeId));
+    }
+    return [...expanded];
+  };
+
   // Handle category filter by ID (legacy)
+  // Phase 5: the pre-expansion roots are remembered — they define
+  // the category facet's scope (subtree counts under the selected
+  // categories) when facets are requested.
+  let selectedCategoryRoots = [];
   if (categoryList.length > 0) {
-    filter.category = { $in: categoryList };
+    filter.category = { $in: await expandToSubtree(categoryList) };
+    selectedCategoryRoots = categoryList;
   }
 
   // Handle categories filter by slug (new)
@@ -62,7 +129,8 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     const categoryDocs = await Category.find({ slug: { $in: categoriesList } }).select("_id");
     const categoryIds = categoryDocs.map((cat) => cat._id);
     if (categoryIds.length > 0) {
-      filter.category = { $in: categoryIds };
+      filter.category = { $in: await expandToSubtree(categoryIds) };
+      selectedCategoryRoots = categoryIds.map((id) => String(id));
     }
   }
 
@@ -81,6 +149,13 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     filter.style = { $in: styleList };
   }
 
+  // Phase 1 (catalog): room as a list dimension — ?room=<slug>
+  // (comma-separated for several). Products carry roomSlugs; a
+  // product assigned to multiple rooms matches each of them.
+  if (roomList.length > 0) {
+    filter.roomSlugs = { $in: roomList.map((slug) => slug.toLowerCase()) };
+  }
+
   if (featured === "true") {
     filter.isFeatured = true;
   }
@@ -88,6 +163,11 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   if (newArrivals === "true") {
     filter.isNewArrival = true;
   }
+
+  // Phase 5: the visibility status as resolved above, BEFORE the
+  // inStock block below replaces it — the facet pools need the
+  // availability-free variant of the scope (disjunctive counting).
+  const statusSnapshot = filter.status;
 
   if (inStock === "true") {
     filter.stock = { $gt: 0 };
@@ -108,6 +188,100 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
 
   const { pageNum, limitNum, skip } = catalogPagination(page, limit);
 
+  // ----------------------------------------------------------------
+  // Phase 5 (catalog): faceted filter engine.
+  //
+  // - Attribute conditions (attr.* params) are parsed against the
+  //   Phase 2 registry by services/catalogFilter.service.js and
+  //   become variant-aware clauses (same-variant rule, hybrid
+  //   legacy matching) — see that module for the semantics.
+  // - minPrice/maxPrice gain EFFECTIVE-price semantics: the shared
+  //   builder above set the legacy Product.price fragment; it is
+  //   replaced here by the engine's branches (non-variant products
+  //   keep Product.price; variant products match through any
+  //   enabled variant). Recorded divergence D6: getCategoryProducts
+  //   keeps the legacy price fragment — the shared builder is
+  //   deliberately untouched.
+  // - inStock=true additionally requires, for variant products, an
+  //   enabled variant with stock - reservedStock > 0 (the legacy
+  //   product-level stock/status conditions above stay in force).
+  // - collection=<slug> resolves a Phase 1 collection through the
+  //   collection service (the same evaluation as the collection
+  //   page) and constrains the list to its published members; an
+  //   unknown/inactive slug is a 404, mirroring
+  //   GET /catalog/collections/:slug.
+  // Model-touching modules are LAZY-required inside the branches
+  // that need them (the Phase 4 stub-harness lesson): a plain
+  // legacy request never loads them.
+  const wantsFacets = query.facets === "1" || query.facets === "true";
+  const hasAttrParams = Object.keys(query).some((key) => key.startsWith("attr."));
+  const collectionSlug = asString(query.collection, 120);
+  const priceRange =
+    minPrice !== undefined || maxPrice !== undefined ? { min: minPrice, max: maxPrice } : null;
+  const inStockRequested = inStock === "true";
+  let attrConditions = [];
+  let collectionFragment = null;
+
+  if (hasAttrParams) {
+    const AttributeDefinition = require("../models/attributeDefinition.model");
+    const { parseAttributeFilters } = require("../services/catalogFilter.service");
+    const definitionDocs = await AttributeDefinition.find({}).lean();
+    const definitionsByKey = new Map(definitionDocs.map((doc) => [doc.key, doc]));
+    attrConditions = parseAttributeFilters(query, definitionsByKey);
+  }
+
+  if (collectionSlug !== undefined) {
+    const Collection = require("../models/collection.model");
+    const { resolveCollectionProductIds } = require("../services/collection.service");
+    const slug = collectionSlug.trim().toLowerCase();
+    const collection = slug
+      ? await Collection.findOne({ slug, active: true }).select("kind productIds rule").lean()
+      : null;
+    if (!collection) {
+      throw new AppError("Collection not found", 404);
+    }
+    const productIds = await resolveCollectionProductIds(collection);
+    filter._id = { $in: productIds };
+    collectionFragment = { _id: filter._id };
+  }
+
+  if (priceRange) {
+    delete filter.price;
+  }
+  {
+    const { buildVariantAwareClause } = require("../services/catalogFilter.service");
+    const engineClauses = buildVariantAwareClause({
+      conditions: attrConditions,
+      priceRange,
+      inStock: inStockRequested,
+    });
+    if (engineClauses.length > 0) {
+      filter.$and = [...(filter.$and || []), ...engineClauses];
+    }
+  }
+
+  // The legacy fragments as they landed on the filter, captured
+  // for the disjunctive facet pools (Pass C computes facets from
+  // these same fragments, so facet pools can never drift from the
+  // list filter's meaning).
+  const facetFragments = {
+    category: filter.category ? { category: filter.category } : null,
+    room: filter.roomSlugs ? { roomSlugs: filter.roomSlugs } : null,
+    rating: filter["rating.average"] ? { "rating.average": filter["rating.average"] } : null,
+    style: filter.style ? { style: filter.style } : null,
+    colors: filter.colors ? { colors: filter.colors } : null,
+    materials: filter.materials ? { materials: filter.materials } : null,
+    availability: inStockRequested ? [{ stock: { $gt: 0 } }, { status: "active" }] : [],
+    scope: [
+      { deletedAt: null },
+      ...(statusSnapshot !== undefined ? [{ status: statusSnapshot }] : []),
+      ...(filter.$text ? [{ $text: filter.$text }] : []),
+      ...(filter.isFeatured ? [{ isFeatured: true }] : []),
+      ...(filter.isNewArrival ? [{ isNewArrival: true }] : []),
+      ...(collectionFragment ? [collectionFragment] : []),
+    ],
+  };
+
   // AR-19: additive cursor mode — only when ?cursor= is present
   // (empty string = start of the walk). Keyset on the list's default
   // sort (createdAt desc, _id desc tiebreak); the response gains a
@@ -121,10 +295,58 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     ? { ...filter, $and: [...(filter.$and || []), cursorAfterFilter(cursor)] }
     : filter;
 
+  // Phase 5: effective-price sorting (sort=effectivePriceAsc /
+  // effectivePriceDesc) needs a computed key, so the page is read
+  // through an aggregation — $addFields effectivePrice
+  // (priceFrom ?? price), $sort, then the category populate
+  // re-expressed as a $lookup so the body matches the find() path
+  // field for field. Aggregation ignores select:false, so the two
+  // internal fields (reservedStock, rating.sum) and the computed
+  // key are projected out. Cursor mode keeps its keyset sort and
+  // ignores the token, exactly as it ignores every other sort.
+  const { parseEffectiveSort, EFFECTIVE_PRICE_EXPR } = require("../services/catalogFilter.service");
+  const effectiveSort = cursorMode ? null : parseEffectiveSort(sort);
+
   const [productsPage, total] = await Promise.all([
-    cursorMode
-      ? Product.find(pageFilter).populate("category", "name slug").sort({ createdAt: -1, _id: -1 }).limit(limitNum + 1).lean()
-      : Product.find(filter).populate("category", "name slug").sort(catalogSort(sort)).skip(skip).limit(limitNum).lean(),
+    effectiveSort
+      ? Product.aggregate([
+          { $match: filter },
+          { $addFields: { effectivePrice: EFFECTIVE_PRICE_EXPR } },
+          { $sort: effectiveSort },
+          { $skip: skip },
+          { $limit: limitNum },
+          {
+            $lookup: {
+              from: "categories",
+              localField: "category",
+              foreignField: "_id",
+              pipeline: [{ $project: { _id: 1, name: 1, slug: 1 } }],
+              as: "_categoryDocs",
+            },
+          },
+          {
+            $addFields: {
+              category: {
+                $cond: [
+                  { $gt: [{ $size: "$_categoryDocs" }, 0] },
+                  { $arrayElemAt: ["$_categoryDocs", 0] },
+                  null,
+                ],
+              },
+            },
+          },
+          {
+            $project: {
+              effectivePrice: 0,
+              _categoryDocs: 0,
+              reservedStock: 0,
+              "rating.sum": 0,
+            },
+          },
+        ])
+      : cursorMode
+        ? Product.find(pageFilter).populate("category", "name slug").sort({ createdAt: -1, _id: -1 }).limit(limitNum + 1).lean()
+        : Product.find(filter).populate("category", "name slug").sort(catalogSort(sort)).skip(skip).limit(limitNum).lean(),
     Product.countDocuments(filter),
   ]);
 
@@ -134,6 +356,31 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     const hasMore = productsPage.length > limitNum;
     products = hasMore ? productsPage.slice(0, limitNum) : productsPage;
     nextCursor = hasMore && products.length > 0 ? encodeCursor(products[products.length - 1]) : null;
+  }
+
+  // Phase 5: disjunctive facets, only when requested (facets=1) —
+  // computed by the ONE faceting implementation from the same
+  // fragments this filter was built from.
+  let facets;
+  if (wantsFacets) {
+    const { computeFacets } = require("../services/catalogFacets.service");
+    ({ facets } = await computeFacets({
+      scopeFragments: facetFragments.scope,
+      conditions: attrConditions,
+      priceRange,
+      inStock: inStockRequested,
+      categoryFragment: facetFragments.category,
+      categoryRoots: selectedCategoryRoots,
+      roomFragment: facetFragments.room,
+      ratingFragment: facetFragments.rating,
+      minRating,
+      fieldFragments: {
+        style: facetFragments.style,
+        colors: facetFragments.colors,
+        materials: facetFragments.materials,
+      },
+      availabilityFragments: facetFragments.availability,
+    }));
   }
 
   res.status(200).json({
@@ -148,6 +395,7 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
         pages: Math.ceil(total / limitNum),
       },
       ...(cursorMode ? { nextCursor } : {}),
+      ...(wantsFacets ? { facets } : {}),
     },
   });
 });
@@ -188,6 +436,9 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     status,
     modelUrl,
     modelUrls, // Array of external model URLs
+    productType,
+    roomSlugs,
+    catalogAttributes,
     dimensions,
     weight,
     colors,
@@ -212,6 +463,27 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     return next(new AppError("Category not found", 400));
   }
 
+  // Phase 1: room assignment validated against the Room registry.
+  const resolvedRoomSlugs = roomSlugs !== undefined ? await resolveRoomSlugs(roomSlugs) : undefined;
+
+  // Phase 3: the product's own type, validated against the
+  // ProductType registry. It supplies the type level for
+  // attribute resolution (below and in
+  // services/attributeResolution.service.js resolveForProduct).
+  const resolvedProductType = await resolveProductType(productType);
+
+  // Phase 2: catalogAttributes validated + normalized through the
+  // attribute engine, with the category's required set enforced —
+  // including when the payload omits catalogAttributes entirely (a
+  // product in a category with required attributes cannot be
+  // created without them). Runs before Product.create, so a
+  // rejection persists nothing.
+  const preparedCatalogAttributes = await prepareCatalogAttributes({
+    category: categoryExists,
+    raw: catalogAttributes === undefined ? {} : catalogAttributes,
+    productType: resolvedProductType || undefined,
+  });
+
   const productData = {
     name,
     description,
@@ -223,6 +495,9 @@ exports.createProduct = catchAsync(async (req, res, next) => {
     sku,
     status: status || "active",
     modelUrl,
+    productType: resolvedProductType || undefined,
+    roomSlugs: resolvedRoomSlugs,
+    catalogAttributes: preparedCatalogAttributes,
     style,
     isFeatured: parseBoolean(isFeatured) || false,
     isNewArrival: parseBoolean(isNewArrival) || false,
@@ -308,6 +583,10 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     status,
     modelUrl,
     modelUrls, // Array of external model URLs to add
+    productType,
+    variantOptionKeys,
+    roomSlugs,
+    catalogAttributes,
     dimensions,
     weight,
     colors,
@@ -323,6 +602,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
   } = req.body;
 
   // Verify category if being updated
+  let changedCategory = null;
   if (category) {
     const categoryId = asObjectId(category);
     if (!categoryId) {
@@ -333,6 +613,7 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
       return next(new AppError("Category not found", 400));
     }
     product.category = categoryId;
+    changedCategory = categoryExists;
   }
 
   // Update basic fields
@@ -354,6 +635,46 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
 
   if (metaTitle !== undefined) product.metaTitle = metaTitle;
   if (metaDescription !== undefined) product.metaDescription = metaDescription;
+
+  // Phase 1: room assignment validated against the Room registry
+  // (an empty list clears the assignment).
+  if (roomSlugs !== undefined) product.roomSlugs = await resolveRoomSlugs(roomSlugs);
+
+  // Phase 3: the product's own type (registry-validated; ""/null
+  // clears). Assigned BEFORE attribute preparation below so a
+  // payload that changes the type and the attributes together is
+  // enforced against the NEW type's required set.
+  if (productType !== undefined) {
+    product.productType = await resolveProductType(productType);
+  }
+
+  // Phase 3: variantOptionKeys — registry/type validated and
+  // LOCKED while variants exist (services/productVariant.service).
+  if (variantOptionKeys !== undefined) {
+    await applyVariantOptionKeys(product, variantOptionKeys);
+  }
+
+  // Phase 2: catalogAttributes through the attribute engine. A
+  // provided payload is fully validated + normalized and replaces
+  // the stored map, with the EFFECTIVE category's required set
+  // enforced; a category-only change checks the stored values
+  // against the new category's required set without re-validating
+  // them. An update touching neither skips attribute enforcement
+  // entirely. All of this runs before product.save(), so a
+  // rejection persists nothing.
+  if (catalogAttributes !== undefined) {
+    const categoryDoc = changedCategory || (await Category.findById(product.category));
+    product.catalogAttributes = await prepareCatalogAttributes({
+      category: categoryDoc,
+      raw: catalogAttributes,
+      productType: product.productType || undefined,
+    });
+  } else if (changedCategory) {
+    await assertRequiredForStoredAttributes({
+      category: changedCategory,
+      storedAttrs: product.catalogAttributes,
+    });
+  }
 
   // Parse and update JSON fields
   if (dimensions !== undefined) product.dimensions = parseJsonField(dimensions);
@@ -539,11 +860,13 @@ exports.setPrimaryImage = catchAsync(async (req, res, next) => {
 
 // Get related products (Enhanced Multi-Tiered Rule Engine)
 exports.getRelatedProducts = catchAsync(async (req, res, next) => {
-  const { id } = req.params;
+  // Route param is :productId (strict ObjectId guard) — this handler
+  // has no slug branch, unlike getProduct (SR-8).
+  const { productId } = req.params;
   const { limit = 4 } = req.query;
   const limitNum = boundedLimit(limit);
 
-  const product = await Product.findOne({ _id: id, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
+  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
 
   if (!product) {
     return next(new AppError("Product not found", 404));
@@ -560,7 +883,11 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
 
   let relatedProducts = await Product.find(query)
     .limit(limitNum)
-    .select("name slug price originalPrice images rating category style tags")
+    // SR-P7-2 (Phase 9+10): hasVariants/priceFrom/catalogVariants
+    // ride every card feed so ProductCard can render "From" pricing
+    // and judge variant availability (the main list ships full docs;
+    // these curated selects were the only card feeds missing them).
+    .select("name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants")
     .populate("category", "name slug")
     .lean();
 
@@ -576,7 +903,7 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
 
     const tier2Products = await Product.find(tier2Query)
       .limit(limitNum - relatedProducts.length)
-      .select("name slug price originalPrice images rating category style tags")
+      .select("name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants")
       .populate("category", "name slug")
       .lean();
 
@@ -595,7 +922,7 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
 
     const tier3Products = await Product.find(tier3Query)
       .limit(limitNum - relatedProducts.length)
-      .select("name slug price originalPrice images rating category style tags")
+      .select("name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants")
       .populate("category", "name slug")
       .lean();
 
@@ -621,7 +948,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
     status: "active",
   })
     .limit(boundedLimit(limit))
-    .select("name slug price originalPrice images rating category")
+    .select("name slug price originalPrice images rating category hasVariants priceFrom catalogVariants")
     .populate("category", "name slug")
     .lean();
 
@@ -644,7 +971,7 @@ exports.getNewArrivals = catchAsync(async (req, res, next) => {
     status: "active",
   })
     .limit(boundedLimit(limit))
-    .select("name slug price originalPrice images rating category")
+    .select("name slug price originalPrice images rating category hasVariants priceFrom catalogVariants")
     .populate("category", "name slug")
     .lean();
 

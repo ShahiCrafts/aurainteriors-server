@@ -4,9 +4,13 @@ const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
 router.use(standardWriteLimiter);
-router.param("id", objectIdParam);
+// SR-8: public GET /:id resolves slug-or-id in getProduct, so the id
+// guard is method-aware here (GET passes through; mutations stay
+// strict). :productId (reviews nesting) keeps the strict guard.
+router.param("id", objectIdParam.slugOrObjectIdParam);
 router.param("productId", objectIdParam);
 const productController = require("../controllers/product.controller");
+const productVariantController = require("../controllers/productVariant.controller");
 const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
 const {
   uploadProductFiles,
@@ -20,6 +24,8 @@ const {
   getProductsQuerySchema,
   updateStockSchema,
   setPrimaryImageSchema,
+  createVariantSchema,
+  updateVariantSchema,
 } = require("../validators/product.validator");
 
 const reviewRoutes = require("./review.routes");
@@ -35,7 +41,9 @@ router.get(
 router.get("/featured", productController.getFeaturedProducts);
 router.get("/new-arrivals", productController.getNewArrivals);
 router.get("/:id", protectOptional, productController.getProduct);
-router.get("/:id/related", productController.getRelatedProducts);
+// Related stays on the strict :productId guard: getRelatedProducts
+// has no slug branch and genuinely requires an ObjectId (SR-8 scope).
+router.get("/:productId/related", productController.getRelatedProducts);
 
 router.use(protect, restrictTo("admin"));
 
@@ -83,5 +91,25 @@ router.patch(
   validate(updateStockSchema),
   productController.updateStock
 );
+
+// Phase 3 (catalog): variant CRUD (admin — this whole section sits
+// behind protect + restrictTo("admin") above). All variant writes
+// funnel into services/productVariant.service.js. The :id param
+// guard is method-aware (Phase 0.5): mutations keep the strict
+// ObjectId 400; the GET list re-checks the id shape in the
+// controller. Variant payloads are JSON (images are URL strings),
+// so no upload middleware runs here.
+router.get("/:id/variants", productVariantController.listVariants);
+router.post(
+  "/:id/variants",
+  validate(createVariantSchema),
+  productVariantController.createVariant
+);
+router.patch(
+  "/:id/variants/:variantId",
+  validate(updateVariantSchema),
+  productVariantController.updateVariant
+);
+router.delete("/:id/variants/:variantId", productVariantController.deleteVariant);
 
 module.exports = router;
