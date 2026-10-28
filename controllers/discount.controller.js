@@ -56,7 +56,7 @@ exports.getAllDiscounts = catchAsync(async (req, res, next) => {
 exports.getDiscount = catchAsync(async (req, res, next) => {
   const discount = await Discount.findById(req.params.id).populate(
     "createdBy",
-    "firstName lastName email"
+    "firstName lastName email",
   );
 
   if (!discount) {
@@ -98,12 +98,17 @@ exports.createDiscount = catchAsync(async (req, res, next) => {
     createdBy: req.user._id,
   });
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "discount.create",
     targetType: "Discount",
     targetId: discount._id,
-    after: { code: discount.code, discountPercentage: discount.discountPercentage, isActive: discount.isActive },
+    after: {
+      code: discount.code,
+      discountPercentage: discount.discountPercentage,
+      isActive: discount.isActive,
+    },
     ip: req.ip,
   });
 
@@ -147,7 +152,7 @@ exports.updateDiscount = catchAsync(async (req, res, next) => {
     });
     if (existingDiscount) {
       return next(
-        new AppError("A discount with this code already exists", 400)
+        new AppError("A discount with this code already exists", 400),
       );
     }
     discount.code = code.toUpperCase();
@@ -165,7 +170,8 @@ exports.updateDiscount = catchAsync(async (req, res, next) => {
 
   await discount.save();
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "discount.update",
     targetType: "Discount",
@@ -196,12 +202,17 @@ exports.deleteDiscount = catchAsync(async (req, res, next) => {
     return next(new AppError("Discount code not found", 404));
   }
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "discount.delete",
     targetType: "Discount",
     targetId: discount._id,
-    before: { code: discount.code, discountPercentage: discount.discountPercentage, isActive: discount.isActive },
+    before: {
+      code: discount.code,
+      discountPercentage: discount.discountPercentage,
+      isActive: discount.isActive,
+    },
     ip: req.ip,
   });
 
@@ -292,18 +303,35 @@ exports.validateDiscount = catchAsync(async (req, res, next) => {
 
 exports.previewDiscount = catchAsync(async (req, res) => {
   let items;
-  if (req.user) {
-    if (!req.body.selectedItemIds) throw new AppError("Select your cart items", 400);
+  if (req.user && !req.body.items) {
+    if (!req.body.selectedItemIds)
+      throw new AppError("Select your cart items", 400);
     const cart = await Cart.findOne({ user: req.user._id });
-    const selected = selectCartItems(cart?.items || [], req.body.selectedItemIds);
-    items = selected.map(item => ({ productId: item.product, quantity: item.quantity, variant: item.variant }));
+    const selected = selectCartItems(
+      cart?.items || [],
+      req.body.selectedItemIds,
+    );
+    items = selected.map((item) => ({
+      productId: item.product,
+      quantity: item.quantity,
+      variant: item.variant,
+    }));
+  } else if (req.user) {
+    // Signed-in Buy Now (direct checkout): the preview prices the
+    // items in the request — there is no cart line to select, and
+    // the cart must not be read for a buy-now order.
+    items = req.body.items;
   } else {
     if (!req.body.items) throw new AppError("Provide guest cart items", 400);
     items = req.body.items;
   }
-  if (!items?.length) throw new AppError("Select items before applying a promo", 400);
+  if (!items?.length)
+    throw new AppError("Select items before applying a promo", 400);
   const prepared = await prepareOrderItems(items);
-  const subtotal = prepared.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = prepared.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
   // AR-31(a): was `Discount.findOne({ code: req.body.code })` VERBATIM —
   // the one lookup site that did not normalize, so a stored (uppercase)
   // code failed preview unless typed in exact uppercase. Now resolved
@@ -311,8 +339,15 @@ exports.previewDiscount = catchAsync(async (req, res) => {
   const discount = await resolveDiscount(req.body.code);
   const { validation, discountAmount } = evaluateDiscount(discount, subtotal);
   if (!validation.valid) throw new AppError(validation.message, 400);
-  res.status(200).json({ status: "success", data: {
-    discount: { code: discount.code, discountPercentage: discount.discountPercentage, discountAmount },
-    cart: { subtotal, discountAmount, total: subtotal - discountAmount },
-  } });
+  res.status(200).json({
+    status: "success",
+    data: {
+      discount: {
+        code: discount.code,
+        discountPercentage: discount.discountPercentage,
+        discountAmount,
+      },
+      cart: { subtotal, discountAmount, total: subtotal - discountAmount },
+    },
+  });
 });

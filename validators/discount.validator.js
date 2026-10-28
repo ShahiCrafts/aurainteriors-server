@@ -88,10 +88,29 @@ exports.applyDiscountSchema = Joi.object({
 
 exports.previewDiscountSchema = Joi.object({
   code: Joi.string().trim().uppercase().max(100).required(),
-  selectedItemIds: Joi.array().items(Joi.string().pattern(/^[a-f0-9]{24}$/i)).min(1).max(100).unique(),
-  items: Joi.array().items(Joi.object({
-    productId: Joi.string().pattern(/^[a-f0-9]{24}$/i).required(),
-    quantity: Joi.number().integer().min(1).max(10000).required(),
-    variant: Joi.object({ color: Joi.string().max(100).allow(""), size: Joi.string().max(100).allow(""), material: Joi.string().max(100).allow("") }),
-  })).min(1).max(100),
+  selectedItemIds: Joi.array()
+    .items(Joi.string().pattern(/^[a-f0-9]{24}$/i))
+    .min(1)
+    .max(100)
+    .unique(),
+  items: Joi.array()
+    .items(
+      Joi.object({
+        productId: Joi.string()
+          .pattern(/^[a-f0-9]{24}$/i)
+          .required(),
+        quantity: Joi.number().integer().min(1).max(10000).required(),
+        // Variant lines (guest cart / Buy Now) name their exact variant
+        // so the preview prices that variant, not the product scalar.
+        variantId: Joi.string().pattern(/^[a-f0-9]{24}$/i),
+        sku: Joi.string().trim().max(64).allow(""),
+        variant: Joi.object({
+          color: Joi.string().max(100).allow(""),
+          size: Joi.string().max(100).allow(""),
+          material: Joi.string().max(100).allow(""),
+        }),
+      }),
+    )
+    .min(1)
+    .max(100),
 }).xor("selectedItemIds", "items");
