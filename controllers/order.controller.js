@@ -1,6 +1,9 @@
 const { checkoutIdentity } = require("../utils/checkoutIdentity");
 const { consumeDiscountUsage } = require("../services/discountUsage.service");
-const { transitionOrder, commitGuestCodStock } = require("../services/orderTransition.service");
+const {
+  transitionOrder,
+  commitGuestCodStock,
+} = require("../services/orderTransition.service");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const Order = require("../models/order.model");
@@ -16,10 +19,21 @@ const stockReservation = require("../services/stockReservation.service");
 const { captureEsewaPayment } = require("../services/esewaCapture.service");
 const notificationEventEmitter = require("../services/notificationEventEmitter");
 const auditLog = require("../services/auditLog.service"); // VULN-004
-const { boundedLimit, boundedPage, encodeCursor, decodeCursor, cursorAfterFilter } = require("../utils/listQuery");
+const {
+  boundedLimit,
+  boundedPage,
+  encodeCursor,
+  decodeCursor,
+  cursorAfterFilter,
+} = require("../utils/listQuery");
 const { getCached, setCached } = require("../utils/ttlCache");
 
-const { getEsewaConfig, verifyEsewaSignature, verifyEsewaPayment, verifyEsewaRefund } = require("../services/esewaVerification.service");
+const {
+  getEsewaConfig,
+  verifyEsewaSignature,
+  verifyEsewaPayment,
+  verifyEsewaRefund,
+} = require("../services/esewaVerification.service");
 // FA-19: the config is resolved lazily (and cached) - importing this
 // module must not crash processes that have no eSewa configuration
 // (tests, tooling), while the first payment operation still fails fast
@@ -29,7 +43,8 @@ let _esewaConfig = null;
 const esewaConfig = () => (_esewaConfig ??= getEsewaConfig());
 
 // OA-1: fallback removed - resolved live via config; using it while unset throws naming FRONTEND_URL.
-const FRONTEND_URL_GET = () => require("../config/appConfig").requireAtUse("FRONTEND_URL");
+const FRONTEND_URL_GET = () =>
+  require("../config/appConfig").requireAtUse("FRONTEND_URL");
 
 // Generate HMAC-SHA256 signature for eSewa ePay v2
 const generateEsewaSignature = (message) => {
@@ -60,10 +75,16 @@ const calculateOrderTotals = async (items, discountCode, session = null) => {
 
   if (discountCode) {
     const discount = await resolveDiscountForCheckout(discountCode, session);
-    const { validation, discountAmount: evaluatedAmount } = evaluateDiscount(discount, subtotal);
+    const { validation, discountAmount: evaluatedAmount } = evaluateDiscount(
+      discount,
+      subtotal,
+    );
     if (!validation.valid) throw new AppError(validation.message, 400);
     discountAmount = evaluatedAmount;
-    discountInfo = { code: discount.code, percentage: discount.discountPercentage };
+    discountInfo = {
+      code: discount.code,
+      percentage: discount.discountPercentage,
+    };
   }
 
   const shippingCost = 0; // Free shipping
@@ -74,7 +95,8 @@ const calculateOrderTotals = async (items, discountCode, session = null) => {
 };
 
 // Backend URL for eSewa callbacks
-const BACKEND_URL_GET = () => require("../config/appConfig").requireAtUse("BACKEND_URL");
+const BACKEND_URL_GET = () =>
+  require("../config/appConfig").requireAtUse("BACKEND_URL");
 
 // Generate eSewa ePay v2 payment data with signature
 const generateEsewaPaymentData = (order) => {
@@ -162,7 +184,12 @@ const finalizeCodCheckout = async ({ order, session, transaction, res }) => {
   const outbox = emailOutbox.isOutboxMode();
   if (outbox) {
     await emailOutbox.dispatchEmail(
-      { kind: "order-confirmation", to: order.guestInfo.email, payload: { orderId: String(order._id) }, dedupeKey: `order-confirmation:${order._id}` },
+      {
+        kind: "order-confirmation",
+        to: order.guestInfo.email,
+        payload: { orderId: String(order._id) },
+        dedupeKey: `order-confirmation:${order._id}`,
+      },
       { session },
     );
   }
@@ -170,9 +197,12 @@ const finalizeCodCheckout = async ({ order, session, transaction, res }) => {
 
   let emailResult = null;
   if (!outbox) {
-    emailResult = await emailOutbox.dispatchEmail(
-      { kind: "order-confirmation", to: order.guestInfo.email, payload: { orderId: String(order._id) }, dedupeKey: `order-confirmation:${order._id}` },
-    );
+    emailResult = await emailOutbox.dispatchEmail({
+      kind: "order-confirmation",
+      to: order.guestInfo.email,
+      payload: { orderId: String(order._id) },
+      dedupeKey: `order-confirmation:${order._id}`,
+    });
   }
   emitOrderNotifications(order);
 
@@ -196,19 +226,46 @@ const finalizeCodCheckout = async ({ order, session, transaction, res }) => {
 // Checkout requires real transactions; standalone writes cannot preserve inventory.
 const startTransactionSession = async () => {
   const session = await mongoose.startSession();
-  try { session.startTransaction(); return session; }
-  catch (error) { await session.endSession(); throw error; }
+  try {
+    session.startTransaction();
+    return session;
+  } catch (error) {
+    await session.endSession();
+    throw error;
+  }
 };
 
 const replayCheckout = async (identity, res) => {
   if (!identity) return false;
-  const existing = await Order.findOne({ _id: identity._id, idempotencyKey: identity.idempotencyKey });
+  const existing = await Order.findOne({
+    _id: identity._id,
+    idempotencyKey: identity.idempotencyKey,
+  });
   if (!existing) return false;
-  if (existing.requestHash !== identity.requestHash) throw new AppError("Checkout key was already used with different details", 409);
-  const data = { order: { orderId: existing.orderId, total: existing.total, orderStatus: existing.orderStatus,
-    paymentMethod: existing.paymentMethod, email: existing.guestInfo.email }, replayed: true };
-  if (existing.paymentMethod === "esewa" && existing.paymentStatus === "pending" && existing.orderStatus === "pending") data.esewa = generateEsewaPaymentData(existing);
-  res.status(201).json({ success: true, message: "Existing checkout returned", data });
+  if (existing.requestHash !== identity.requestHash)
+    throw new AppError(
+      "Checkout key was already used with different details",
+      409,
+    );
+  const data = {
+    order: {
+      orderId: existing.orderId,
+      total: existing.total,
+      orderStatus: existing.orderStatus,
+      paymentMethod: existing.paymentMethod,
+      email: existing.guestInfo.email,
+    },
+    replayed: true,
+  };
+  if (
+    existing.paymentMethod === "esewa" &&
+    existing.paymentStatus === "pending" &&
+    existing.orderStatus === "pending"
+  )
+    data.esewa = generateEsewaPaymentData(existing);
+  res
+    .status(201)
+    .json({ success: true, message: "Existing checkout returned", data });
   return true;
 };
 
@@ -249,16 +306,35 @@ const guestCheckoutOnce = async (req, res) => {
     // when GUEST_COD_HOLD_RELEASE_HOURS is set (backgroundTasks.js).
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [byEmail, byPhone] = await Promise.all([
-      Order.countDocuments({ isGuestOrder: true, "guestInfo.email": String(email || "").toLowerCase(), createdAt: { $gt: since } }),
-      phone ? Order.countDocuments({ isGuestOrder: true, "guestInfo.phone": String(phone), createdAt: { $gt: since } }) : Promise.resolve(0),
+      Order.countDocuments({
+        isGuestOrder: true,
+        "guestInfo.email": String(email || "").toLowerCase(),
+        createdAt: { $gt: since },
+      }),
+      phone
+        ? Order.countDocuments({
+            isGuestOrder: true,
+            "guestInfo.phone": String(phone),
+            createdAt: { $gt: since },
+          })
+        : Promise.resolve(0),
     ]);
     if (byEmail >= 3 || byPhone >= 3) {
-      throw new AppError("Too many recent guest orders for this email or phone. Please sign in or try again later.", 429);
+      throw new AppError(
+        "Too many recent guest orders for this email or phone. Please sign in or try again later.",
+        429,
+      );
     }
     const requestedItems = Array.isArray(items) ? items : [];
-    const totalQuantity = requestedItems.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+    const totalQuantity = requestedItems.reduce(
+      (sum, item) => sum + (Number(item?.quantity) || 0),
+      0,
+    );
     if (requestedItems.length > 20 || totalQuantity > 20) {
-      throw new AppError("Guest orders are limited to 20 items. Please sign in for larger orders.", 400);
+      throw new AppError(
+        "Guest orders are limited to 20 items. Please sign in for larger orders.",
+        400,
+      );
     }
 
     // Prepare order items and validate stock within transaction
@@ -353,7 +429,12 @@ const guestCheckoutOnce = async (req, res) => {
     await finalizeCodCheckout({ order, session, transaction, res });
   } catch (error) {
     if (session.inTransaction()) await transaction.abortTransaction();
-    if (error.code === 11000 && identity && await replayCheckout(identity, res)) return;
+    if (
+      error.code === 11000 &&
+      identity &&
+      (await replayCheckout(identity, res))
+    )
+      return;
     throw error;
   } finally {
     await session.endSession();
@@ -370,11 +451,13 @@ const guestCheckoutOnce = async (req, res) => {
 // then either reserves or fails with the gate's 400. The retry is
 // gated on the flag — flag off, guest checkout remains exactly one
 // attempt, byte-identical to before.
-const isTransientTransactionError = (error) => !!error && (
-  error.code === 112 ||
-  (typeof error.hasErrorLabel === "function" && error.hasErrorLabel("TransientTransactionError")) ||
-  (Array.isArray(error.errorLabels) && error.errorLabels.includes("TransientTransactionError"))
-);
+const isTransientTransactionError = (error) =>
+  !!error &&
+  (error.code === 112 ||
+    (typeof error.hasErrorLabel === "function" &&
+      error.hasErrorLabel("TransientTransactionError")) ||
+    (Array.isArray(error.errorLabels) &&
+      error.errorLabels.includes("TransientTransactionError")));
 
 exports.guestCheckout = catchAsync(async (req, res, next) => {
   const maxAttempts = stockReservation.isEnabled() ? 8 : 1;
@@ -383,8 +466,11 @@ exports.guestCheckout = catchAsync(async (req, res, next) => {
       await guestCheckoutOnce(req, res);
       return;
     } catch (error) {
-      if (attempt >= maxAttempts || !isTransientTransactionError(error)) return next(error);
-      await new Promise((resolve) => setTimeout(resolve, Math.min(25 * attempt, 150)));
+      if (attempt >= maxAttempts || !isTransientTransactionError(error))
+        return next(error);
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(25 * attempt, 150)),
+      );
     }
   }
 });
@@ -410,34 +496,55 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
       customerNote,
     } = req.body;
 
-    // Get user's cart within transaction
+    // Buy Now (direct checkout): req.body.items carries the order's
+    // lines directly. In that mode the cart is never read, required
+    // or cleared — the shopper's cart stays exactly as it was, and
+    // an empty cart must not block a direct purchase.
+    const isDirectCheckout =
+      Array.isArray(req.body.items) && req.body.items.length > 0;
+
+    // Get user's cart within transaction (cart checkout only)
     // AR-47: the populated product is only read for its _id downstream
     // (prepareOrderItems re-fetches and validates price/stock/images
     // with its own projection), so the populate projects just the
     // identity fields instead of hydrating full product documents.
-    const cartQuery = Cart.findOne({ user: userId }).populate({
-      path: "items.product",
-      select: "_id name price stock images status",
-    });
-    const cart = session ? await cartQuery.session(session) : await cartQuery;
-    
-    if (!cart || cart.items.length === 0) {
-      await transaction.abortTransaction();
-      return next(new AppError("Your cart is empty", 400));
-    }
+    let cart = null;
+    let selectedItems = [];
+    if (!isDirectCheckout) {
+      const cartQuery = Cart.findOne({ user: userId }).populate({
+        path: "items.product",
+        select: "_id name price stock images status",
+      });
+      cart = session ? await cartQuery.session(session) : await cartQuery;
 
-    // Prepare items from cart
-    const selectedItems = selectCartItems(cart.items, req.body.selectedItemIds);
-    const items = selectedItems.map((item) => ({
-      cartItemId: item._id,
-      productId: item.product?._id || item.product,
-      quantity: item.quantity,
-      variant: item.variant,
-      // Phase 4: the cart line's variant identity flows into
-      // prepareOrderItems, which resolves + revalidates it.
-      variantId: item.variantId,
-      sku: item.sku,
-    }));
+      if (!cart || cart.items.length === 0) {
+        await transaction.abortTransaction();
+        return next(new AppError("Your cart is empty", 400));
+      }
+
+      // Prepare items from cart
+      selectedItems = selectCartItems(cart.items, req.body.selectedItemIds);
+    }
+    const items = isDirectCheckout
+      ? req.body.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          variant: item.variant,
+          // Phase 4: the line's variant identity flows into
+          // prepareOrderItems, which resolves + revalidates it.
+          variantId: item.variantId,
+          sku: item.sku,
+        }))
+      : selectedItems.map((item) => ({
+          cartItemId: item._id,
+          productId: item.product?._id || item.product,
+          quantity: item.quantity,
+          variant: item.variant,
+          // Phase 4: the cart line's variant identity flows into
+          // prepareOrderItems, which resolves + revalidates it.
+          variantId: item.variantId,
+          sku: item.sku,
+        }));
 
     const orderItems = await prepareOrderItems(items, session);
 
@@ -448,8 +555,10 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
         _id: shippingAddressId,
         user: userId,
       });
-      const savedAddress = session ? await addressQuery.session(session) : await addressQuery;
-      
+      const savedAddress = session
+        ? await addressQuery.session(session)
+        : await addressQuery;
+
       if (!savedAddress) {
         await transaction.abortTransaction();
         return next(new AppError("Shipping address not found", 404));
@@ -480,7 +589,9 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
           _id: billingAddressId,
           user: userId,
         });
-        const savedBilling = session ? await billingQuery.session(session) : await billingQuery;
+        const savedBilling = session
+          ? await billingQuery.session(session)
+          : await billingQuery;
 
         if (!savedBilling) {
           await transaction.abortTransaction();
@@ -545,30 +656,41 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
       // Phase 4: a variant line's op guards + deducts the VARIANT
       // subdoc (the $elemMatch makes the op match only while the
       // variant holds enough stock); legacy ops are unchanged.
-      const bulkOps = orderItems.map((item) => item.variantId ? {
-        updateOne: {
-          filter: {
-            _id: item.product,
-            deletedAt: null, status: "active",
-            catalogVariants: { $elemMatch: { _id: item.variantId, stock: { $gte: item.quantity } } },
-          },
-          update: {
-            $inc: { "catalogVariants.$[v].stock": -item.quantity },
-          },
-          arrayFilters: [{ "v._id": item.variantId }],
-        },
-      } : {
-        updateOne: {
-          filter: {
-            _id: item.product,
-            deletedAt: null, status: "active",
-            stock: { $gte: item.quantity },
-          },
-          update: {
-            $inc: { stock: -item.quantity },
-          },
-        },
-      });
+      const bulkOps = orderItems.map((item) =>
+        item.variantId
+          ? {
+              updateOne: {
+                filter: {
+                  _id: item.product,
+                  deletedAt: null,
+                  status: "active",
+                  catalogVariants: {
+                    $elemMatch: {
+                      _id: item.variantId,
+                      stock: { $gte: item.quantity },
+                    },
+                  },
+                },
+                update: {
+                  $inc: { "catalogVariants.$[v].stock": -item.quantity },
+                },
+                arrayFilters: [{ "v._id": item.variantId }],
+              },
+            }
+          : {
+              updateOne: {
+                filter: {
+                  _id: item.product,
+                  deletedAt: null,
+                  status: "active",
+                  stock: { $gte: item.quantity },
+                },
+                update: {
+                  $inc: { stock: -item.quantity },
+                },
+              },
+            },
+      );
 
       if (bulkOps.length > 0) {
         const result = await Product.bulkWrite(bulkOps, {
@@ -579,7 +701,7 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
         if (result.modifiedCount !== orderItems.length) {
           throw new AppError(
             "Insufficient stock for one or more products in your cart. Please review.",
-            400
+            400,
           );
         }
 
@@ -590,10 +712,14 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
         // the checkout path break stub-based harnesses — the
         // stockReservation.service precedent).
         const mirroredProducts = new Set(
-          orderItems.filter((item) => item.variantId).map((item) => String(item.product))
+          orderItems
+            .filter((item) => item.variantId)
+            .map((item) => String(item.product)),
         );
         if (mirroredProducts.size > 0) {
-          const { refreshStockMirror } = require("../services/productVariant.service");
+          const {
+            refreshStockMirror,
+          } = require("../services/productVariant.service");
           for (const productId of mirroredProducts) {
             await refreshStockMirror(productId, { session });
           }
@@ -606,9 +732,17 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
       await consumeDiscountUsage(order, session);
     }
 
-    // Clear user's cart within transaction (only for non-eSewa orders like COD)
-    if (paymentMethod !== "esewa") {
-      cart.items = cart.items.filter(item => !selectedItems.some(selected => String(selected._id) === String(item._id)));
+    // Clear the ordered lines from the user's cart within the
+    // transaction (only for non-eSewa orders like COD). Direct
+    // (Buy Now) checkouts skip this entirely: cart is null in that
+    // mode and the cart must remain untouched.
+    if (paymentMethod !== "esewa" && cart) {
+      cart.items = cart.items.filter(
+        (item) =>
+          !selectedItems.some(
+            (selected) => String(selected._id) === String(item._id),
+          ),
+      );
       await cart.save({ session });
     }
 
@@ -627,7 +761,12 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
     await finalizeCodCheckout({ order, session, transaction, res });
   } catch (error) {
     if (session.inTransaction()) await transaction.abortTransaction();
-    if (error.code === 11000 && identity && await replayCheckout(identity, res)) return;
+    if (
+      error.code === 11000 &&
+      identity &&
+      (await replayCheckout(identity, res))
+    )
+      return;
     return next(error);
   } finally {
     await session.endSession();
@@ -702,7 +841,14 @@ exports.getMyOrders = catchAsync(async (req, res, next) => {
   };
   // FA-76: the raw query value never reaches the filter.
   const { asEnum } = require("../utils/params");
-  const statusValue = asEnum(status, ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]);
+  const statusValue = asEnum(status, [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ]);
   if (statusValue) filter.orderStatus = statusValue;
 
   const skip = (page - 1) * limit;
@@ -760,9 +906,21 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   // object-shaped query values out of the Mongo filter. The enum sets
   // match validators/order.validator.js getOrdersQuerySchema exactly.
   const { asEnum } = require("../utils/params");
-  const statusValue = asEnum(status, ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]);
+  const statusValue = asEnum(status, [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ]);
   if (statusValue) filter.orderStatus = statusValue;
-  const paymentStatusValue = asEnum(paymentStatus, ["pending", "paid", "failed", "refunded"]);
+  const paymentStatusValue = asEnum(paymentStatus, [
+    "pending",
+    "paid",
+    "failed",
+    "refunded",
+  ]);
   if (paymentStatusValue) filter.paymentStatus = paymentStatusValue;
   if (search) {
     // Literal substring search: the raw value must never reach Mongo's
@@ -782,7 +940,8 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   // nextCursor field and pages by keyset on (createdAt desc, _id desc)
   // instead of skip. Absent param = byte-identical legacy behavior.
   const cursorMode = req.query.cursor !== undefined;
-  const cursor = cursorMode && req.query.cursor ? decodeCursor(req.query.cursor) : null;
+  const cursor =
+    cursorMode && req.query.cursor ? decodeCursor(req.query.cursor) : null;
   const pageFilter = cursor
     ? { ...filter, $and: [...(filter.$and || []), cursorAfterFilter(cursor)] }
     : filter;
@@ -796,53 +955,58 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   const cachedStats = getCached(statsCacheKey);
   // Calculate stats for all orders matching the filter (not just paginated)
   // Revenue only counts orders that are paid and not cancelled/refunded
-  const statsPromise = cachedStats !== undefined ? Promise.resolve(cachedStats) : Order.aggregate([
-    { $match: filter },
-    {
-      $group: {
-        _id: null,
-        // Only count revenue for paid orders that are not cancelled or refunded
-        totalRevenue: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$paymentStatus", "paid"] },
-                  {
-                    $not: { $in: ["$orderStatus", ["cancelled", "refunded"]] },
-                  },
-                ],
+  const statsPromise =
+    cachedStats !== undefined
+      ? Promise.resolve(cachedStats)
+      : Order.aggregate([
+          { $match: filter },
+          {
+            $group: {
+              _id: null,
+              // Only count revenue for paid orders that are not cancelled or refunded
+              totalRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$paymentStatus", "paid"] },
+                        {
+                          $not: {
+                            $in: ["$orderStatus", ["cancelled", "refunded"]],
+                          },
+                        },
+                      ],
+                    },
+                    "$total",
+                    0,
+                  ],
+                },
               },
-              "$total",
-              0,
-            ],
-          },
-        },
-        totalOrders: { $sum: 1 },
-        // Pending revenue: orders with pending payment that aren't cancelled
-        pendingRevenue: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$paymentStatus", "pending"] },
-                  { $ne: ["$orderStatus", "cancelled"] },
-                ],
+              totalOrders: { $sum: 1 },
+              // Pending revenue: orders with pending payment that aren't cancelled
+              pendingRevenue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ["$paymentStatus", "pending"] },
+                        { $ne: ["$orderStatus", "cancelled"] },
+                      ],
+                    },
+                    "$total",
+                    0,
+                  ],
+                },
               },
-              "$total",
-              0,
-            ],
+              // Refunded amount
+              refundedAmount: {
+                $sum: {
+                  $cond: [{ $eq: ["$paymentStatus", "refunded"] }, "$total", 0],
+                },
+              },
+            },
           },
-        },
-        // Refunded amount
-        refundedAmount: {
-          $sum: {
-            $cond: [{ $eq: ["$paymentStatus", "refunded"] }, "$total", 0],
-          },
-        },
-      },
-    },
-  ]);
+        ]);
 
   const [statsAggregation, ordersPage, total] = await Promise.all([
     statsPromise,
@@ -874,7 +1038,10 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   if (cursorMode) {
     const hasMore = ordersPage.length > limit;
     orders = hasMore ? ordersPage.slice(0, limit) : ordersPage;
-    nextCursor = hasMore && orders.length > 0 ? encodeCursor(orders[orders.length - 1]) : null;
+    nextCursor =
+      hasMore && orders.length > 0
+        ? encodeCursor(orders[orders.length - 1])
+        : null;
   }
 
   res.status(200).json({
@@ -915,9 +1082,14 @@ exports.getOrderAdmin = catchAsync(async (req, res, next) => {
 
 exports.updateOrderStatus = catchAsync(async (req, res, next) => {
   const { status, note } = req.body;
-  const { order, previousStatus } = await transitionOrder({ _id: req.params.id }, status, note || `Status updated to ${status}`);
+  const { order, previousStatus } = await transitionOrder(
+    { _id: req.params.id },
+    status,
+    note || `Status updated to ${status}`,
+  );
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "order.status.update",
     targetType: "Order",
@@ -1000,28 +1172,48 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
 
   if (status !== "COMPLETE") {
     // An incomplete browser return cannot downgrade a captured payment.
-    return res.redirect(`${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_incomplete`);
+    return res.redirect(
+      `${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_incomplete`,
+    );
   }
-  if (typeof transaction_code !== "string" || !transaction_code.trim() || transaction_code.length > 200) {
-    return res.redirect(`${FRONTEND_URL_GET()}/checkout/payment-failed?error=invalid_transaction`);
+  if (
+    typeof transaction_code !== "string" ||
+    !transaction_code.trim() ||
+    transaction_code.length > 200
+  ) {
+    return res.redirect(
+      `${FRONTEND_URL_GET()}/checkout/payment-failed?error=invalid_transaction`,
+    );
   }
 
   try {
     await verifyEsewaPayment(responseData, order, esewaConfig());
   } catch (_error) {
-    return res.redirect(`${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_verification_failed`);
+    return res.redirect(
+      `${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_verification_failed`,
+    );
   }
 
   let capture;
   try {
-    capture = await captureEsewaPayment(order._id, esewaConfig().merchantId, responseData);
+    capture = await captureEsewaPayment(
+      order._id,
+      esewaConfig().merchantId,
+      responseData,
+    );
   } catch (_error) {
     // No nontransactional fallback: a replica set is required for capture.
-    console.error("eSewa capture could not be committed; reconciliation required");
-    return res.redirect(`${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_reconciliation_required`);
+    console.error(
+      "eSewa capture could not be committed; reconciliation required",
+    );
+    return res.redirect(
+      `${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_reconciliation_required`,
+    );
   }
   if (capture.outcome === "review_required") {
-    return res.redirect(`${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_reconciliation_required`);
+    return res.redirect(
+      `${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_reconciliation_required`,
+    );
   }
   // External effects only occur for the request which committed this capture.
   if (capture.applied) {
@@ -1037,7 +1229,8 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
         payload: { orderId: String(confirmedOrder._id) },
         dedupeKey: `order-confirmation:${confirmedOrder._id}`,
       });
-      if (r.status === "failed") console.error("eSewa confirmation email delivery failed");
+      if (r.status === "failed")
+        console.error("eSewa confirmation email delivery failed");
     } catch {
       console.error("eSewa confirmation email delivery failed");
     }
@@ -1049,9 +1242,10 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
   // customer's address should not ride in one unnecessarily. The
   // guest confirmation flow, which needs orderId + email, is
   // unchanged.
-  const emailParam = !order.user && order.guestInfo?.email
-    ? `&email=${encodeURIComponent(order.guestInfo.email)}`
-    : "";
+  const emailParam =
+    !order.user && order.guestInfo?.email
+      ? `&email=${encodeURIComponent(order.guestInfo.email)}`
+      : "";
   return res.redirect(
     `${FRONTEND_URL_GET()}/order-confirmation/${order.orderId}?emailSent=${capture.applied}${emailParam}`,
   );
@@ -1063,8 +1257,12 @@ exports.esewaFailure = (_req, res) => {
 };
 
 exports.cancelOrder = catchAsync(async (req, res, next) => {
-  const { order } = await transitionOrder({ _id: req.params.id, user: req.user._id }, "cancelled",
-    req.body.reason || "Cancelled by user", true);
+  const { order } = await transitionOrder(
+    { _id: req.params.id, user: req.user._id },
+    "cancelled",
+    req.body.reason || "Cancelled by user",
+    true,
+  );
 
   notificationEventEmitter.emit("order.cancelled", {
     orderId: order._id,
@@ -1099,15 +1297,14 @@ exports.requestReturn = catchAsync(async (req, res, next) => {
     return next(new AppError("Return reason is required", 400));
   }
 
-  let order = await Order.findOne({ _id: req.params.id, user: req.user._id }).populate(
-    "user",
-    "firstName lastName email",
-  );
+  let order = await Order.findOne({
+    _id: req.params.id,
+    user: req.user._id,
+  }).populate("user", "firstName lastName email");
 
   if (!order) {
     return next(new AppError("Order not found", 404));
   }
-
 
   if (order.orderStatus !== "delivered") {
     return next(
@@ -1165,7 +1362,10 @@ exports.requestReturn = catchAsync(async (req, res, next) => {
 
   if (!updatedOrder) {
     return next(
-      new AppError("This order changed while your request was being processed. Please try again.", 409),
+      new AppError(
+        "This order changed while your request was being processed. Please try again.",
+        409,
+      ),
     );
   }
   order = updatedOrder;
@@ -1242,7 +1442,8 @@ exports.processReturnRequest = catchAsync(async (req, res, next) => {
     update.$set.refundRequest = {
       status: "pending",
       requestedAt: new Date(),
-      reason: "Return approved; awaiting returned goods and refund reconciliation",
+      reason:
+        "Return approved; awaiting returned goods and refund reconciliation",
     };
   }
   const updatedOrder = await Order.findOneAndUpdate(
@@ -1274,31 +1475,74 @@ exports.processReturnRequest = catchAsync(async (req, res, next) => {
 
 // Admin reconciliation records settlement; it does not initiate a refund.
 exports.reconcileRefund = catchAsync(async (req, res, next) => {
-  const order = await Order.findOne({ _id: req.params.id, paymentStatus: "paid", "refundRequest.status": "pending" });
+  const order = await Order.findOne({
+    _id: req.params.id,
+    paymentStatus: "paid",
+    "refundRequest.status": "pending",
+  });
   if (!order) return next(new AppError("No pending paid refund found", 404));
   let reference;
   if (order.paymentMethod === "esewa") {
-    try { reference = await verifyEsewaRefund(order, esewaConfig()); }
-    catch (_error) { return next(new AppError("Full refund has not been verified by eSewa", 409)); }
+    try {
+      reference = await verifyEsewaRefund(order, esewaConfig());
+    } catch (_error) {
+      return next(
+        new AppError("Full refund has not been verified by eSewa", 409),
+      );
+    }
   } else {
     reference = req.body.reference;
-    if (req.body.settlementConfirmed !== true || typeof reference !== "string" || !reference.trim() || reference.length > 200) {
-      return next(new AppError("Confirm manual settlement and provide a refund reference", 400));
+    if (
+      req.body.settlementConfirmed !== true ||
+      typeof reference !== "string" ||
+      !reference.trim() ||
+      reference.length > 200
+    ) {
+      return next(
+        new AppError(
+          "Confirm manual settlement and provide a refund reference",
+          400,
+        ),
+      );
     }
   }
-  const settled = await Order.findOneAndUpdate({ _id: order._id, paymentStatus: "paid", "refundRequest.status": "pending" }, {
-    $set: { paymentStatus: "refunded", "refundRequest.status": "completed", "refundRequest.providerReference": reference,
-      "refundRequest.completedAt": new Date(), "refundRequest.processedBy": req.user._id },
-  }, { new: true, runValidators: true });
-  if (!settled) return next(new AppError("Refund state changed; reload the order", 409));
-  await auditLog.record({ // VULN-004 (never throws)
+  const settled = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      paymentStatus: "paid",
+      "refundRequest.status": "pending",
+    },
+    {
+      $set: {
+        paymentStatus: "refunded",
+        "refundRequest.status": "completed",
+        "refundRequest.providerReference": reference,
+        "refundRequest.completedAt": new Date(),
+        "refundRequest.processedBy": req.user._id,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!settled)
+    return next(new AppError("Refund state changed; reload the order", 409));
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "order.refund.reconcile",
     targetType: "Order",
     targetId: settled._id,
     before: { paymentStatus: "paid", refundStatus: "pending" },
-    after: { paymentStatus: settled.paymentStatus, refundStatus: settled.refundRequest?.status },
+    after: {
+      paymentStatus: settled.paymentStatus,
+      refundStatus: settled.refundRequest?.status,
+    },
     ip: req.ip,
   });
-  res.status(200).json({ success: true, message: "Refund settlement recorded", data: { order: settled } });
+  res
+    .status(200)
+    .json({
+      success: true,
+      message: "Refund settlement recorded",
+      data: { order: settled },
+    });
 });

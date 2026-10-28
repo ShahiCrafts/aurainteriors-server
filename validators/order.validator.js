@@ -15,7 +15,9 @@ const addressSchema = Joi.object({
 });
 
 exports.guestCheckoutSchema = Joi.object({
-  idempotencyKey: Joi.string().pattern(/^[a-zA-Z0-9_-]{16,128}$/).optional(),
+  idempotencyKey: Joi.string()
+    .pattern(/^[a-zA-Z0-9_-]{16,128}$/)
+    .optional(),
   email: Joi.string().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
@@ -51,7 +53,7 @@ exports.guestCheckoutSchema = Joi.object({
           size: Joi.string().allow(""),
           material: Joi.string().allow(""),
         }),
-      })
+      }),
     )
     .min(1)
     .required()
@@ -75,8 +77,34 @@ exports.guestCheckoutSchema = Joi.object({
 });
 
 exports.authenticatedCheckoutSchema = Joi.object({
-  selectedItemIds: Joi.array().items(Joi.string().pattern(/^[a-f0-9]{24}$/i)).min(1).max(100).unique(),
-  idempotencyKey: Joi.string().pattern(/^[a-zA-Z0-9_-]{16,128}$/).optional(),
+  selectedItemIds: Joi.array()
+    .items(Joi.string().pattern(/^[a-f0-9]{24}$/i))
+    .min(1)
+    .max(100)
+    .unique(),
+  // Buy Now (direct checkout): the order's lines travel with the
+  // request instead of being read from the cart — same item shape
+  // as guest checkout. When items is present it takes precedence
+  // over selectedItemIds and the cart is never read or cleared.
+  items: Joi.array()
+    .max(50)
+    .items(
+      Joi.object({
+        productId: Joi.string().required(),
+        quantity: Joi.number().integer().min(1).max(99).required(),
+        variantId: Joi.string().pattern(/^[a-f0-9]{24}$/i),
+        sku: Joi.string().trim().max(64).allow(""),
+        variant: Joi.object({
+          color: Joi.string().allow(""),
+          size: Joi.string().allow(""),
+          material: Joi.string().allow(""),
+        }),
+      }),
+    )
+    .min(1),
+  idempotencyKey: Joi.string()
+    .pattern(/^[a-zA-Z0-9_-]{16,128}$/)
+    .optional(),
   shippingAddressId: Joi.string(),
   shippingAddress: addressSchema,
   billingAddressId: Joi.string(),
@@ -108,7 +136,7 @@ exports.updateOrderStatusSchema = Joi.object({
       "processing",
       "shipped",
       "delivered",
-      "cancelled"
+      "cancelled",
     )
     .required()
     .messages({
@@ -125,7 +153,7 @@ exports.getOrdersQuerySchema = Joi.object({
     "processing",
     "shipped",
     "delivered",
-    "cancelled"
+    "cancelled",
   ),
   paymentStatus: Joi.string().valid("pending", "paid", "failed", "refunded"),
   search: Joi.string().trim().allow(""),
