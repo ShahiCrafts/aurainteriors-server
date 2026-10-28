@@ -21,7 +21,9 @@ function runProbe() {
       { timeout: 300000, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
-          reject(new Error(`probe failed: ${err.message}\n${stdout}\n${stderr}`));
+          reject(
+            new Error(`probe failed: ${err.message}\n${stdout}\n${stderr}`),
+          );
           return;
         }
         const results = {};
@@ -33,7 +35,7 @@ function runProbe() {
           }
         }
         resolve(results);
-      }
+      },
     );
   });
 }
@@ -49,17 +51,38 @@ function probeResults() {
 // ---------------------------------------------------------------------
 test("SR-P7-2: GET /products list items carry the variant card fields (all read paths)", async () => {
   const r = await probeResults();
-  assert.equal(r["p72-find"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
-  assert.equal(r["p72-effective-sort"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
-  assert.equal(r["p72-cursor"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
-  assert.equal(r["p72-legacy"], "hasVariants=false priceFrom=null variants=0 purchasable=false");
+  assert.equal(
+    r["p72-find"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
+  assert.equal(
+    r["p72-effective-sort"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
+  assert.equal(
+    r["p72-cursor"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
+  assert.equal(
+    r["p72-legacy"],
+    "hasVariants=false priceFrom=null variants=0 purchasable=false",
+  );
 });
 
 test("SR-P7-2: curated card feeds (featured / new-arrivals / related) carry the variant fields", async () => {
   const r = await probeResults();
-  assert.equal(r["p72-featured"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
-  assert.equal(r["p72-new-arrivals"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
-  assert.equal(r["p72-related"], "hasVariants=true priceFrom=450 variants=2 purchasable=true");
+  assert.equal(
+    r["p72-featured"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
+  assert.equal(
+    r["p72-new-arrivals"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
+  assert.equal(
+    r["p72-related"],
+    "hasVariants=true priceFrom=450 variants=2 purchasable=true",
+  );
 });
 
 test("battery: operator injection via the products query grammar is rejected or inert", async () => {
@@ -111,18 +134,31 @@ test("battery: registry list includeInactive honors admin only, over HTTP", asyn
 test("battery: catalog write routes reject anonymous and non-admin callers", async () => {
   const r = await probeResults();
   for (const key of [
-    "authz-post-types-anon", "authz-post-types-customer",
-    "authz-post-rooms-anon", "authz-post-rooms-customer",
-    "authz-post-collections-anon", "authz-post-collections-customer",
-    "authz-post-attributes-anon", "authz-post-attributes-customer",
-    "authz-delete-type-anon", "authz-delete-type-customer",
-    "authz-post-variant-anon", "authz-post-variant-customer",
+    "authz-post-types-anon",
+    "authz-post-types-customer",
+    "authz-post-rooms-anon",
+    "authz-post-rooms-customer",
+    "authz-post-collections-anon",
+    "authz-post-collections-customer",
+    "authz-post-attributes-anon",
+    "authz-post-attributes-customer",
+    "authz-delete-type-anon",
+    "authz-delete-type-customer",
+    "authz-post-variant-anon",
+    "authz-post-variant-customer",
     "authz-patch-variant-customer",
-    "authz-post-category-anon", "authz-post-category-customer",
-    "authz-reorder-anon", "authz-reorder-customer",
-    "authz-put-assignments-anon", "authz-put-assignments-customer",
+    "authz-post-category-anon",
+    "authz-post-category-customer",
+    "authz-reorder-anon",
+    "authz-reorder-customer",
+    "authz-put-assignments-anon",
+    "authz-put-assignments-customer",
   ]) {
-    assert.match(r[key], /^(401|403)$/, `${key} expected 401/403, got ${r[key]}`);
+    assert.match(
+      r[key],
+      /^(401|403)$/,
+      `${key} expected 401/403, got ${r[key]}`,
+    );
   }
   // Admin passes the gate (validation/controller answer, not 401/403).
   assert.equal(r["authz-post-types-admin"], "201");

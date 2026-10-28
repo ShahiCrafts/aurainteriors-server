@@ -25,12 +25,18 @@ const {
 } = require("../../validators/catalog.validator");
 
 const ok = (schema, value) => {
-  const { error, value: out } = schema.validate(value, { abortEarly: false, stripUnknown: true });
+  const { error, value: out } = schema.validate(value, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
   assert.equal(error, undefined, error && error.message);
   return out;
 };
 const bad = (schema, value) => {
-  const { error } = schema.validate(value, { abortEarly: false, stripUnknown: true });
+  const { error } = schema.validate(value, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
   assert.ok(error, `expected validation error for ${JSON.stringify(value)}`);
 };
 
@@ -42,8 +48,11 @@ test("validators: category create accepts productType + roomSlugs (array and JSO
   });
   assert.equal(out.productType, "sofa");
   assert.deepEqual(out.roomSlugs, ["living-room", "small-spaces"]);
-  const fromForm = ok(createCategorySchema, { name: "Sofas", roomSlugs: "[\"living-room\"]" });
-  assert.equal(fromForm.roomSlugs, "[\"living-room\"]"); // parsed by the controller
+  const fromForm = ok(createCategorySchema, {
+    name: "Sofas",
+    roomSlugs: '["living-room"]',
+  });
+  assert.equal(fromForm.roomSlugs, '["living-room"]'); // parsed by the controller
 });
 
 test("validators: category create rejects malformed productType and room slugs", () => {
@@ -74,7 +83,10 @@ test("validators: product create/update accept roomSlugs; query accepts room", (
     category: "64b64c64b64c64b64c64b64c",
     price: 100,
   };
-  const created = ok(createProductSchema, { ...base, roomSlugs: ["living-room"] });
+  const created = ok(createProductSchema, {
+    ...base,
+    roomSlugs: ["living-room"],
+  });
   assert.deepEqual(created.roomSlugs, ["living-room"]);
   bad(createProductSchema, { ...base, roomSlugs: ["Living Room"] });
   const updated = ok(updateProductSchema, { roomSlugs: [] });
@@ -84,7 +96,11 @@ test("validators: product create/update accept roomSlugs; query accepts room", (
 });
 
 test("validators: unknown keys are stripped, Phase 1 fields are not", () => {
-  const out = ok(createCategorySchema, { name: "Sofas", productType: "sofa", bogusField: 1 });
+  const out = ok(createCategorySchema, {
+    name: "Sofas",
+    productType: "sofa",
+    bogusField: 1,
+  });
   assert.equal(out.bogusField, undefined);
   assert.equal(out.productType, "sofa");
 });
@@ -105,7 +121,10 @@ test("validators: collection schema requires a rule for rule collections and pre
     slug: "oak-picks",
     label: "Oak Picks",
     kind: "rule",
-    rule: { type: "attribute-match", params: { key: "frameMaterial", value: "oak" } },
+    rule: {
+      type: "attribute-match",
+      params: { key: "frameMaterial", value: "oak" },
+    },
   });
   assert.deepEqual(rule.rule.params, { key: "frameMaterial", value: "oak" });
   bad(createCollectionSchema, {

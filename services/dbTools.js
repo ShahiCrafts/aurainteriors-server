@@ -9,18 +9,23 @@ const User = require("../models/user.model");
 // FA-13 / FA-32 (FRESH): guest order lookups disclose as little as possible
 // and fail indistinguishably. One shared error string; a per-key failure
 // throttle (5 failures per 15 minutes) blunts order-id/email grinding.
-const GUEST_LOOKUP_ERROR = "Order not found, or the email does not match this order.";
+const GUEST_LOOKUP_ERROR =
+  "Order not found, or the email does not match this order.";
 const guestLookupFailures = new Map();
 function guestLookupThrottled(key) {
   const entry = guestLookupFailures.get(key);
   if (!entry) return false;
-  if (Date.now() > entry.resetAt) { guestLookupFailures.delete(key); return false; }
+  if (Date.now() > entry.resetAt) {
+    guestLookupFailures.delete(key);
+    return false;
+  }
   return entry.count >= 5;
 }
 function noteGuestLookupFailure(key) {
   const now = Date.now();
   const entry = guestLookupFailures.get(key);
-  if (!entry || now > entry.resetAt) guestLookupFailures.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  if (!entry || now > entry.resetAt)
+    guestLookupFailures.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
   else entry.count += 1;
   if (guestLookupFailures.size > 10000) guestLookupFailures.clear();
 }
@@ -36,7 +41,12 @@ const ORDER_HISTORY_LIMIT = 20;
 // lightweight query stubs (tests) working unchanged.
 function applyMaxTime(query, opts) {
   const ms = opts && Number(opts.maxTimeMS);
-  if (Number.isFinite(ms) && ms > 0 && query && typeof query.maxTimeMS === "function") {
+  if (
+    Number.isFinite(ms) &&
+    ms > 0 &&
+    query &&
+    typeof query.maxTimeMS === "function"
+  ) {
     return query.maxTimeMS(Math.floor(ms));
   }
   return query;
@@ -52,9 +62,14 @@ class DbTools {
 
       if (categoryName) {
         const escapedCategory = escapeRegExp(categoryName);
-        const category = await applyMaxTime(Category.findOne({
-          name: { $regex: new RegExp(`^${escapedCategory}$`, "i") },
-        }), opts).select("_id").lean();
+        const category = await applyMaxTime(
+          Category.findOne({
+            name: { $regex: new RegExp(`^${escapedCategory}$`, "i") },
+          }),
+          opts,
+        )
+          .select("_id")
+          .lean();
         if (category) {
           dbQuery.category = category._id;
         }
@@ -96,7 +111,10 @@ class DbTools {
    */
   async getProductDetails({ sku, productId }, opts = {}) {
     try {
-      const dbQuery = { deletedAt: null, status: { $in: ["active", "out_of_stock"] } };
+      const dbQuery = {
+        deletedAt: null,
+        status: { $in: ["active", "out_of_stock"] },
+      };
       if (productId) dbQuery._id = productId;
       else if (sku) dbQuery.sku = sku.toUpperCase();
       else return { error: "Either sku or productId must be provided" };
@@ -136,12 +154,17 @@ class DbTools {
         const query = { user: userId };
         if (orderId) {
           // Specific order requested
-          const order = await applyMaxTime(Order.findOne({
-            $or: [
-              { orderId, user: userId },
-              ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId, user: userId }] : []),
-            ],
-          }), opts).lean();
+          const order = await applyMaxTime(
+            Order.findOne({
+              $or: [
+                { orderId, user: userId },
+                ...(mongoose.isValidObjectId(orderId)
+                  ? [{ _id: orderId, user: userId }]
+                  : []),
+              ],
+            }),
+            opts,
+          ).lean();
 
           if (!order) return { error: "Order not found for your account" };
           return this._formatOrder(order);
@@ -153,11 +176,13 @@ class DbTools {
           .limit(3)
           .lean();
 
-        if (orders.length === 0) return { error: "No orders found for your account" };
+        if (orders.length === 0)
+          return { error: "No orders found for your account" };
         if (orders.length === 1) return this._formatOrder(orders[0]);
 
         return {
-          message: "Here are your most recent orders. Please specify an order ID for more details.",
+          message:
+            "Here are your most recent orders. Please specify an order ID for more details.",
           orders: orders.map((o) => ({
             orderId: o.orderId,
             status: o.orderStatus,
@@ -170,7 +195,10 @@ class DbTools {
 
       // --- Guest path: require both orderId and email ---
       if (!orderId || !email) {
-        return { error: "Please provide your order ID and the email address used when placing the order to look up your order status." };
+        return {
+          error:
+            "Please provide your order ID and the email address used when placing the order to look up your order status.",
+        };
       }
 
       // FA-13: failed guest lookups are throttled per caller key so the
@@ -179,17 +207,30 @@ class DbTools {
         return { error: "Too many lookup attempts. Please try again later." };
       }
 
-      const order = await applyMaxTime(Order.findOne({
-        $or: [
-          { orderId },
-          ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
-        ],
-      }), opts).populate("user", "email").lean();
+      const order = await applyMaxTime(
+        Order.findOne({
+          $or: [
+            { orderId },
+            ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
+          ],
+        }),
+        opts,
+      )
+        .populate("user", "email")
+        .lean();
 
-      const orderEmail = order ? (order.isGuestOrder ? order.guestInfo?.email : order.user?.email) : null;
+      const orderEmail = order
+        ? order.isGuestOrder
+          ? order.guestInfo?.email
+          : order.user?.email
+        : null;
       // FA-32: ONE uniform error for "no such order" and "email mismatch" -
       // the two cases must be indistinguishable to the caller.
-      if (!order || !orderEmail || orderEmail.toLowerCase() !== String(email).toLowerCase()) {
+      if (
+        !order ||
+        !orderEmail ||
+        orderEmail.toLowerCase() !== String(email).toLowerCase()
+      ) {
         if (lookupKey) noteGuestLookupFailure(lookupKey);
         return { error: GUEST_LOOKUP_ERROR };
       }
@@ -217,9 +258,11 @@ class DbTools {
       const orders = await applyMaxTime(Order.find({ user: userId }), opts)
         .sort({ createdAt: -1 })
         .limit(ORDER_HISTORY_LIMIT)
-        .select("orderId orderStatus paymentMethod paymentStatus total shippingAddress items createdAt")
+        .select(
+          "orderId orderStatus paymentMethod paymentStatus total shippingAddress items createdAt",
+        )
         .lean();
-      return orders.map(o => this._formatOrder(o));
+      return orders.map((o) => this._formatOrder(o));
     } catch (error) {
       console.error("DbTools getOrderHistory error:", error.message);
       return [];
@@ -232,10 +275,16 @@ class DbTools {
   async getDefaultAddress({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const address = await applyMaxTime(Address.findOne({ user: userId, isDefault: true }), opts).lean();
+      const address = await applyMaxTime(
+        Address.findOne({ user: userId, isDefault: true }),
+        opts,
+      ).lean();
       if (address) return address;
 
-      const fallback = await applyMaxTime(Address.findOne({ user: userId }), opts).lean();
+      const fallback = await applyMaxTime(
+        Address.findOne({ user: userId }),
+        opts,
+      ).lean();
       return fallback || null;
     } catch (error) {
       console.error("DbTools getDefaultAddress error:", error.message);
@@ -249,7 +298,10 @@ class DbTools {
   async getSavedAddresses({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const addresses = await applyMaxTime(Address.find({ user: userId }), opts).lean();
+      const addresses = await applyMaxTime(
+        Address.find({ user: userId }),
+        opts,
+      ).lean();
       return addresses;
     } catch (error) {
       console.error("DbTools getSavedAddresses error:", error.message);
@@ -263,7 +315,9 @@ class DbTools {
   async getProfileInfo({ userId }, opts = {}) {
     try {
       if (!userId) return { error: "User context not available." };
-      const user = await applyMaxTime(User.findById(userId), opts).select("firstName lastName email role phone createdAt").lean();
+      const user = await applyMaxTime(User.findById(userId), opts)
+        .select("firstName lastName email role phone createdAt")
+        .lean();
       if (!user) return { error: "User profile not found" };
       return {
         fullName: `${user.firstName} ${user.lastName}`,

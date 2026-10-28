@@ -25,7 +25,9 @@ async function main() {
   await connectDatabase();
   registerAllHandlers();
   jobQueue.startWorker();
-  console.log(`[worker] job worker started (id=${jobQueue.workerId()}, types=${jobQueue.registeredTypes().join(", ") || "none"})`);
+  console.log(
+    `[worker] job worker started (id=${jobQueue.workerId()}, types=${jobQueue.registeredTypes().join(", ") || "none"})`,
+  );
 
   // AR-20 drain trigger (3 of 3): in outbox mode the dedicated worker
   // also drains the email outbox every 15 s.
@@ -33,7 +35,9 @@ async function main() {
   if (require("./config/appConfig").getString("EMAIL_MODE") === "outbox") {
     const { drainEmailOutbox } = require("./services/emailOutbox.service");
     emailDrainTimer = setInterval(() => {
-      drainEmailOutbox().catch((e) => console.error("[worker] email outbox drain failed:", e.message));
+      drainEmailOutbox().catch((e) =>
+        console.error("[worker] email outbox drain failed:", e.message),
+      );
     }, 15 * 1000);
     emailDrainTimer.unref?.();
   }
@@ -45,7 +49,11 @@ async function main() {
     console.log(`[worker] shutting down (${trigger})...`);
     if (emailDrainTimer) clearInterval(emailDrainTimer);
     jobQueue.stopWorker();
-    try { await mongoose.connection.close(); } catch { /* ignore */ }
+    try {
+      await mongoose.connection.close();
+    } catch {
+      /* ignore */
+    }
     process.exit(0);
   };
   process.on("SIGINT", () => shutdown("SIGINT"));

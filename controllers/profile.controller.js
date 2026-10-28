@@ -10,20 +10,36 @@ const { buildPreferenceUpdates } = require("../utils/preferenceUpdates");
 // global error handler, never raw internal error text.
 const sendServerError = (res, error, where) => {
   console.error(`[profile:${where}]`, error);
-  return res.status(500).json({ status: "error", message: "Something went wrong. Please try again." });
+  return res
+    .status(500)
+    .json({
+      status: "error",
+      message: "Something went wrong. Please try again.",
+    });
 };
 const sendClientError = (res, error, where) => {
   if (error?.name === "ValidationError") {
     const details = Object.values(error.errors || {}).map((e) => e.message);
-    return res.status(400).json({ status: "fail", message: `Invalid input data. ${details.join(". ")}` });
+    return res
+      .status(400)
+      .json({
+        status: "fail",
+        message: `Invalid input data. ${details.join(". ")}`,
+      });
   }
   if (error?.name === "CastError") {
-    return res.status(400).json({ status: "fail", message: `Invalid ${error.path}: ${error.value}` });
+    return res
+      .status(400)
+      .json({
+        status: "fail",
+        message: `Invalid ${error.path}: ${error.value}`,
+      });
   }
   console.error(`[profile:${where}]`, error);
-  return res.status(400).json({ status: "fail", message: "Invalid request data." });
+  return res
+    .status(400)
+    .json({ status: "fail", message: "Invalid request data." });
 };
-
 
 exports.getProfile = async (req, res) => {
   try {
@@ -88,13 +104,21 @@ exports.updateAvatar = async (req, res) => {
         avatar: req.file.cloudinaryUrl,
         avatarPublicId: req.file.cloudinaryPublicId,
       },
-      { new: true }
+      { new: true },
     );
 
     if (oldAvatarPublicId) {
       const result = await deleteFromCloudinary(oldAvatarPublicId);
       if (result === null) {
-        console.error(JSON.stringify({ level: "error", event: "asset_cleanup_pending", publicId: oldAvatarPublicId, resourceType: "image", context: "profile.updateAvatar" }));
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "asset_cleanup_pending",
+            publicId: oldAvatarPublicId,
+            resourceType: "image",
+            context: "profile.updateAvatar",
+          }),
+        );
       }
     }
 
@@ -119,13 +143,21 @@ exports.removeAvatar = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { avatar: null, avatarPublicId: null },
-      { new: true }
+      { new: true },
     );
 
     if (oldAvatarPublicId) {
       const result = await deleteFromCloudinary(oldAvatarPublicId);
       if (result === null) {
-        console.error(JSON.stringify({ level: "error", event: "asset_cleanup_pending", publicId: oldAvatarPublicId, resourceType: "image", context: "profile.removeAvatar" }));
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "asset_cleanup_pending",
+            publicId: oldAvatarPublicId,
+            resourceType: "image",
+            context: "profile.removeAvatar",
+          }),
+        );
       }
     }
 
@@ -149,7 +181,7 @@ exports.updatePreferences = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     res.status(200).json({
@@ -172,17 +204,34 @@ exports.deleteAccount = async (req, res) => {
     // last 10 minutes (obtaining one required a fresh email link).
     const user = await User.findById(req.user.id).select("+password");
     if (!user || user.deletedAt) {
-      return res.status(404).json({ status: "fail", message: "Account not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Account not found" });
     }
     if (user.password) {
-      const candidate = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+      const candidate =
+        typeof req.body?.currentPassword === "string"
+          ? req.body.currentPassword
+          : "";
       if (!candidate || !(await bcrypt.compare(candidate, user.password))) {
-        return res.status(400).json({ status: "fail", message: "Current password confirmation is required to delete your account" });
+        return res
+          .status(400)
+          .json({
+            status: "fail",
+            message:
+              "Current password confirmation is required to delete your account",
+          });
       }
     } else {
       const iat = Number(req.user.iat || 0);
       if (!iat || Date.now() - iat * 1000 > 10 * 60 * 1000) {
-        return res.status(403).json({ status: "fail", message: "Please sign in again (fresh authentication) before deleting your account" });
+        return res
+          .status(403)
+          .json({
+            status: "fail",
+            message:
+              "Please sign in again (fresh authentication) before deleting your account",
+          });
       }
     }
 
@@ -198,11 +247,18 @@ exports.deleteAccount = async (req, res) => {
       const decoded = require("jsonwebtoken").decode(currentToken);
       await RevokedToken.updateOne(
         { _id: authToken.hash(currentToken) },
-        { $setOnInsert: { expiresAt: new Date((decoded?.exp || Math.floor(Date.now() / 1000) + 3600) * 1000) } },
-        { upsert: true }
+        {
+          $setOnInsert: {
+            expiresAt: new Date(
+              (decoded?.exp || Math.floor(Date.now() / 1000) + 3600) * 1000,
+            ),
+          },
+        },
+        { upsert: true },
       );
     }
-    const isProd = (process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+    const isProd =
+      (process.env.NODE_ENV || "").trim().toLowerCase() === "production";
     res.cookie("jwt", "loggedout", {
       expires: new Date(Date.now() + 10 * 1000),
       httpOnly: true,

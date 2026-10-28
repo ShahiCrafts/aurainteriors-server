@@ -12,7 +12,12 @@ class CircuitBreaker {
   }
 
   state(k) {
-    const x = this.s.get(k) || { failures: 0, state: "closed", until: 0, probeInFlight: false };
+    const x = this.s.get(k) || {
+      failures: 0,
+      state: "closed",
+      until: 0,
+      probeInFlight: false,
+    };
     if (x.state === "open" && Date.now() >= x.until) {
       x.state = "half-open";
       x.probeInFlight = false;
@@ -34,7 +39,12 @@ class CircuitBreaker {
   }
 
   success(k) {
-    this.s.set(k, { failures: 0, state: "closed", until: 0, probeInFlight: false });
+    this.s.set(k, {
+      failures: 0,
+      state: "closed",
+      until: 0,
+      probeInFlight: false,
+    });
   }
 
   failure(k, { fatal = false, retryAfterMs = 0 } = {}) {

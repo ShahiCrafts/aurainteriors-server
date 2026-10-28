@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 
-
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -13,8 +12,6 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
     },
-
-
 
     firstName: {
       type: String,
@@ -90,7 +87,15 @@ const userSchema = new mongoose.Schema(
       preferredCategories: [
         {
           type: String,
-          enum: ["living_room", "bedroom", "dining", "office", "outdoor", "storage", "decor"],
+          enum: [
+            "living_room",
+            "bedroom",
+            "dining",
+            "office",
+            "outdoor",
+            "storage",
+            "decor",
+          ],
         },
       ],
     },
@@ -112,7 +117,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 userSchema.index({ role: 1 });
@@ -120,7 +125,8 @@ userSchema.index({ phone: 1 });
 userSchema.index({ createdAt: -1 });
 
 userSchema.virtual("fullName").get(function () {
-  if (this.firstName && this.lastName) return `${this.firstName} ${this.lastName}`;
+  if (this.firstName && this.lastName)
+    return `${this.firstName} ${this.lastName}`;
   return this.firstName || null;
 });
 
@@ -131,7 +137,10 @@ userSchema.pre("save", async function () {
 });
 
 // Compare password
-userSchema.methods.comparePassword = async function (candidatePassword, userPassword) {
+userSchema.methods.comparePassword = async function (
+  candidatePassword,
+  userPassword,
+) {
   return await bcrypt.compare(candidatePassword, userPassword);
 };
 
@@ -147,12 +156,13 @@ userSchema.methods.createOtp = function () {
 
 userSchema.methods.createMagicLinkToken = function () {
   const rawToken = crypto.randomBytes(32).toString("hex");
-  this.magicLinkToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+  this.magicLinkToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
   this.magicLinkExpires = Date.now() + 15 * 60 * 1000;
   return rawToken;
 };
-
-
 
 userSchema.methods.updateLoginActivity = async function () {
   const now = new Date();
@@ -174,7 +184,7 @@ userSchema.methods.updateLoginActivity = async function () {
   // simply await this).
   await this.constructor.updateOne(
     { _id: this._id },
-    { $set: { lastLogin: now }, $inc: { loginCount: 1 } }
+    { $set: { lastLogin: now }, $inc: { loginCount: 1 } },
   );
   this._doc.lastLogin = now;
   this._doc.loginCount = (this.loginCount || 0) + 1;

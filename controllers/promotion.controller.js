@@ -59,10 +59,11 @@ exports.createPromotion = catchAsync(async (req, res, next) => {
       tags,
       expiresAt,
     },
-    req.user._id
+    req.user._id,
   );
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "promotion.create",
     targetType: "Promotion",
@@ -81,10 +82,11 @@ exports.createPromotion = catchAsync(async (req, res, next) => {
 exports.updatePromotion = catchAsync(async (req, res, next) => {
   const promotion = await PromotionService.updatePromotion(
     req.params.id,
-    req.body
+    req.body,
   );
 
-  await auditLog.record({ // VULN-004 (never throws; after-state only — this handler does not load the prior state)
+  await auditLog.record({
+    // VULN-004 (never throws; after-state only — this handler does not load the prior state)
     actor: req.user?._id,
     action: "promotion.update",
     targetType: "Promotion",
@@ -129,7 +131,7 @@ exports.schedulePromotion = catchAsync(async (req, res, next) => {
 
   const promotion = await PromotionService.schedulePromotion(
     req.params.id,
-    new Date(scheduledAt)
+    new Date(scheduledAt),
   );
 
   res.status(200).json({
@@ -152,7 +154,8 @@ exports.cancelPromotion = catchAsync(async (req, res, next) => {
 exports.deletePromotion = catchAsync(async (req, res, next) => {
   await PromotionService.deletePromotion(req.params.id);
 
-  await auditLog.record({ // VULN-004 (never throws)
+  await auditLog.record({
+    // VULN-004 (never throws)
     actor: req.user?._id,
     action: "promotion.delete",
     targetType: "Promotion",
@@ -187,8 +190,8 @@ exports.trackEngagement = catchAsync(async (req, res, next) => {
     return next(
       new AppError(
         `Invalid action. Must be one of: ${validActions.join(", ")}`,
-        400
-      )
+        400,
+      ),
     );
   }
 

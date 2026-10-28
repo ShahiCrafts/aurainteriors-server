@@ -59,7 +59,11 @@ test("AR-33: no global.io / global.notification* / global.keepAliveService refer
       }
     }
   }
-  assert.deepEqual(offenders, [], `mutable-global service wiring remains:\n${offenders.join("\n")}`);
+  assert.deepEqual(
+    offenders,
+    [],
+    `mutable-global service wiring remains:\n${offenders.join("\n")}`,
+  );
 });
 
 test("AR-33: services/runtimeContext.js is the only sanctioned holder (requires nothing)", () => {
@@ -71,7 +75,14 @@ test("AR-33: services/runtimeContext.js is the only sanctioned holder (requires 
     !/^const .* = require\(/m.test(src),
     "runtimeContext must require nothing (no circular-dependency risk)",
   );
-  for (const name of ["setNotificationGateway", "getNotificationGateway", "getIo", "setKeepAliveService", "getKeepAliveService", "reset"]) {
+  for (const name of [
+    "setNotificationGateway",
+    "getNotificationGateway",
+    "getIo",
+    "setKeepAliveService",
+    "getKeepAliveService",
+    "reset",
+  ]) {
     assert.ok(src.includes(name), `runtimeContext must export ${name}`);
   }
 });

@@ -22,16 +22,25 @@ test("CQ-E: split/nested payloads leave no tag structure in excerpts", () => {
   ];
   for (const payload of cases) {
     const out = extractExcerpt({ description: payload });
-    assert.ok(!TAG_LIKE.test(out), `no tag structure may survive: ${JSON.stringify(payload)} -> ${JSON.stringify(out)}`);
-    assert.ok(!out.includes("onerror"), "event-handler attributes must not survive");
+    assert.ok(
+      !TAG_LIKE.test(out),
+      `no tag structure may survive: ${JSON.stringify(payload)} -> ${JSON.stringify(out)}`,
+    );
+    assert.ok(
+      !out.includes("onerror"),
+      "event-handler attributes must not survive",
+    );
   }
 });
 
 test("CQ-E: ordinary feed text produces the same excerpt as before (characterization)", () => {
   const out = extractExcerpt({
-    description: "<p>Tom &amp; Jerry&#39;s <b>big</b> adventure&nbsp;awaits</p>",
+    description:
+      "<p>Tom &amp; Jerry&#39;s <b>big</b> adventure&nbsp;awaits</p>",
   });
   assert.equal(out, "Tom & Jerry's big adventure awaits");
-  const plain = extractExcerpt({ contentSnippet: "Just plain text, no markup at all." });
+  const plain = extractExcerpt({
+    contentSnippet: "Just plain text, no markup at all.",
+  });
   assert.equal(plain, "Just plain text, no markup at all.");
 });

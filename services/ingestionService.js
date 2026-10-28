@@ -15,7 +15,8 @@ class IngestionService {
   }
 
   qdrantClient() {
-    if (!this.qdrant) this.qdrant = require("../config/appConfig").createQdrantClient();
+    if (!this.qdrant)
+      this.qdrant = require("../config/appConfig").createQdrantClient();
     return this.qdrant;
   }
 
@@ -51,7 +52,7 @@ class IngestionService {
 
     while (start < cleanedText.length) {
       let end = start + chunkSize;
-      
+
       // If we are not at the end of the text, try to find a sentence boundary or word boundary
       if (end < cleanedText.length) {
         // Try sentence boundary (period, question mark, exclamation mark followed by space)
@@ -90,14 +91,22 @@ class IngestionService {
    * Call embedding API to generate vector
    */
   async getEmbedding(text, inputType = "passage") {
-    const apiKey = process.env.NVIDIA_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey =
+      process.env.NVIDIA_API_KEY ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing API Key for embedding model in environment variables.");
+      throw new Error(
+        "Missing API Key for embedding model in environment variables.",
+      );
     }
 
     // Default to Nvidia NIM Embedding Model
-    const url = process.env.EMBEDDING_API_URL || "https://integrate.api.nvidia.com/v1/embeddings";
-    const model = process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
+    const url =
+      process.env.EMBEDDING_API_URL ||
+      "https://integrate.api.nvidia.com/v1/embeddings";
+    const model =
+      process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
 
     try {
       const response = await fetch(url, {
@@ -105,7 +114,7 @@ class IngestionService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           input: [text],
@@ -117,7 +126,9 @@ class IngestionService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Embedding model responded with status ${response.status}: ${errorText}`);
+        throw new Error(
+          `Embedding model responded with status ${response.status}: ${errorText}`,
+        );
       }
 
       const result = await response.json();
@@ -138,7 +149,9 @@ class IngestionService {
   async initCollection() {
     try {
       const collections = await this.qdrantClient().getCollections();
-      const exists = collections.collections.some((c) => c.name === this.collectionName);
+      const exists = collections.collections.some(
+        (c) => c.name === this.collectionName,
+      );
 
       if (!exists) {
         await this.qdrantClient().createCollection(this.collectionName, {
@@ -147,7 +160,9 @@ class IngestionService {
             distance: "Cosine",
           },
         });
-        console.log(`✓ Collection ${this.collectionName} created in Qdrant Vector Store`);
+        console.log(
+          `✓ Collection ${this.collectionName} created in Qdrant Vector Store`,
+        );
       }
     } catch (error) {
       console.error("Qdrant collection initialization failed:", error.message);
@@ -173,7 +188,8 @@ class IngestionService {
       // Generate time-limited secure private download URL from Cloudinary
       let downloadUrl = doc.fileUrl;
       const headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       };
 
       if (doc.filePublicId) {
@@ -181,16 +197,25 @@ class IngestionService {
           const cloudinary = require("cloudinary").v2;
           const { getCloudinaryConfig } = require("../config/cloudinary");
           getCloudinaryConfig(); // Ensure config initialized
-          
-          downloadUrl = cloudinary.utils.private_download_url(doc.filePublicId, doc.fileType, {
-            resource_type: "raw",
-            type: "authenticated",
-            expires_at: Math.floor(Date.now() / 1000) + 3600, // Valid for 1 hour
-          });
+
+          downloadUrl = cloudinary.utils.private_download_url(
+            doc.filePublicId,
+            doc.fileType,
+            {
+              resource_type: "raw",
+              type: "authenticated",
+              expires_at: Math.floor(Date.now() / 1000) + 3600, // Valid for 1 hour
+            },
+          );
           // Never log the URL itself: it is a signed credential (B-10).
-          console.log(`[INGESTION] Generated secure download URL for document ${doc._id}`);
+          console.log(
+            `[INGESTION] Generated secure download URL for document ${doc._id}`,
+          );
         } catch (signError) {
-          console.warn("[INGESTION] Cloudinary private URL signing failed. Falling back:", signError.message);
+          console.warn(
+            "[INGESTION] Cloudinary private URL signing failed. Falling back:",
+            signError.message,
+          );
         }
       }
 
@@ -201,12 +226,20 @@ class IngestionService {
       // the whole response before checking its size).
       const parsedFetchUrl = new URL(downloadUrl);
       if (parsedFetchUrl.protocol !== "https:") {
-        throw new Error(`Refusing to fetch document from a non-https URL for document ${doc._id}`);
+        throw new Error(
+          `Refusing to fetch document from a non-https URL for document ${doc._id}`,
+        );
       }
       const { guardedFetch } = require("../utils/guardedFetch");
-      const response = await guardedFetch(downloadUrl, { headers, timeoutMs: 15000, maxBytes: 25 * 1024 * 1024 });
+      const response = await guardedFetch(downloadUrl, {
+        headers,
+        timeoutMs: 15000,
+        maxBytes: 25 * 1024 * 1024,
+      });
       if (!response.ok) {
-        throw new Error(`Failed to fetch file for document ${doc._id}: HTTP ${response.status}`);
+        throw new Error(
+          `Failed to fetch file for document ${doc._id}: HTTP ${response.status}`,
+        );
       }
       const buffer = await response.buffer();
 
@@ -218,7 +251,9 @@ class IngestionService {
       console.log(`Segmented ${doc.fileName} into ${chunks.length} chunks`);
 
       if (chunks.length === 0) {
-        throw new Error("No text content could be extracted from this document.");
+        throw new Error(
+          "No text content could be extracted from this document.",
+        );
       }
 
       // AR-05: optional per-job chunk cap (INGEST_MAX_CHUNKS_PER_JOB,
@@ -226,9 +261,13 @@ class IngestionService {
       // acceptance exactly). Checked before any embedding/Qdrant
       // work; the catch below marks the document "failed".
       const maxChunks = Number(process.env.INGEST_MAX_CHUNKS_PER_JOB);
-      if (Number.isInteger(maxChunks) && maxChunks > 0 && chunks.length > maxChunks) {
+      if (
+        Number.isInteger(maxChunks) &&
+        maxChunks > 0 &&
+        chunks.length > maxChunks
+      ) {
         throw new Error(
-          `Document produced ${chunks.length} chunks, exceeding INGEST_MAX_CHUNKS_PER_JOB=${maxChunks}`
+          `Document produced ${chunks.length} chunks, exceeding INGEST_MAX_CHUNKS_PER_JOB=${maxChunks}`,
         );
       }
 
@@ -254,7 +293,7 @@ class IngestionService {
           .createHash("md5")
           .update(`${doc._id.toString()}_chunk_${i}`)
           .digest("hex");
-        
+
         // Add hyphen boundaries to fit standard UUID format (32 hex characters split as 8-4-4-4-12)
         const uuid = `${pointId.slice(0, 8)}-${pointId.slice(8, 12)}-${pointId.slice(12, 16)}-${pointId.slice(16, 20)}-${pointId.slice(20)}`;
 
@@ -314,7 +353,10 @@ class IngestionService {
       console.log(`✓ Document ${doc.fileName} ingested successfully!`);
       return { success: true, chunksCount: chunks.length };
     } catch (error) {
-      console.error(`✗ Ingestion failed for document ${doc.fileName}:`, error.message);
+      console.error(
+        `✗ Ingestion failed for document ${doc.fileName}:`,
+        error.message,
+      );
       doc.status = "failed";
       doc.error = error.message;
       await doc.save();

@@ -19,7 +19,11 @@ const HASHED = crypto.createHash("sha256").update(RAW_TOKEN).digest("hex");
 // read-modify-write gap the bug lived in.
 let store;
 function freshStore() {
-  return { magicLinkToken: HASHED, magicLinkExpires: Date.now() + 60_000, claimed: false };
+  return {
+    magicLinkToken: HASHED,
+    magicLinkExpires: Date.now() + 60_000,
+    claimed: false,
+  };
 }
 function makeDoc() {
   return {
@@ -37,9 +41,12 @@ function makeDoc() {
   };
 }
 stubModule("models/user.model.js", {
-  findOne: (filter) => makeQuery(
-    store.magicLinkToken === filter.magicLinkToken && !store.claimed ? makeDoc() : null,
-  ),
+  findOne: (filter) =>
+    makeQuery(
+      store.magicLinkToken === filter.magicLinkToken && !store.claimed
+        ? makeDoc()
+        : null,
+    ),
   findOneAndUpdate: (filter, update) => {
     // Atomic: decide and mutate in one synchronous step.
     if (store.magicLinkToken !== filter.magicLinkToken || store.claimed) {
@@ -53,16 +60,29 @@ stubModule("models/user.model.js", {
     return makeQuery(doc);
   },
 });
-stubModule("services/email.service.js", { sendMagicLinkEmail: async () => true });
+stubModule("services/email.service.js", {
+  sendMagicLinkEmail: async () => true,
+});
 
 const controller = require("../../controllers/auth.controller");
 
 function mockRes() {
   return {
-    statusCode: undefined, body: undefined, cookies: {},
-    cookie(name, value, options) { this.cookies[name] = { value, options }; return this; },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.body = payload; return this; },
+    statusCode: undefined,
+    body: undefined,
+    cookies: {},
+    cookie(name, value, options) {
+      this.cookies[name] = { value, options };
+      return this;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
   };
 }
 async function verify(token) {
@@ -76,7 +96,11 @@ test("A-06: two concurrent redemptions of one token yield exactly one session", 
   const [r1, r2] = await Promise.all([verify(RAW_TOKEN), verify(RAW_TOKEN)]);
   const successes = [r1, r2].filter((r) => r.statusCode === 200);
   const failures = [r1, r2].filter((r) => r.statusCode === 400);
-  assert.equal(successes.length, 1, `expected exactly one 200, got statuses ${r1.statusCode}/${r2.statusCode}`);
+  assert.equal(
+    successes.length,
+    1,
+    `expected exactly one 200, got statuses ${r1.statusCode}/${r2.statusCode}`,
+  );
   assert.equal(failures.length, 1);
 });
 

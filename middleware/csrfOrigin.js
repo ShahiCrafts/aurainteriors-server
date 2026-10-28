@@ -19,7 +19,11 @@ const EXEMPT_PREFIXES = [];
 
 function originOf(value) {
   if (typeof value !== "string" || !value) return null;
-  try { return new URL(value).origin; } catch { return null; }
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
 }
 
 function createOriginCheck(allowedOrigins) {
@@ -28,10 +32,17 @@ function createOriginCheck(allowedOrigins) {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
     const cookieHeader = req.headers.cookie || "";
     if (!/(?:^|;\s*)jwt=/.test(cookieHeader)) return next();
-    if (EXEMPT_PREFIXES.some((prefix) => req.path?.startsWith(prefix))) return next();
-    const origin = originOf(req.headers.origin) || originOf(req.headers.referer);
+    if (EXEMPT_PREFIXES.some((prefix) => req.path?.startsWith(prefix)))
+      return next();
+    const origin =
+      originOf(req.headers.origin) || originOf(req.headers.referer);
     if (!origin || !allowed.has(origin)) {
-      return res.status(403).json({ status: "fail", message: "Trusted origin required for cookie authentication." });
+      return res
+        .status(403)
+        .json({
+          status: "fail",
+          message: "Trusted origin required for cookie authentication.",
+        });
     }
     return next();
   };

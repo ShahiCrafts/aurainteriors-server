@@ -1,4 +1,7 @@
-const { adminReadLimiter, adminWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  adminReadLimiter,
+  adminWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router();
 router.use(adminReadLimiter);

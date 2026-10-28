@@ -28,7 +28,10 @@ let ingestActive = 0;
 const ingestWaiters = [];
 async function acquireIngestSlot() {
   const cap = envInt("INGEST_CONCURRENCY", 2);
-  if (ingestActive < cap) { ingestActive += 1; return; }
+  if (ingestActive < cap) {
+    ingestActive += 1;
+    return;
+  }
   await new Promise((resolve) => ingestWaiters.push(resolve));
   ingestActive += 1;
 }
@@ -42,14 +45,16 @@ async function enqueueIngestion(documentId) {
   const Document = require("../models/document.model");
   const doc = await Document.findById(documentId);
   if (!doc) {
-    console.log(`[INGESTION] enqueue skipped: document ${documentId} not found`);
+    console.log(
+      `[INGESTION] enqueue skipped: document ${documentId} not found`,
+    );
     return null;
   }
   const jobQueue = require("./jobQueue.service");
   return jobQueue.enqueue(
     "ingest-document",
     { documentId: String(doc._id) },
-    { idempotencyKey: `ingest:${doc._id}:${doc.updatedAt.toISOString()}` }
+    { idempotencyKey: `ingest:${doc._id}:${doc.updatedAt.toISOString()}` },
   );
 }
 
@@ -73,7 +78,9 @@ async function runIngestionRecoverySweep() {
   const stale = await Document.find({
     status: "processing",
     updatedAt: { $lt: cutoff },
-  }).select("_id ingestRecoveries").lean();
+  })
+    .select("_id ingestRecoveries")
+    .lean();
   let requeued = 0;
   let failed = 0;
   for (const doc of stale) {
@@ -84,24 +91,37 @@ async function runIngestionRecoverySweep() {
         const claimed = await Document.findOneAndUpdate(
           { _id: doc._id, status: "processing", updatedAt: { $lt: cutoff } },
           { $set: { status: "pending" }, $inc: { ingestRecoveries: 1 } },
-          { new: true }
+          { new: true },
         );
         if (!claimed) continue;
         await enqueueIngestion(doc._id);
         requeued += 1;
-        console.log(`[INGESTION] Recovery sweep re-queued stalled document ${doc._id} (recovery ${claimed.ingestRecoveries}/${maxRecoveries})`);
+        console.log(
+          `[INGESTION] Recovery sweep re-queued stalled document ${doc._id} (recovery ${claimed.ingestRecoveries}/${maxRecoveries})`,
+        );
       } else {
         const claimed = await Document.findOneAndUpdate(
           { _id: doc._id, status: "processing", updatedAt: { $lt: cutoff } },
-          { $set: { status: "failed", error: "Ingestion stalled repeatedly - marked failed by the recovery sweep" } },
-          { new: true }
+          {
+            $set: {
+              status: "failed",
+              error:
+                "Ingestion stalled repeatedly - marked failed by the recovery sweep",
+            },
+          },
+          { new: true },
         );
         if (!claimed) continue;
         failed += 1;
-        console.log(`[INGESTION] Recovery sweep marked document ${doc._id} failed after ${maxRecoveries} stalled recoveries`);
+        console.log(
+          `[INGESTION] Recovery sweep marked document ${doc._id} failed after ${maxRecoveries} stalled recoveries`,
+        );
       }
     } catch (error) {
-      console.error(`[INGESTION] Recovery sweep failed for document ${doc._id}:`, error.message);
+      console.error(
+        `[INGESTION] Recovery sweep failed for document ${doc._id}:`,
+        error.message,
+      );
     }
   }
   return { requeued, failed };

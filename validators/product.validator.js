@@ -2,21 +2,40 @@ const Joi = require("joi");
 
 const objectId = Joi.string().regex(/^[0-9a-fA-F]{24}$/, "valid ObjectId");
 
-const modelUrlsSchema = Joi.array().items(Joi.object({
-  url: Joi.string().uri({ scheme: ["http", "https"] }).max(2048).required(),
-  format: Joi.string().valid("glb", "gltf", "usdz").required(),
-  platform: Joi.string().valid("android", "ios", "universal"),
-})).max(20);
-const removeModelsSchema = Joi.array().items(Joi.string().uri({ scheme: ["http", "https"] }).max(2048)).max(100).unique();
-const jsonArray = schema => Joi.any().custom((value, helpers) => {
-  let parsed = value;
-  if (typeof value === "string") {
-    try { parsed = JSON.parse(value); } catch { return helpers.error("any.invalid"); }
-  }
-  const result = schema.validate(parsed, { abortEarly: false });
-  if (result.error) return helpers.error("any.invalid");
-  return result.value;
-});
+const modelUrlsSchema = Joi.array()
+  .items(
+    Joi.object({
+      url: Joi.string()
+        .uri({ scheme: ["http", "https"] })
+        .max(2048)
+        .required(),
+      format: Joi.string().valid("glb", "gltf", "usdz").required(),
+      platform: Joi.string().valid("android", "ios", "universal"),
+    }),
+  )
+  .max(20);
+const removeModelsSchema = Joi.array()
+  .items(
+    Joi.string()
+      .uri({ scheme: ["http", "https"] })
+      .max(2048),
+  )
+  .max(100)
+  .unique();
+const jsonArray = (schema) =>
+  Joi.any().custom((value, helpers) => {
+    let parsed = value;
+    if (typeof value === "string") {
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        return helpers.error("any.invalid");
+      }
+    }
+    const result = schema.validate(parsed, { abortEarly: false });
+    if (result.error) return helpers.error("any.invalid");
+    return result.value;
+  });
 
 // Phase 1 (catalog): room assignment. Slugs are validated against
 // the Room registry in the controller (a Joi schema cannot see the
@@ -29,10 +48,10 @@ const roomSlugsSchema = Joi.alternatives().try(
         .trim()
         .lowercase()
         .pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-        .max(60)
+        .max(60),
     )
     .max(20),
-  Joi.string()
+  Joi.string(),
 );
 
 // Phase 2 (catalog): catalogAttributes pass through as an object
@@ -43,14 +62,18 @@ const roomSlugsSchema = Joi.alternatives().try(
 // the offending key; a Joi schema cannot see the registry.
 const catalogAttributesSchema = Joi.alternatives().try(
   Joi.object().unknown(true),
-  Joi.string()
+  Joi.string(),
 );
 
 // Phase 3 (catalog): Product.productType — a key in the ProductType
 // registry. Shape pinned here (lowercased like the model's field);
 // registry membership is validated in the controller (a Joi schema
 // cannot see the database). ""/null clears the assignment.
-const productTypeSchema = Joi.string().trim().lowercase().max(60).allow("", null);
+const productTypeSchema = Joi.string()
+  .trim()
+  .lowercase()
+  .max(60)
+  .allow("", null);
 
 // Phase 3 (catalog): variantOptionKeys — the attribute keys that
 // define a product's variants. Keys are CASE-SENSITIVE (Phase 2
@@ -60,7 +83,7 @@ const productTypeSchema = Joi.string().trim().lowercase().max(60).allow("", null
 // array (multipart form-data) is accepted here.
 const variantOptionKeysSchema = Joi.alternatives().try(
   Joi.array().items(Joi.string().trim().min(1).max(60)).max(20),
-  Joi.string()
+  Joi.string(),
 );
 
 const dimensionsSchema = Joi.object({
@@ -131,11 +154,11 @@ exports.createProductSchema = Joi.object({
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim()),
-    Joi.string()
+    Joi.string(),
   ),
   materials: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim()),
-    Joi.string()
+    Joi.string(),
   ),
   style: Joi.string()
     .valid(
@@ -146,7 +169,7 @@ exports.createProductSchema = Joi.object({
       "cozy",
       "industrial",
       "scandinavian",
-      "bohemian"
+      "bohemian",
     )
     .allow("")
     .messages({
@@ -166,7 +189,7 @@ exports.createProductSchema = Joi.object({
   }),
   tags: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim().lowercase()),
-    Joi.string() // Allow JSON string from form-data
+    Joi.string(), // Allow JSON string from form-data
   ),
 });
 
@@ -214,11 +237,11 @@ exports.updateProductSchema = Joi.object({
   weight: Joi.alternatives().try(weightSchema, Joi.string()),
   colors: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim()),
-    Joi.string()
+    Joi.string(),
   ),
   materials: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim()),
-    Joi.string()
+    Joi.string(),
   ),
   style: Joi.string()
     .valid(
@@ -229,7 +252,7 @@ exports.updateProductSchema = Joi.object({
       "cozy",
       "industrial",
       "scandinavian",
-      "bohemian"
+      "bohemian",
     )
     .allow("", null)
     .messages({
@@ -237,11 +260,11 @@ exports.updateProductSchema = Joi.object({
     }),
   isFeatured: Joi.alternatives().try(
     Joi.boolean(),
-    Joi.string().valid("true", "false")
+    Joi.string().valid("true", "false"),
   ),
   isNewArrival: Joi.alternatives().try(
     Joi.boolean(),
-    Joi.string().valid("true", "false")
+    Joi.string().valid("true", "false"),
   ),
   metaTitle: Joi.string().trim().max(100).allow("").messages({
     "string.max": "Meta title cannot exceed 100 characters",
@@ -251,12 +274,12 @@ exports.updateProductSchema = Joi.object({
   }),
   tags: Joi.alternatives().try(
     Joi.array().items(Joi.string().trim().lowercase()),
-    Joi.string()
+    Joi.string(),
   ),
   removeModelFiles: jsonArray(removeModelsSchema),
   removeImages: Joi.alternatives().try(
     Joi.array().items(Joi.string()),
-    Joi.string()
+    Joi.string(),
   ),
 });
 
@@ -328,7 +351,7 @@ const variantSkuSchema = Joi.string()
 
 const variantOptionsSchema = Joi.alternatives().try(
   Joi.object().unknown(true),
-  Joi.string()
+  Joi.string(),
 );
 
 const variantWeightSchema = Joi.object({

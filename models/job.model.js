@@ -28,7 +28,7 @@ const jobSchema = new mongoose.Schema(
     lastError: { type: String, default: null },
     completedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // New collection (created empty by definition), so schema-declared
@@ -37,7 +37,10 @@ const jobSchema = new mongoose.Schema(
 // lock on legacy data.
 jobSchema.index(
   { idempotencyKey: 1 },
-  { unique: true, partialFilterExpression: { idempotencyKey: { $type: "string" } } }
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: "string" } },
+  },
 );
 jobSchema.index({ status: 1, runAt: 1 });
 jobSchema.index({ type: 1, status: 1, runAt: 1 });

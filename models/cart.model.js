@@ -11,7 +11,10 @@ const cartItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 1,
-      validate: { validator: Number.isSafeInteger, message: "Quantity must be a safe integer" },
+      validate: {
+        validator: Number.isSafeInteger,
+        message: "Quantity must be a safe integer",
+      },
       default: 1,
     },
     variant: {
@@ -34,7 +37,7 @@ const cartItemSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const cartSchema = new mongoose.Schema(
@@ -49,7 +52,7 @@ const cartSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 cartSchema.virtual("totalItems").get(function () {
@@ -61,20 +64,28 @@ cartSchema.methods.addItem = async function (
   quantity = 1,
   variant = {},
   variantId = null,
-  sku = undefined
+  sku = undefined,
 ) {
-  if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error("Quantity must be a positive integer");
+  if (!Number.isSafeInteger(quantity) || quantity < 1)
+    throw new Error("Quantity must be a positive integer");
   const existingItem = this.items.find(
     (item) =>
       item.product.toString() === productId.toString() &&
       String(item.variantId || "") === String(variantId || "") &&
-      ["color", "size", "material"].every(key => (item.variant?.[key] || "") === (variant?.[key] || ""))
+      ["color", "size", "material"].every(
+        (key) => (item.variant?.[key] || "") === (variant?.[key] || ""),
+      ),
   );
 
   if (existingItem) {
     existingItem.quantity += quantity;
   } else {
-    this.items.push({ product: productId, quantity, variant, ...(variantId ? { variantId, sku } : {}) });
+    this.items.push({
+      product: productId,
+      quantity,
+      variant,
+      ...(variantId ? { variantId, sku } : {}),
+    });
   }
 
   return this.save();
@@ -82,7 +93,7 @@ cartSchema.methods.addItem = async function (
 
 cartSchema.methods.removeItem = async function (itemId) {
   this.items = this.items.filter(
-    (item) => item._id.toString() !== itemId.toString()
+    (item) => item._id.toString() !== itemId.toString(),
   );
   return this.save();
 };

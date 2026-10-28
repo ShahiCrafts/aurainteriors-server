@@ -29,11 +29,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   process.env.JOB_BACKOFF_BASE_MS = "100"; // keep the probe fast
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "job-queue-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri("aura_job_queue_test");
 
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
@@ -45,34 +49,60 @@ async function main() {
 
   // (a) exactly-once claim
   const enqueued = [];
-  for (let i = 0; i < 40; i++) enqueued.push(await queue.enqueue("probe-a", { i }));
+  for (let i = 0; i < 40; i++)
+    enqueued.push(await queue.enqueue("probe-a", { i }));
   const claims = [];
-  await Promise.all(Array.from({ length: 8 }, async (_, w) => {
-    for (;;) {
-      const job = await queue.claimNext(`claimer-${w}`, { types: ["probe-a"], visibilityMs: 30000 });
-      if (!job) break;
-      claims.push(String(job._id));
-    }
-  }));
+  await Promise.all(
+    Array.from({ length: 8 }, async (_, w) => {
+      for (;;) {
+        const job = await queue.claimNext(`claimer-${w}`, {
+          types: ["probe-a"],
+          visibilityMs: 30000,
+        });
+        if (!job) break;
+        claims.push(String(job._id));
+      }
+    }),
+  );
   const uniqueClaims = new Set(claims).size;
-  console.log(`RESULT claim total=${claims.length} unique=${uniqueClaims} enqueued=${enqueued.length}`);
+  console.log(
+    `RESULT claim total=${claims.length} unique=${uniqueClaims} enqueued=${enqueued.length}`,
+  );
 
   // (b) idempotent enqueue
-  const first = await queue.enqueue("probe-b", { x: 1 }, { idempotencyKey: "probe-b-key" });
-  const second = await queue.enqueue("probe-b", { x: 1 }, { idempotencyKey: "probe-b-key" });
+  const first = await queue.enqueue(
+    "probe-b",
+    { x: 1 },
+    { idempotencyKey: "probe-b-key" },
+  );
+  const second = await queue.enqueue(
+    "probe-b",
+    { x: 1 },
+    { idempotencyKey: "probe-b-key" },
+  );
   const bCount = await Job.countDocuments({ type: "probe-b" });
-  console.log(`RESULT idem sameId=${String(first._id) === String(second._id)} rows=${bCount}`);
+  console.log(
+    `RESULT idem sameId=${String(first._id) === String(second._id)} rows=${bCount}`,
+  );
 
   // (c) visibility reclaim
   const cJob = await queue.enqueue("probe-c", { x: 1 });
-  await queue.claimNext("worker-dead", { types: ["probe-c"], visibilityMs: 700 });
+  await queue.claimNext("worker-dead", {
+    types: ["probe-c"],
+    visibilityMs: 700,
+  });
   await sleep(1100); // no heartbeat: the claim goes stale
-  const cSecond = await queue.claimNext("worker-live", { types: ["probe-c"], visibilityMs: 700 });
+  const cSecond = await queue.claimNext("worker-live", {
+    types: ["probe-c"],
+    visibilityMs: 700,
+  });
   const staleComplete = await queue.complete(cJob._id, "worker-dead");
-  const liveComplete = cSecond ? await queue.complete(cJob._id, "worker-live") : false;
+  const liveComplete = cSecond
+    ? await queue.complete(cJob._id, "worker-live")
+    : false;
   console.log(
     `RESULT reclaim reclaimed=${!!cSecond} attempts=${cSecond ? cSecond.attempts : -1}` +
-    ` staleComplete=${staleComplete} liveComplete=${liveComplete}`
+      ` staleComplete=${staleComplete} liveComplete=${liveComplete}`,
   );
 
   // (d) dead-letter via fail()
@@ -81,19 +111,29 @@ async function main() {
   await queue.fail(dJob._id, "w1", new Error("boom-1"));
   let dRow = await Job.findById(dJob._id).lean();
   const afterFirstFail = dRow.status;
-  await Job.updateOne({ _id: dJob._id }, { $set: { runAt: new Date(Date.now() - 1000) } });
+  await Job.updateOne(
+    { _id: dJob._id },
+    { $set: { runAt: new Date(Date.now() - 1000) } },
+  );
   await queue.claimNext("w1", { types: ["probe-d"], visibilityMs: 30000 });
   await queue.fail(dJob._id, "w1", new Error("boom-2"));
   dRow = await Job.findById(dJob._id).lean();
-  console.log(`RESULT deadfail afterFirst=${afterFirstFail} final=${dRow.status} lastError=${dRow.lastError} attempts=${dRow.attempts}`);
+  console.log(
+    `RESULT deadfail afterFirst=${afterFirstFail} final=${dRow.status} lastError=${dRow.lastError} attempts=${dRow.attempts}`,
+  );
 
   // (e) dead-letter via crash-reclaim at maxAttempts
   const eJob = await queue.enqueue("probe-e", { x: 1 }, { maxAttempts: 1 });
   await queue.claimNext("w-crash", { types: ["probe-e"], visibilityMs: 500 });
   await sleep(900);
-  const eSecond = await queue.claimNext("w-next", { types: ["probe-e"], visibilityMs: 500 });
+  const eSecond = await queue.claimNext("w-next", {
+    types: ["probe-e"],
+    visibilityMs: 500,
+  });
   const eRow = await Job.findById(eJob._id).lean();
-  console.log(`RESULT deadreclaim handedOut=${!!eSecond} status=${eRow.status}`);
+  console.log(
+    `RESULT deadreclaim handedOut=${!!eSecond} status=${eRow.status}`,
+  );
 
   // (f) backoff: runAt lands in the future after fail()
   const fJob = await queue.enqueue("probe-f", { x: 1 }, { maxAttempts: 5 });
@@ -101,17 +141,24 @@ async function main() {
   const before = Date.now();
   await queue.fail(fJob._id, "w1", new Error("boom"));
   const fRow = await Job.findById(fJob._id).lean();
-  console.log(`RESULT backoff runAtDeltaMs=${fRow.runAt.getTime() - before} status=${fRow.status}`);
+  console.log(
+    `RESULT backoff runAtDeltaMs=${fRow.runAt.getTime() - before} status=${fRow.status}`,
+  );
 
   // (g) worker loop end-to-end
   const handled = [];
-  queue.registerHandler("probe-g-ok", async (job) => { handled.push(job.payload.n); });
-  queue.registerHandler("probe-g-bad", async () => { throw new Error("always fails"); });
+  queue.registerHandler("probe-g-ok", async (job) => {
+    handled.push(job.payload.n);
+  });
+  queue.registerHandler("probe-g-bad", async () => {
+    throw new Error("always fails");
+  });
   const gOk = await queue.enqueue("probe-g-ok", { n: 7 });
   const gBad = await queue.enqueue("probe-g-bad", {}, { maxAttempts: 2 });
   queue.startWorker({ pollMs: 100, concurrency: 2, visibilityMs: 30000 });
   const deadline = Date.now() + 30000;
-  let gOkRow; let gBadRow;
+  let gOkRow;
+  let gBadRow;
   for (;;) {
     gOkRow = await Job.findById(gOk._id).lean();
     gBadRow = await Job.findById(gBad._id).lean();
@@ -120,26 +167,58 @@ async function main() {
     await sleep(200);
   }
   queue.stopWorker();
-  console.log(`RESULT worker okStatus=${gOkRow.status} handled=${handled.join(",")} badStatus=${gBadRow.status} badAttempts=${gBadRow.attempts}`);
+  console.log(
+    `RESULT worker okStatus=${gOkRow.status} handled=${handled.join(",")} badStatus=${gBadRow.status} badAttempts=${gBadRow.attempts}`,
+  );
 
   // (h) lease race
   let executions = 0;
-  const raceResults = await Promise.all(Array.from({ length: 8 }, (_, i) =>
-    leases.withLease("probe-lease", 5000, async () => { executions++; await sleep(50); }, { holderId: `holder-${i}` })
-  ));
+  const raceResults = await Promise.all(
+    Array.from({ length: 8 }, (_, i) =>
+      leases.withLease(
+        "probe-lease",
+        5000,
+        async () => {
+          executions++;
+          await sleep(50);
+        },
+        { holderId: `holder-${i}` },
+      ),
+    ),
+  );
   const winners = raceResults.filter(Boolean).length;
-  const blockedWhileHeld = await leases.withLease("probe-lease", 5000, async () => { executions++; }, { holderId: "holder-late" });
+  const blockedWhileHeld = await leases.withLease(
+    "probe-lease",
+    5000,
+    async () => {
+      executions++;
+    },
+    { holderId: "holder-late" },
+  );
   await leases.acquire("probe-lease-short", "holder-x", 400);
-  const shortBlocked = await leases.tryAcquire("probe-lease-short", "holder-y", 400);
+  const shortBlocked = await leases.tryAcquire(
+    "probe-lease-short",
+    "holder-y",
+    400,
+  );
   await sleep(600);
-  const shortAfterExpiry = await leases.tryAcquire("probe-lease-short", "holder-y", 400);
+  const shortAfterExpiry = await leases.tryAcquire(
+    "probe-lease-short",
+    "holder-y",
+    400,
+  );
   console.log(
     `RESULT lease winners=${winners} executions=${executions} blockedWhileHeld=${blockedWhileHeld}` +
-    ` shortBlocked=${!!shortBlocked} shortAfterExpiry=${!!shortAfterExpiry}`
+      ` shortBlocked=${!!shortBlocked} shortAfterExpiry=${!!shortAfterExpiry}`,
   );
 
   await mongoose.disconnect();
   await mongod.stop();
 }
 
-main().then(() => process.exit(0)).catch((err) => { console.error("PROBE ERROR:", err); process.exit(1); });
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("PROBE ERROR:", err);
+    process.exit(1);
+  });

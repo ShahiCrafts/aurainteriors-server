@@ -7,7 +7,9 @@ exports.protect = catchAsync(async (req, res, next) => {
   const token = authToken.extract(req);
 
   if (!token) {
-    return next(new AppError("You are not logged in. Please log in to get access.", 401));
+    return next(
+      new AppError("You are not logged in. Please log in to get access.", 401),
+    );
   }
 
   const decoded = await authToken.verify(token);
@@ -27,7 +29,9 @@ exports.protect = catchAsync(async (req, res, next) => {
     .select("_id role isActive deletedAt email firstName lastName avatar phone")
     .lean();
   if (!user) {
-    return next(new AppError("The user belonging to this token no longer exists.", 401));
+    return next(
+      new AppError("The user belonging to this token no longer exists.", 401),
+    );
   }
 
   if (!user.isActive || user.deletedAt) {
@@ -53,11 +57,12 @@ exports.protectOptional = catchAsync(async (req, res, next) => {
   req.isAuthenticated = false;
   req.user = null;
 
-
   if (token) {
     try {
       const decoded = await authToken.verify(token);
-      const user = await User.findById(decoded.id).select("_id role isActive deletedAt email firstName lastName avatar").lean();
+      const user = await User.findById(decoded.id)
+        .select("_id role isActive deletedAt email firstName lastName avatar")
+        .lean();
 
       if (user && user.isActive && !user.deletedAt) {
         req.user = user;
@@ -75,7 +80,9 @@ exports.protectOptional = catchAsync(async (req, res, next) => {
 exports.restrictTo = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return next(new AppError("You do not have permission to perform this action.", 403));
+      return next(
+        new AppError("You do not have permission to perform this action.", 403),
+      );
     }
     next();
   };

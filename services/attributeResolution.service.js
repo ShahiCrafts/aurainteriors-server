@@ -46,11 +46,9 @@ const { ancestorsForParent } = require("./categoryHierarchy.service");
 async function loadActiveDefinitions() {
   // PERF-B-05 (U-4): registry cached in-process (60s) — this loader
   // also serves catalogFacets; attribute writes invalidate it.
-  const {
-    getAttributeDefinitionsCached,
-  } = require("./attributeRegistryCache");
+  const { getAttributeDefinitionsCached } = require("./attributeRegistryCache");
   const definitions = await getAttributeDefinitionsCached("active", () =>
-    AttributeDefinition.find({ active: true }).lean()
+    AttributeDefinition.find({ active: true }).lean(),
   );
   return new Map(definitions.map((definition) => [definition.key, definition]));
 }
@@ -94,7 +92,8 @@ function applyOverrides(entry, assignment, source) {
   if (assignment.required !== undefined && assignment.required !== null) {
     entry.required = Boolean(assignment.required);
   }
-  if (assignment.defaultValue !== undefined) entry.defaultValue = assignment.defaultValue;
+  if (assignment.defaultValue !== undefined)
+    entry.defaultValue = assignment.defaultValue;
   if (assignment.displayGroup) entry.displayGroup = assignment.displayGroup;
   if (assignment.sortOrder !== undefined && assignment.sortOrder !== null) {
     entry.sortOrder = assignment.sortOrder;
@@ -112,9 +111,14 @@ async function applyTypeLevel(entries, definitionsByKey, typeKey) {
   const productType = await ProductType.findOne({ key: typeKey }).lean();
   if (!productType) return null;
   const overrides = new Map(
-    (productType.attributeAssignments || []).map((assignment) => [assignment.attributeKey, assignment])
+    (productType.attributeAssignments || []).map((assignment) => [
+      assignment.attributeKey,
+      assignment,
+    ]),
   );
-  const keys = [...new Set([...(productType.attributeKeys || []), ...overrides.keys()])];
+  const keys = [
+    ...new Set([...(productType.attributeKeys || []), ...overrides.keys()]),
+  ];
   for (const key of keys) {
     const definition = definitionsByKey.get(key);
     if (!definition) continue;
@@ -143,7 +147,8 @@ async function categoryChain(category) {
 
 function sortedEntries(entries) {
   return [...entries.values()].sort(
-    (a, b) => a.sortOrder - b.sortOrder || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+    (a, b) =>
+      a.sortOrder - b.sortOrder || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
   );
 }
 
@@ -202,7 +207,9 @@ async function resolveForCategory(category, options = {}) {
         entries.delete(assignment.attributeKey);
         continue;
       }
-      const entry = entries.get(assignment.attributeKey) || baseEntry(definition, "category");
+      const entry =
+        entries.get(assignment.attributeKey) ||
+        baseEntry(definition, "category");
       applyOverrides(entry, assignment, "category");
       entry.sourceCategoryId = String(chainCategory._id);
       entries.set(assignment.attributeKey, entry);

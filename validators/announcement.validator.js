@@ -2,7 +2,14 @@ const Joi = require("joi");
 const { joiSafeUrl } = require("../utils/safeUrl");
 
 // Valid announcement types
-const validTypes = ["general", "maintenance", "update", "promotion", "policy", "event"];
+const validTypes = [
+  "general",
+  "maintenance",
+  "update",
+  "promotion",
+  "policy",
+  "event",
+];
 const validPriorities = ["low", "normal", "high", "critical"];
 const validStatuses = ["draft", "scheduled", "published", "archived"];
 const validTargetTypes = ["all", "customers", "admins"];
@@ -93,10 +100,7 @@ exports.updateAnnouncementSchema = Joi.object({
   imageUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
   actionUrl: joiSafeUrl(Joi, 500).optional().allow("", null),
   actionLabel: Joi.string().max(50).optional().allow("", null),
-  tags: Joi.array()
-    .items(Joi.string().trim().max(50))
-    .max(10)
-    .optional(),
+  tags: Joi.array().items(Joi.string().trim().max(50)).max(10).optional(),
 });
 
 // Schedule announcement validation schema

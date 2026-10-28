@@ -13,9 +13,19 @@ const User = require("../models/user.model");
 // transitions go only through publishAnnouncement / scheduleAnnouncement /
 // archiveAnnouncement, which enforce the state machine's guards.
 const ANNOUNCEMENT_CLIENT_FIELDS = [
-  "title", "content", "summary", "type", "priority",
-  "targetAudience", "scheduledAt", "expiresAt", "isPinned",
-  "imageUrl", "actionUrl", "actionLabel", "tags",
+  "title",
+  "content",
+  "summary",
+  "type",
+  "priority",
+  "targetAudience",
+  "scheduledAt",
+  "expiresAt",
+  "isPinned",
+  "imageUrl",
+  "actionUrl",
+  "actionLabel",
+  "tags",
 ];
 const pickAnnouncementFields = (data = {}) => {
   const picked = {};
@@ -30,12 +40,7 @@ class AnnouncementService {
    * Get all announcements (Admin)
    */
   async getAllAnnouncements(options = {}) {
-    const {
-      status,
-      type,
-      priority,
-      isPinned,
-    } = options;
+    const { status, type, priority, isPinned } = options;
 
     // AR-19: bound pagination to the house contract (page <= 10000,
     // limit <= 100, NaN -> defaults). Previously raw parseInt values
@@ -47,8 +52,20 @@ class AnnouncementService {
     const query = {};
 
     // FA-56: coerce at the sink - raw option values never reach the filter.
-    const statusC = asEnum(status, ["draft", "scheduled", "published", "archived"]);
-    const typeC = asEnum(type, ["general", "maintenance", "update", "promotion", "policy", "event"]);
+    const statusC = asEnum(status, [
+      "draft",
+      "scheduled",
+      "published",
+      "archived",
+    ]);
+    const typeC = asEnum(type, [
+      "general",
+      "maintenance",
+      "update",
+      "promotion",
+      "policy",
+      "event",
+    ]);
     const priorityC = asEnum(priority, ["low", "normal", "high", "critical"]);
     const pinnedC = asBoolean(isPinned);
     if (statusC !== undefined) query.status = statusC;
@@ -121,10 +138,7 @@ class AnnouncementService {
     // Published announcements are immutable here; archiving has its own
     // endpoint (FA-04 - status can no longer ride the generic update).
     if (announcement.status === "published") {
-      throw new AppError(
-        "Published announcements can only be archived",
-        400
-      );
+      throw new AppError("Published announcements can only be archived", 400);
     }
 
     // Update fields (whitelist only - see ANNOUNCEMENT_CLIENT_FIELDS)
@@ -181,7 +195,11 @@ class AnnouncementService {
       { path: "updatedBy", select: "firstName lastName email" },
     ]);
     if (notifyResult && notifyResult.queued) {
-      return { announcement: populated, queued: true, jobId: notifyResult.jobId };
+      return {
+        announcement: populated,
+        queued: true,
+        jobId: notifyResult.jobId,
+      };
     }
     return populated;
   }
@@ -255,7 +273,7 @@ class AnnouncementService {
     if (announcement.status === "published") {
       throw new AppError(
         "Published announcements cannot be deleted. Archive them instead.",
-        400
+        400,
       );
     }
 
@@ -372,8 +390,10 @@ class AnnouncementService {
         // the losing tick gets null and skips.
         const claimed = await Announcement.findOneAndUpdate(
           { _id: announcement._id, status: "scheduled" },
-          { $set: { status: "published", publishedAt: now, scheduledAt: null } },
-          { new: true }
+          {
+            $set: { status: "published", publishedAt: now, scheduledAt: null },
+          },
+          { new: true },
         );
         if (!claimed) continue;
 
@@ -435,7 +455,8 @@ class AnnouncementService {
         {
           title: `📢 ${announcement.title}`,
           type: "announcement",
-          message: announcement.summary || announcement.content.substring(0, 200),
+          message:
+            announcement.summary || announcement.content.substring(0, 200),
           expiresAt: announcement.expiresAt,
           idempotencyKey: `announcement:${announcement._id}`,
           category: "info",
@@ -446,9 +467,13 @@ class AnnouncementService {
             announcementType: announcement.type,
           },
         },
-        userIds
+        userIds,
       );
-      if (delivery.failedCount) throw new AppError("Some announcement notifications could not be persisted", 503);
+      if (delivery.failedCount)
+        throw new AppError(
+          "Some announcement notifications could not be persisted",
+          503,
+        );
     } catch (error) {
       console.error("Failed to notify users about announcement:", error);
       // Don't throw - notification failure shouldn't block publishing

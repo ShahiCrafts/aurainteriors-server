@@ -38,7 +38,7 @@ const stockReservationSchema = new mongoose.Schema(
     },
     expiresAt: { type: Date, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 stockReservationSchema.index({ order: 1, status: 1 });

@@ -44,24 +44,43 @@ function policies(env = process.env) {
 async function deleteBatched(Model, predicate, batchSize, maxBatches) {
   let deleted = 0;
   for (let batch = 0; batch < maxBatches; batch++) {
-    const docs = await Model.find(predicate).select("_id").limit(batchSize).lean();
+    const docs = await Model.find(predicate)
+      .select("_id")
+      .limit(batchSize)
+      .lean();
     if (!docs.length) break;
-    const res = await Model.deleteMany({ _id: { $in: docs.map((d) => d._id) } });
+    const res = await Model.deleteMany({
+      _id: { $in: docs.map((d) => d._id) },
+    });
     deleted += res.deletedCount || 0;
     if (docs.length < batchSize) break;
   }
   return deleted;
 }
 
-async function runRetention({ dryRun = false, batchSize = 1000, maxBatches = 10, now = new Date() } = {}) {
+async function runRetention({
+  dryRun = false,
+  batchSize = 1000,
+  maxBatches = 10,
+  now = new Date(),
+} = {}) {
   const pol = policies();
-  const results = { notifications: null, chatMessages: null, blogEngagements: null, contacts: null };
+  const results = {
+    notifications: null,
+    chatMessages: null,
+    blogEngagements: null,
+    contacts: null,
+  };
   const cutoff = (days) => new Date(now.getTime() - days * DAY_MS);
   const apply = async (Model, predicate) =>
-    dryRun ? Model.countDocuments(predicate) : deleteBatched(Model, predicate, batchSize, maxBatches);
+    dryRun
+      ? Model.countDocuments(predicate)
+      : deleteBatched(Model, predicate, batchSize, maxBatches);
 
   if (pol.notifications !== null) {
-    results.notifications = await apply(Notification, { createdAt: { $lt: cutoff(pol.notifications) } });
+    results.notifications = await apply(Notification, {
+      createdAt: { $lt: cutoff(pol.notifications) },
+    });
   }
   if (pol.chatMessages !== null) {
     // PERF-B-05 (U-9): load the closed/resolved chat ids in bounded

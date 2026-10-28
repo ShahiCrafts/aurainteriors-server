@@ -38,7 +38,7 @@ const guestSessionSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Update lastActivityAt on any activity

@@ -1,11 +1,19 @@
-const { boundedLimit, boundedPage, literalRegex, escapeRegex, safeSort } = require("../utils/listQuery");
+const {
+  boundedLimit,
+  boundedPage,
+  literalRegex,
+  escapeRegex,
+  safeSort,
+} = require("../utils/listQuery");
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
-const reviewFilter = req => ({ _id: req.params.reviewId,
-  ...(req.params.productId ? { product: req.params.productId } : {}) });
+const reviewFilter = (req) => ({
+  _id: req.params.reviewId,
+  ...(req.params.productId ? { product: req.params.productId } : {}),
+});
 const notificationEventEmitter = require("../services/notificationEventEmitter");
 
 // Get all reviews for a product
@@ -20,7 +28,11 @@ exports.getProductReviews = catchAsync(async (req, res, next) => {
   } = req.query;
 
   // Verify product exists
-  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
+  const product = await Product.findOne({
+    _id: productId,
+    deletedAt: null,
+    status: { $in: ["active", "out_of_stock"] },
+  });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
@@ -76,7 +88,7 @@ exports.getReview = catchAsync(async (req, res, next) => {
 
   const review = await Review.findOne(reviewFilter(req)).populate(
     "user",
-    "firstName lastName avatar"
+    "firstName lastName avatar",
   );
 
   if (!review) {
@@ -95,7 +107,11 @@ exports.createReview = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
 
   // Verify product exists
-  const product = await Product.findOne({ _id: productId, deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
+  const product = await Product.findOne({
+    _id: productId,
+    deletedAt: null,
+    status: { $in: ["active", "out_of_stock"] },
+  });
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
@@ -163,7 +179,10 @@ exports.updateReview = catchAsync(async (req, res, next) => {
   }
 
   // Check ownership (unless admin)
-  if (review.user.toString() !== userId.toString() && req.user.role !== "admin") {
+  if (
+    review.user.toString() !== userId.toString() &&
+    req.user.role !== "admin"
+  ) {
     return next(new AppError("You can only edit your own reviews", 403));
   }
 
@@ -197,7 +216,10 @@ exports.deleteReview = catchAsync(async (req, res, next) => {
   }
 
   // Check ownership (unless admin)
-  if (review.user.toString() !== userId.toString() && req.user.role !== "admin") {
+  if (
+    review.user.toString() !== userId.toString() &&
+    req.user.role !== "admin"
+  ) {
     return next(new AppError("You can only delete your own reviews", 403));
   }
 
@@ -232,16 +254,24 @@ exports.markHelpful = catchAsync(async (req, res, next) => {
   const updated = await Review.findOneAndUpdate(
     { _id: review._id },
     [
-      { $set: { helpfulVotes: { $cond: [
-        { $in: [userId, "$helpfulVotes"] },
-        { $setDifference: ["$helpfulVotes", [userId]] },
-        { $setUnion: ["$helpfulVotes", [userId]] },
-      ] } } },
+      {
+        $set: {
+          helpfulVotes: {
+            $cond: [
+              { $in: [userId, "$helpfulVotes"] },
+              { $setDifference: ["$helpfulVotes", [userId]] },
+              { $setUnion: ["$helpfulVotes", [userId]] },
+            ],
+          },
+        },
+      },
       { $set: { helpfulCount: { $size: "$helpfulVotes" } } },
     ],
-    { new: true }
+    { new: true },
   );
-  const voted = updated.helpfulVotes.some((id) => String(id) === String(userId));
+  const voted = updated.helpfulVotes.some(
+    (id) => String(id) === String(userId),
+  );
 
   res.status(200).json({
     status: "success",
@@ -311,7 +341,7 @@ exports.addAdminResponse = catchAsync(async (req, res, next) => {
         respondedAt: new Date(),
       },
     },
-    { new: true }
+    { new: true },
   ).populate("user", "firstName lastName avatar");
 
   if (!review) {

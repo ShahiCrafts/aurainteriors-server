@@ -30,12 +30,12 @@ const emailOutboxSchema = new mongoose.Schema(
     nextAttemptAt: { type: Date, default: Date.now },
     sentAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 emailOutboxSchema.index(
   { dedupeKey: 1 },
-  { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } }
+  { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } },
 );
 emailOutboxSchema.index({ status: 1, nextAttemptAt: 1 });
 

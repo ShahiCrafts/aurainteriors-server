@@ -35,7 +35,7 @@ const notificationSchema = new mongoose.Schema(
       type: String,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 notificationSchema.index({ expiresAt: 1 });

@@ -39,11 +39,13 @@ exports.getWishlist = catchAsync(async (req, res, next) => {
   }
 
   // Transform products to include addedAt at the item level
-  const items = wishlist.products.filter(item => item.product).map((item) => ({
-    _id: item._id,
-    product: item.product,
-    addedAt: item.addedAt,
-  }));
+  const items = wishlist.products
+    .filter((item) => item.product)
+    .map((item) => ({
+      _id: item._id,
+      product: item.product,
+      addedAt: item.addedAt,
+    }));
 
   res.status(200).json({
     status: "success",
@@ -69,38 +71,73 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
     return next(new AppError("Invalid product ID", 400));
   }
   const lookupStart = performance.now();
-  const product = await Product.findOne({ _id: productId, deletedAt: null,
-    status: { $in: ["active", "out_of_stock"] } })
-    .select(WISHLIST_PRODUCT_FIELDS).lean();
-  req.wishlistTimings?.push(`product;dur=${(performance.now() - lookupStart).toFixed(1)}`);
+  const product = await Product.findOne({
+    _id: productId,
+    deletedAt: null,
+    status: { $in: ["active", "out_of_stock"] },
+  })
+    .select(WISHLIST_PRODUCT_FIELDS)
+    .lean();
+  req.wishlistTimings?.push(
+    `product;dur=${(performance.now() - lookupStart).toFixed(1)}`,
+  );
   if (!product) return next(new AppError("Product not found", 404));
 
   const writeStart = performance.now();
   const productObjectId = new mongoose.Types.ObjectId(productId);
   const userObjectId = new mongoose.Types.ObjectId(String(req.user._id));
   const now = new Date();
-  const pipeline = [{ $set: {
-    user: userObjectId,
-    createdAt: { $ifNull: ["$createdAt", now] },
-    products: { $cond: [
-      { $in: [productObjectId, { $ifNull: ["$products.product", []] }] },
-      { $ifNull: ["$products", []] },
-      { $concatArrays: [{ $ifNull: ["$products", []] },
-        [{ _id: new mongoose.Types.ObjectId(), product: productObjectId, addedAt: now }]] },
-    ] },
-    updatedAt: now,
-  } }];
+  const pipeline = [
+    {
+      $set: {
+        user: userObjectId,
+        createdAt: { $ifNull: ["$createdAt", now] },
+        products: {
+          $cond: [
+            { $in: [productObjectId, { $ifNull: ["$products.product", []] }] },
+            { $ifNull: ["$products", []] },
+            {
+              $concatArrays: [
+                { $ifNull: ["$products", []] },
+                [
+                  {
+                    _id: new mongoose.Types.ObjectId(),
+                    product: productObjectId,
+                    addedAt: now,
+                  },
+                ],
+              ],
+            },
+          ],
+        },
+        updatedAt: now,
+      },
+    },
+  ];
   let wishlist;
   try {
-    wishlist = await Wishlist.findOneAndUpdate({ user: userObjectId }, pipeline,
-      { upsert: true, updatePipeline: true, new: true, projection: { products: 1 } }).lean();
+    wishlist = await Wishlist.findOneAndUpdate(
+      { user: userObjectId },
+      pipeline,
+      {
+        upsert: true,
+        updatePipeline: true,
+        new: true,
+        projection: { products: 1 },
+      },
+    ).lean();
   } catch (error) {
     // Concurrent first additions may race on the unique user index.
     if (error.code !== 11000) throw error;
-    wishlist = await Wishlist.findOneAndUpdate({ user: userObjectId }, pipeline,
-      { updatePipeline: true, new: true, projection: { products: 1 } }).lean();
+    wishlist = await Wishlist.findOneAndUpdate(
+      { user: userObjectId },
+      pipeline,
+      { updatePipeline: true, new: true, projection: { products: 1 } },
+    ).lean();
   }
-  req.wishlistTimings?.push(`write;dur=${(performance.now() - writeStart).toFixed(1)}`);
+  req.wishlistTimings?.push(
+    `write;dur=${(performance.now() - writeStart).toFixed(1)}`,
+  );
 
   res.status(200).json({
     status: "success",
@@ -108,7 +145,9 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
     data: {
       inWishlist: true,
       item: (() => {
-        const item = wishlist.products.find(entry => String(entry.product) === productId.toLowerCase());
+        const item = wishlist.products.find(
+          (entry) => String(entry.product) === productId.toLowerCase(),
+        );
         return { _id: item._id, product, addedAt: item.addedAt };
       })(),
     },
@@ -123,10 +162,17 @@ exports.removeFromWishlist = catchAsync(async (req, res, next) => {
     return next(new AppError("Invalid product ID", 400));
   }
   const writeStart = performance.now();
-  const result = await Wishlist.updateOne({ user: req.user._id },
-    { $pull: { products: { product: new mongoose.Types.ObjectId(productId) } } });
-  req.wishlistTimings?.push(`write;dur=${(performance.now() - writeStart).toFixed(1)}`);
-  if (!result.matchedCount) return next(new AppError("Wishlist not found", 404));
+  const result = await Wishlist.updateOne(
+    { user: req.user._id },
+    {
+      $pull: { products: { product: new mongoose.Types.ObjectId(productId) } },
+    },
+  );
+  req.wishlistTimings?.push(
+    `write;dur=${(performance.now() - writeStart).toFixed(1)}`,
+  );
+  if (!result.matchedCount)
+    return next(new AppError("Wishlist not found", 404));
 
   res.status(200).json({
     status: "success",

@@ -1,6 +1,12 @@
 const Joi = require("joi");
 
-const validStatuses = ["ai_handling", "escalated", "agent_handling", "resolved", "closed"];
+const validStatuses = [
+  "ai_handling",
+  "escalated",
+  "agent_handling",
+  "resolved",
+  "closed",
+];
 const validPriorities = ["low", "normal", "high", "urgent"];
 
 exports.startChatSchema = Joi.object({
@@ -13,7 +19,9 @@ exports.startChatSchema = Joi.object({
   // client - the server derives them from the request (see startChat).
   // stripUnknown drops them if a client sends them anyway.
   metadata: Joi.object({}).optional(),
-  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string()
+    .pattern(/^guest_[a-f0-9]{64}$/)
+    .optional(), // Allow guest session ID to pass through
 });
 
 exports.sendMessageSchema = Joi.object({
@@ -25,10 +33,17 @@ exports.sendMessageSchema = Joi.object({
     .items(
       Joi.object({
         fileName: Joi.string().max(255).required(),
-        fileUrl: Joi.string().uri({ scheme: ["https"] }).max(2048).required(),
+        fileUrl: Joi.string()
+          .uri({ scheme: ["https"] })
+          .max(2048)
+          .required(),
         fileType: Joi.string().valid("image", "document").required(),
-        fileSize: Joi.number().integer().positive().max(10 * 1024 * 1024).required(),
-      })
+        fileSize: Joi.number()
+          .integer()
+          .positive()
+          .max(10 * 1024 * 1024)
+          .required(),
+      }),
     )
     .max(3)
     .optional()
@@ -36,7 +51,9 @@ exports.sendMessageSchema = Joi.object({
       "array.max": "Maximum of 3 attachments allowed per message",
     }),
   isInternalNote: Joi.boolean().optional().default(false),
-  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string()
+    .pattern(/^guest_[a-f0-9]{64}$/)
+    .optional(), // Allow guest session ID to pass through
 });
 
 exports.updateTypingSchema = Joi.object({
@@ -61,11 +78,15 @@ exports.getChatsQuerySchema = Joi.object({
   sortBy: Joi.string()
     .valid("lastMessageAt", "createdAt", "priority")
     .default("lastMessageAt"),
-  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string()
+    .pattern(/^guest_[a-f0-9]{64}$/)
+    .optional(), // Allow guest session ID to pass through
 });
 
 exports.getMessagesQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(50),
-  guestSessionId: Joi.string().pattern(/^guest_[a-f0-9]{64}$/).optional(), // Allow guest session ID to pass through
+  guestSessionId: Joi.string()
+    .pattern(/^guest_[a-f0-9]{64}$/)
+    .optional(), // Allow guest session ID to pass through
 });

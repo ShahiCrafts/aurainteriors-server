@@ -14,10 +14,7 @@ const {
   startBackgroundTasks,
   stopBackgroundTasks,
 } = require("./backgroundTasks");
-const {
-  fetchAllFeeds,
-  updateFeaturedArticles,
-} = require("./rssFeedService");
+const { fetchAllFeeds, updateFeaturedArticles } = require("./rssFeedService");
 
 function startScheduledJobs({ notificationGateway }) {
   startBackgroundTasks();
@@ -31,7 +28,9 @@ function startScheduledJobs({ notificationGateway }) {
     require("./jobQueue.service").startWorker();
     console.log("✓ Job queue worker started (in-process)");
   } else {
-    console.log("✓ Job queue worker delegated to a separate worker process (WORKER_MODE=separate)");
+    console.log(
+      "✓ Job queue worker delegated to a separate worker process (WORKER_MODE=separate)",
+    );
   }
 
   const heartbeatInterval = setInterval(() => {
@@ -73,7 +72,12 @@ function startScheduledJobs({ notificationGateway }) {
     }
   }, 30000);
 
-  return { heartbeatInterval, cleanupInterval, rssFeedInterval, initialRssTimer };
+  return {
+    heartbeatInterval,
+    cleanupInterval,
+    rssFeedInterval,
+    initialRssTimer,
+  };
 }
 
 function stopScheduledJobs(handles) {
@@ -83,7 +87,11 @@ function stopScheduledJobs(handles) {
   clearInterval(handles.rssFeedInterval);
   clearTimeout(handles.initialRssTimer);
   stopBackgroundTasks();
-  try { require("./jobQueue.service").stopWorker(); } catch { /* not started */ }
+  try {
+    require("./jobQueue.service").stopWorker();
+  } catch {
+    /* not started */
+  }
 }
 
 module.exports = { startScheduledJobs, stopScheduledJobs };

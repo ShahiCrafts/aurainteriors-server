@@ -25,7 +25,7 @@ class NotificationEventEmitter extends EventEmitter {
         "New Order Received",
         `New order #${orderNumber} by ${customerName} - NRs. ${total}`,
         { orderId, orderNumber },
-        "/admin/orders"
+        "/admin/orders",
       );
       this.broadcastToAdmins("admin:notification:new", savedNotifications);
     } catch (error) {
@@ -44,7 +44,7 @@ class NotificationEventEmitter extends EventEmitter {
         title: "Order Confirmed",
         message: `Your order #${data.orderId || orderId} has been placed successfully.`,
         data: { orderId, total, paymentMethod },
-        actionUrl: "/profile/orders"
+        actionUrl: "/profile/orders",
       });
       this.broadcastToUser(userId, notification);
     } catch (error) {
@@ -53,7 +53,14 @@ class NotificationEventEmitter extends EventEmitter {
   }
 
   async onOrderStatusChanged(data) {
-    const { userId, guestEmail, orderId, status, previousStatus, trackingNumber } = data;
+    const {
+      userId,
+      guestEmail,
+      orderId,
+      status,
+      previousStatus,
+      trackingNumber,
+    } = data;
 
     if (userId) {
       try {
@@ -63,7 +70,7 @@ class NotificationEventEmitter extends EventEmitter {
           title: "Order Update",
           message: `Your order is now ${status}.`,
           data: { orderId, status, previousStatus, trackingNumber },
-          actionUrl: "/profile/orders"
+          actionUrl: "/profile/orders",
         });
         this.broadcastToUser(userId, notification);
       } catch (error) {
@@ -80,7 +87,7 @@ class NotificationEventEmitter extends EventEmitter {
         "New Product Review",
         `${customerName} rated ${productName} ${rating}/5 stars.`,
         { reviewId, productName, rating },
-        "/admin/reviews"
+        "/admin/reviews",
       );
       this.broadcastToAdmins("admin:notification:new", savedNotifications);
     } catch (error) {
@@ -96,7 +103,7 @@ class NotificationEventEmitter extends EventEmitter {
         "New Contact Message",
         `${name} sent a message: ${subject}`,
         { contactId },
-        "/admin/contacts"
+        "/admin/contacts",
       );
       this.broadcastToAdmins("admin:notification:new", savedNotifications);
     } catch (error) {
@@ -112,7 +119,7 @@ class NotificationEventEmitter extends EventEmitter {
         "New Support Chat",
         `${customerName} started a support chat.`,
         { chatId },
-        "/admin/support"
+        "/admin/support",
       );
       this.broadcastToAdmins("admin:notification:new", savedNotifications);
     } catch (error) {
@@ -138,9 +145,14 @@ class NotificationEventEmitter extends EventEmitter {
     // compute the real count.
     const room = String(userId);
     io.to(room).emit("notification:new", notification);
-    notificationService.getUnreadCount(userId)
-      .then((unreadCount) => { io.to(room).emit("badge:update", { unreadCount }); })
-      .catch((error) => { console.error("Failed to compute unread badge count:", error.message); });
+    notificationService
+      .getUnreadCount(userId)
+      .then((unreadCount) => {
+        io.to(room).emit("badge:update", { unreadCount });
+      })
+      .catch((error) => {
+        console.error("Failed to compute unread badge count:", error.message);
+      });
   }
 }
 

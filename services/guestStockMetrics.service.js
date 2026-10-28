@@ -11,13 +11,15 @@ let total = 0;
 
 function recordGuestStockConfirmFailure({ orderId, source, reason } = {}) {
   total += 1;
-  console.error(JSON.stringify({
-    event: "guest_stock_confirm_failure",
-    orderId: orderId ? String(orderId) : null,
-    source: source || null,
-    reason: reason ? String(reason) : null,
-    total,
-  }));
+  console.error(
+    JSON.stringify({
+      event: "guest_stock_confirm_failure",
+      orderId: orderId ? String(orderId) : null,
+      source: source || null,
+      reason: reason ? String(reason) : null,
+      total,
+    }),
+  );
   return total;
 }
 

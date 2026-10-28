@@ -5,7 +5,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-process.env.JWT_SECRET = process.env.JWT_SECRET || "test-only-secret-for-model-load";
+process.env.JWT_SECRET =
+  process.env.JWT_SECRET || "test-only-secret-for-model-load";
 const User = require("../../models/user.model");
 
 test("A-14: googleId has a unique sparse index", () => {
@@ -14,7 +15,11 @@ test("A-14: googleId has a unique sparse index", () => {
   assert.ok(googleIndex, "an index on googleId should exist");
   const [, options] = googleIndex;
   assert.equal(options.unique, true, "googleId index must be unique");
-  assert.equal(options.sparse, true, "googleId index must stay sparse (most users have no googleId)");
+  assert.equal(
+    options.sparse,
+    true,
+    "googleId index must stay sparse (most users have no googleId)",
+  );
 });
 
 test("characterization: email stays uniquely indexed", () => {

@@ -46,7 +46,7 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
@@ -67,19 +67,55 @@ const field = (l, name) => {
   return m ? m[1] : null;
 };
 
-test("AR-24 property: >=1000 mixed review ops leave rating exactly equal to a from-scratch aggregation, with zero aggregations on the write path", { timeout: 310000 }, async () => {
-  const l = await line("rating");
-  assert.ok(Number(field(l, "ops")) >= 1000, `the mix must run >= 1000 ops; got: ${l}`);
-  assert.equal(field(l, "aggregateCalls"), "0",
-    `no full aggregation may run on the review write path; got: ${l}`);
-  assert.equal(field(l, "storedCount"), field(l, "expectedCount"), `count must match exactly; got: ${l}`);
-  assert.equal(field(l, "storedSum"), field(l, "expectedSum"), `sum must match exactly; got: ${l}`);
-  assert.ok(Number(field(l, "avgDiff")) <= 1e-9, `average must match within 1e-9; got: ${l}`);
-});
+test(
+  "AR-24 property: >=1000 mixed review ops leave rating exactly equal to a from-scratch aggregation, with zero aggregations on the write path",
+  { timeout: 310000 },
+  async () => {
+    const l = await line("rating");
+    assert.ok(
+      Number(field(l, "ops")) >= 1000,
+      `the mix must run >= 1000 ops; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "aggregateCalls"),
+      "0",
+      `no full aggregation may run on the review write path; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "storedCount"),
+      field(l, "expectedCount"),
+      `count must match exactly; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "storedSum"),
+      field(l, "expectedSum"),
+      `sum must match exactly; got: ${l}`,
+    );
+    assert.ok(
+      Number(field(l, "avgDiff")) <= 1e-9,
+      `average must match within 1e-9; got: ${l}`,
+    );
+  },
+);
 
-test("AR-24 legacy: a product without rating.sum is lazily initialized exactly on its first tracked write", { timeout: 310000 }, async () => {
-  const l = await line("legacy");
-  assert.equal(field(l, "storedCount"), field(l, "expectedCount"), `count must match exactly; got: ${l}`);
-  assert.equal(field(l, "storedSum"), field(l, "expectedSum"), `sum must be initialized to the true sum; got: ${l}`);
-  assert.ok(Number(field(l, "avgDiff")) <= 1e-9, `average must match within 1e-9; got: ${l}`);
-});
+test(
+  "AR-24 legacy: a product without rating.sum is lazily initialized exactly on its first tracked write",
+  { timeout: 310000 },
+  async () => {
+    const l = await line("legacy");
+    assert.equal(
+      field(l, "storedCount"),
+      field(l, "expectedCount"),
+      `count must match exactly; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "storedSum"),
+      field(l, "expectedSum"),
+      `sum must be initialized to the true sum; got: ${l}`,
+    );
+    assert.ok(
+      Number(field(l, "avgDiff")) <= 1e-9,
+      `average must match within 1e-9; got: ${l}`,
+    );
+  },
+);

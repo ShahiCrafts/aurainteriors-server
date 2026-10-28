@@ -47,11 +47,26 @@ test("variants: combinationKey escapes separators inside values", () => {
 });
 
 test("variants: variantPurchasable = enabled and stock above reserved", () => {
-  assert.equal(variantPurchasable({ enabled: true, stock: 5, reservedStock: 0 }), true);
-  assert.equal(variantPurchasable({ enabled: true, stock: 5, reservedStock: 4 }), true);
-  assert.equal(variantPurchasable({ enabled: true, stock: 5, reservedStock: 5 }), false);
-  assert.equal(variantPurchasable({ enabled: true, stock: 0, reservedStock: 0 }), false);
-  assert.equal(variantPurchasable({ enabled: false, stock: 5, reservedStock: 0 }), false);
+  assert.equal(
+    variantPurchasable({ enabled: true, stock: 5, reservedStock: 0 }),
+    true,
+  );
+  assert.equal(
+    variantPurchasable({ enabled: true, stock: 5, reservedStock: 4 }),
+    true,
+  );
+  assert.equal(
+    variantPurchasable({ enabled: true, stock: 5, reservedStock: 5 }),
+    false,
+  );
+  assert.equal(
+    variantPurchasable({ enabled: true, stock: 0, reservedStock: 0 }),
+    false,
+  );
+  assert.equal(
+    variantPurchasable({ enabled: false, stock: 5, reservedStock: 0 }),
+    false,
+  );
   // Legacy-shaped variants lacking the Phase 3 fields degrade sanely.
   assert.equal(variantPurchasable({ stock: 3 }), true);
   assert.equal(variantPurchasable({}), false);
@@ -67,7 +82,7 @@ test("variants: computePriceFrom is the min ENABLED variant price, else null", (
       { price: 400, enabled: false },
       { price: 475, enabled: true },
     ]),
-    450
+    450,
   );
 });
 

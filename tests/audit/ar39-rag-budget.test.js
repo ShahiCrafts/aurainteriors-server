@@ -20,8 +20,19 @@ let capturedJob = null;
 let capturedRetrieve = null;
 let capturedQdrantArgs = [];
 
-const chatDoc = { _id: CHAT_ID, customer: "cust1", guestSession: null, status: "ai_handling", metadata: { botActive: true } };
-const latestDoc = { _id: CHAT_ID, status: "ai_handling", metadata: {}, customer: "cust1" };
+const chatDoc = {
+  _id: CHAT_ID,
+  customer: "cust1",
+  guestSession: null,
+  status: "ai_handling",
+  metadata: { botActive: true },
+};
+const latestDoc = {
+  _id: CHAT_ID,
+  status: "ai_handling",
+  metadata: {},
+  customer: "cust1",
+};
 
 stubModule("models/chat.model", {
   findOne: () => makeQuery(chatDoc),
@@ -32,8 +43,14 @@ stubModule("models/chat.model", {
 stubModule("models/chatMessage.model", {
   create: async (data) => {
     const doc = {
-      _id: "msg-ar39", ...data,
-      toObject: () => ({ _id: "msg-ar39", chat: data.chat, senderRole: data.senderRole, content: data.content }),
+      _id: "msg-ar39",
+      ...data,
+      toObject: () => ({
+        _id: "msg-ar39",
+        chat: data.chat,
+        senderRole: data.senderRole,
+        content: data.content,
+      }),
       populate: async () => doc,
     };
     return doc;
@@ -42,11 +59,23 @@ stubModule("models/chatMessage.model", {
   findOne: () => makeQuery(null),
 });
 stubModule("models/guestSession.model", {});
-stubModule("models/user.model", { findOne: () => makeQuery(null), findById: () => makeQuery(null) });
-stubModule("models/document.model", { find: () => makeQuery([{ _id: DOC_ID }]) });
+stubModule("models/user.model", {
+  findOne: () => makeQuery(null),
+  findById: () => makeQuery(null),
+});
+stubModule("models/document.model", {
+  find: () => makeQuery([{ _id: DOC_ID }]),
+});
 stubModule("services/notificationEventEmitter", {});
 stubModule("services/chatV2", {
-  queue: { resume: () => {}, cancel: () => {}, enqueue: (roomId, fn) => { capturedJob = fn; return Promise.resolve(); } },
+  queue: {
+    resume: () => {},
+    cancel: () => {},
+    enqueue: (roomId, fn) => {
+      capturedJob = fn;
+      return Promise.resolve();
+    },
+  },
   pipeline: {
     run: async (turn) => {
       capturedRetrieve = await turn.context.retrieve("return policy");
@@ -61,14 +90,26 @@ const retrievalService = require("../../services/retrievalService");
 retrievalService.qdrant = {
   search: async (_collection, args) => {
     capturedQdrantArgs.push(args);
-    return [{ score: 0.9, payload: { documentId: DOC_ID, text: "Policy text", fileName: "policy.pdf", visibility: "public" } }];
+    return [
+      {
+        score: 0.9,
+        payload: {
+          documentId: DOC_ID,
+          text: "Policy text",
+          fileName: "policy.pdf",
+          visibility: "public",
+        },
+      },
+    ];
   },
 };
 
 const runtimeContext = require("../../services/runtimeContext"); // AR-33: registry replaces global.notificationGateway
 const service = require("../../services/chatService");
 service.authorizeChat = async () => true;
-runtimeContext.setNotificationGateway({ io: { to: () => ({ emit: () => {} }) } });
+runtimeContext.setNotificationGateway({
+  io: { to: () => ({ emit: () => {} }) },
+});
 
 const originalFetch = global.fetch;
 const originalLog = console.log;
@@ -78,24 +119,38 @@ function installSlowEmbeddingFetch() {
     await new Promise((resolve, reject) => {
       const t = setTimeout(resolve, 400);
       if (options.signal) {
-        options.signal.addEventListener("abort", () => {
-          clearTimeout(t);
-          const e = new Error("The operation was aborted");
-          e.name = "AbortError";
-          reject(e);
-        }, { once: true });
+        options.signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(t);
+            const e = new Error("The operation was aborted");
+            e.name = "AbortError";
+            reject(e);
+          },
+          { once: true },
+        );
       }
     });
-    return { ok: true, status: 200, json: async () => ({ data: [{ embedding: [0.1, 0.2, 0.3] }] }), text: async () => "" };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ embedding: [0.1, 0.2, 0.3] }] }),
+      text: async () => "",
+    };
   };
 }
 
 async function runTurnCollectingLogs() {
   const lines = [];
-  console.log = (...args) => { lines.push(args.map(String).join(" ")); };
+  console.log = (...args) => {
+    lines.push(args.map(String).join(" "));
+  };
   try {
-    capturedJob = null; capturedRetrieve = null;
-    await service.sendMessage(CHAT_ID, "cust1", "customer", { content: "What is the return policy?" });
+    capturedJob = null;
+    capturedRetrieve = null;
+    await service.sendMessage(CHAT_ID, "cust1", "customer", {
+      content: "What is the return policy?",
+    });
     assert.ok(capturedJob, "the v2 turn job must have been enqueued");
     await capturedJob();
   } finally {
@@ -105,19 +160,36 @@ async function runTurnCollectingLogs() {
 }
 
 test("AR-39: embeddingTimeoutMs defaults to 250 and honors RAG_EMBEDDING_TIMEOUT_MS", () => {
-  assert.equal(typeof retrievalService.embeddingTimeoutMs, "function", "retrievalService exposes the budget resolver");
+  assert.equal(
+    typeof retrievalService.embeddingTimeoutMs,
+    "function",
+    "retrievalService exposes the budget resolver",
+  );
   const saved = process.env.RAG_EMBEDDING_TIMEOUT_MS;
   delete process.env.RAG_EMBEDDING_TIMEOUT_MS;
   try {
-    assert.equal(retrievalService.embeddingTimeoutMs(), 250, "default = the previous hard-coded 250 ms");
+    assert.equal(
+      retrievalService.embeddingTimeoutMs(),
+      250,
+      "default = the previous hard-coded 250 ms",
+    );
     process.env.RAG_EMBEDDING_TIMEOUT_MS = "900";
     assert.equal(retrievalService.embeddingTimeoutMs(), 900);
     process.env.RAG_EMBEDDING_TIMEOUT_MS = "not-a-number";
-    assert.equal(retrievalService.embeddingTimeoutMs(), 250, "invalid values fall back to the default");
+    assert.equal(
+      retrievalService.embeddingTimeoutMs(),
+      250,
+      "invalid values fall back to the default",
+    );
     process.env.RAG_EMBEDDING_TIMEOUT_MS = "0";
-    assert.equal(retrievalService.embeddingTimeoutMs(), 250, "non-positive values fall back to the default");
+    assert.equal(
+      retrievalService.embeddingTimeoutMs(),
+      250,
+      "non-positive values fall back to the default",
+    );
   } finally {
-    if (saved === undefined) delete process.env.RAG_EMBEDDING_TIMEOUT_MS; else process.env.RAG_EMBEDDING_TIMEOUT_MS = saved;
+    if (saved === undefined) delete process.env.RAG_EMBEDDING_TIMEOUT_MS;
+    else process.env.RAG_EMBEDDING_TIMEOUT_MS = saved;
   }
 });
 
@@ -129,12 +201,28 @@ test("AR-39: with the default 250 ms budget a slow embedding returns empty AND l
   capturedQdrantArgs = [];
   try {
     const lines = await runTurnCollectingLogs();
-    assert.deepEqual(capturedRetrieve, [], "a 400 ms embedding under a 250 ms budget yields no context");
-    assert.equal(capturedQdrantArgs.length, 0, "Qdrant is never reached when the embedding times out");
+    assert.deepEqual(
+      capturedRetrieve,
+      [],
+      "a 400 ms embedding under a 250 ms budget yields no context",
+    );
+    assert.equal(
+      capturedQdrantArgs.length,
+      0,
+      "Qdrant is never reached when the embedding times out",
+    );
     const timeoutEvents = lines.filter((l) => {
-      try { return JSON.parse(l).event === "rag_retrieve_timeout"; } catch { return false; }
+      try {
+        return JSON.parse(l).event === "rag_retrieve_timeout";
+      } catch {
+        return false;
+      }
     });
-    assert.equal(timeoutEvents.length, 1, `exactly one structured rag_retrieve_timeout line must be logged; lines: ${lines.join(" | ")}`);
+    assert.equal(
+      timeoutEvents.length,
+      1,
+      `exactly one structured rag_retrieve_timeout line must be logged; lines: ${lines.join(" | ")}`,
+    );
   } finally {
     global.fetch = originalFetch;
   }
@@ -148,16 +236,35 @@ test("AR-39: with RAG_EMBEDDING_TIMEOUT_MS raised, the same slow embedding succe
   capturedQdrantArgs = [];
   try {
     const lines = await runTurnCollectingLogs();
-    assert.equal(capturedRetrieve.length, 1, "with a 2000 ms budget the 400 ms embedding succeeds");
+    assert.equal(
+      capturedRetrieve.length,
+      1,
+      "with a 2000 ms budget the 400 ms embedding succeeds",
+    );
     assert.equal(capturedRetrieve[0].text, "Policy text");
     assert.equal(capturedQdrantArgs.length, 1, "Qdrant search runs once");
     const qargs = capturedQdrantArgs[0];
-    assert.equal(typeof qargs.timeout, "number", "the Qdrant search call carries an explicit timeout");
-    assert.ok(qargs.timeout >= 1, "the explicit Qdrant timeout is positive (seconds)");
+    assert.equal(
+      typeof qargs.timeout,
+      "number",
+      "the Qdrant search call carries an explicit timeout",
+    );
+    assert.ok(
+      qargs.timeout >= 1,
+      "the explicit Qdrant timeout is positive (seconds)",
+    );
     const timeoutEvents = lines.filter((l) => {
-      try { return JSON.parse(l).event === "rag_retrieve_timeout"; } catch { return false; }
+      try {
+        return JSON.parse(l).event === "rag_retrieve_timeout";
+      } catch {
+        return false;
+      }
     });
-    assert.equal(timeoutEvents.length, 0, "no timeout event on a successful retrieve");
+    assert.equal(
+      timeoutEvents.length,
+      0,
+      "no timeout event on a successful retrieve",
+    );
   } finally {
     global.fetch = originalFetch;
     delete process.env.RAG_EMBEDDING_TIMEOUT_MS;

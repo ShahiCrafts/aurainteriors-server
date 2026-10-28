@@ -13,8 +13,15 @@ test("CQ-F: order id suffixes are well-formed and crypto-drawn", () => {
   const seen = new Set();
   for (let i = 0; i < 2000; i++) {
     const suffix = Order.generateOrderSuffix();
-    assert.match(suffix, /^[0-9A-Z]{4}$/, "format/length preserved (AU + base36 ts + 4 chars)");
+    assert.match(
+      suffix,
+      /^[0-9A-Z]{4}$/,
+      "format/length preserved (AU + base36 ts + 4 chars)",
+    );
     seen.add(suffix);
   }
-  assert.ok(seen.size > 1900, `suffixes must be effectively unique (got ${seen.size}/2000)`);
+  assert.ok(
+    seen.size > 1900,
+    `suffixes must be effectively unique (got ${seen.size}/2000)`,
+  );
 });

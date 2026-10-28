@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
@@ -11,7 +14,11 @@ router.param("id", objectIdParam.slugOrObjectIdParam);
 router.param("productId", objectIdParam);
 const productController = require("../controllers/product.controller");
 const productVariantController = require("../controllers/productVariant.controller");
-const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
+const {
+  protect,
+  protectOptional,
+  restrictTo,
+} = require("../middleware/auth.middleware");
 const {
   uploadProductFiles,
   processProductFiles,
@@ -39,14 +46,18 @@ router.get(
   publicCache,
   protectOptional,
   validate(getProductsQuerySchema, "query"),
-  productController.getAllProducts
+  productController.getAllProducts,
 );
 router.get("/featured", publicCache, productController.getFeaturedProducts);
 router.get("/new-arrivals", publicCache, productController.getNewArrivals);
 router.get("/:id", publicCache, protectOptional, productController.getProduct);
 // Related stays on the strict :productId guard: getRelatedProducts
 // has no slug branch and genuinely requires an ObjectId (SR-8 scope).
-router.get("/:productId/related", publicCache, productController.getRelatedProducts);
+router.get(
+  "/:productId/related",
+  publicCache,
+  productController.getRelatedProducts,
+);
 
 router.use(protect, restrictTo("admin"));
 
@@ -57,10 +68,17 @@ const cleanupUploadedProductFiles = async (err, req, res, next) => {
   try {
     const uploaded = [
       ...(req.files?.images || []).map((f) => [f.cloudinaryPublicId, "image"]),
-      ...(req.files?.modelFiles || []).map((f) => [f.cloudinaryPublicId, "raw"]),
+      ...(req.files?.modelFiles || []).map((f) => [
+        f.cloudinaryPublicId,
+        "raw",
+      ]),
     ].filter(([id]) => Boolean(id));
-    await Promise.allSettled(uploaded.map(([id, type]) => deleteFromCloudinary(id, type)));
-  } catch { /* cleanup is best-effort; the original error wins */ }
+    await Promise.allSettled(
+      uploaded.map(([id, type]) => deleteFromCloudinary(id, type)),
+    );
+  } catch {
+    /* cleanup is best-effort; the original error wins */
+  }
   next(err);
 };
 
@@ -70,7 +88,7 @@ router.post(
   validate(createProductSchema),
   processProductFiles,
   productController.createProduct,
-  cleanupUploadedProductFiles
+  cleanupUploadedProductFiles,
 );
 
 router.patch(
@@ -79,7 +97,7 @@ router.patch(
   validate(updateProductSchema),
   processProductFiles,
   productController.updateProduct,
-  cleanupUploadedProductFiles
+  cleanupUploadedProductFiles,
 );
 
 router.delete("/:id", productController.deleteProduct);
@@ -87,12 +105,12 @@ router.delete("/:id/permanent", productController.hardDeleteProduct);
 router.patch(
   "/:id/primary-image",
   validate(setPrimaryImageSchema),
-  productController.setPrimaryImage
+  productController.setPrimaryImage,
 );
 router.patch(
   "/:id/stock",
   validate(updateStockSchema),
-  productController.updateStock
+  productController.updateStock,
 );
 
 // Phase 3 (catalog): variant CRUD (admin — this whole section sits
@@ -106,13 +124,16 @@ router.get("/:id/variants", productVariantController.listVariants);
 router.post(
   "/:id/variants",
   validate(createVariantSchema),
-  productVariantController.createVariant
+  productVariantController.createVariant,
 );
 router.patch(
   "/:id/variants/:variantId",
   validate(updateVariantSchema),
-  productVariantController.updateVariant
+  productVariantController.updateVariant,
 );
-router.delete("/:id/variants/:variantId", productVariantController.deleteVariant);
+router.delete(
+  "/:id/variants/:variantId",
+  productVariantController.deleteVariant,
+);
 
 module.exports = router;

@@ -8,13 +8,30 @@ const { escapeRegExp, literalRegExp } = require("../../utils/escapeRegex");
 const { literalRegex, escapeRegex } = require("../../utils/listQuery");
 
 test("CQ-C: attack strings are literalized", () => {
-  for (const attack of ["(a+)+$", ".*", "[", "\\", "a|b", "^$", "a{2,}", "(?<x>)", "\\\\d+"]) {
+  for (const attack of [
+    "(a+)+$",
+    ".*",
+    "[",
+    "\\",
+    "a|b",
+    "^$",
+    "a{2,}",
+    "(?<x>)",
+    "\\\\d+",
+  ]) {
     const re = literalRegExp(attack);
     assert.ok(re.test(attack), `the literal text itself must match: ${attack}`);
-    assert.ok(!re.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), `no pattern semantics for: ${attack}`);
+    assert.ok(
+      !re.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+      `no pattern semantics for: ${attack}`,
+    );
   }
   assert.equal(escapeRegExp("a.b*c"), "a\\.b\\*c");
-  assert.equal(escapeRegExp("x".repeat(500)).length, 100, "input is length-capped");
+  assert.equal(
+    escapeRegExp("x".repeat(500)).length,
+    100,
+    "input is length-capped",
+  );
   // listQuery re-exports are the same functions (single definition)
   assert.equal(escapeRegex, escapeRegExp);
   assert.equal(literalRegex("(a+)+$").source, escapeRegExp("(a+)+$"));
@@ -31,6 +48,9 @@ test("CQ-C: substring search behavior is preserved (characterization)", () => {
   const re = literalRegExp("Oak Table");
   assert.ok(re.test("Solid Oak Table (Large)"));
   assert.ok(re.test("solid oak table"));
-  assert.ok(re.test("Oak Tables"), "substring semantics: 'Oak Tables' contains the search text");
+  assert.ok(
+    re.test("Oak Tables"),
+    "substring semantics: 'Oak Tables' contains the search text",
+  );
   assert.ok(!re.test("Pine Table"));
 });

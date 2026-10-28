@@ -75,10 +75,18 @@ function findPollutionKey(value, depth = 0) {
 }
 
 function checkBounds(definition, value) {
-  if (definition.min !== undefined && definition.min !== null && value < definition.min) {
+  if (
+    definition.min !== undefined &&
+    definition.min !== null &&
+    value < definition.min
+  ) {
     return `must be at least ${definition.min}`;
   }
-  if (definition.max !== undefined && definition.max !== null && value > definition.max) {
+  if (
+    definition.max !== undefined &&
+    definition.max !== null &&
+    value > definition.max
+  ) {
     return `must be at most ${definition.max}`;
   }
   if (definition.step) {
@@ -100,13 +108,15 @@ function validateEnumMembership(definition, value) {
 }
 
 function validateValue(definition, value) {
-  if (!definition || !definition.type) return fail("Unknown attribute definition");
+  if (!definition || !definition.type)
+    return fail("Unknown attribute definition");
   switch (definition.type) {
     case "string": {
       if (typeof value !== "string") return fail("must be a string");
       const trimmed = value.trim();
       const cap = definition.maxLength || DEFAULT_STRING_MAX;
-      if (trimmed.length > cap) return fail(`must be at most ${cap} characters`);
+      if (trimmed.length > cap)
+        return fail(`must be at most ${cap} characters`);
       return pass(trimmed);
     }
     case "enum": {
@@ -120,11 +130,13 @@ function validateValue(definition, value) {
     case "multi-enum": {
       if (!Array.isArray(value)) return fail("must be an array of strings");
       if (value.length === 0) return fail("must contain at least one value");
-      if (value.length > MAX_MULTI_VALUES) return fail(`must contain at most ${MAX_MULTI_VALUES} values`);
+      if (value.length > MAX_MULTI_VALUES)
+        return fail(`must contain at most ${MAX_MULTI_VALUES} values`);
       const seen = new Set();
       const out = [];
       for (const item of value) {
-        if (typeof item !== "string") return fail("must be an array of strings");
+        if (typeof item !== "string")
+          return fail("must be an array of strings");
         const trimmed = item.trim();
         if (!trimmed) return fail("must not contain empty values");
         const membership = validateEnumMembership(definition, trimmed);
@@ -141,29 +153,37 @@ function validateValue(definition, value) {
       return pass(value);
     }
     case "integer": {
-      if (typeof value !== "number" || !Number.isFinite(value)) return fail("must be a number");
+      if (typeof value !== "number" || !Number.isFinite(value))
+        return fail("must be a number");
       if (!Number.isInteger(value)) return fail("must be a whole number");
       const bounds = checkBounds(definition, value);
       if (bounds) return fail(bounds);
       return pass(value);
     }
     case "decimal": {
-      if (typeof value !== "number" || !Number.isFinite(value)) return fail("must be a number");
+      if (typeof value !== "number" || !Number.isFinite(value))
+        return fail("must be a number");
       const bounds = checkBounds(definition, value);
       if (bounds) return fail(bounds);
       return pass(value);
     }
     case "money": {
-      if (typeof value !== "number" || !Number.isFinite(value)) return fail("must be a number");
+      if (typeof value !== "number" || !Number.isFinite(value))
+        return fail("must be a number");
       const floor = Math.max(0, definition.min ?? 0);
       if (value < floor) return fail(`must be at least ${floor}`);
-      if (definition.max !== undefined && definition.max !== null && value > definition.max) {
+      if (
+        definition.max !== undefined &&
+        definition.max !== null &&
+        value > definition.max
+      ) {
         return fail(`must be at most ${definition.max}`);
       }
       return pass(value);
     }
     case "measurement": {
-      if (!isPlainObject(value)) return fail("must be an object { value, unit }");
+      if (!isPlainObject(value))
+        return fail("must be an object { value, unit }");
       const keys = Object.keys(value);
       if (keys.some((k) => k !== "value" && k !== "unit")) {
         return fail("must be an object { value, unit } with no other keys");
@@ -173,7 +193,11 @@ function validateValue(definition, value) {
       }
       const floor = definition.min ?? null;
       if (floor !== null ? value.value < floor : value.value <= 0) {
-        return fail(floor !== null ? `measurement value must be at least ${floor}` : "measurement value must be positive");
+        return fail(
+          floor !== null
+            ? `measurement value must be at least ${floor}`
+            : "measurement value must be positive",
+        );
       }
       if (typeof value.unit !== "string" || !value.unit.trim()) {
         return fail("measurement unit is required");
@@ -193,36 +217,53 @@ function validateValue(definition, value) {
       const trimmed = value.trim();
       const allowed = definition.allowedValues || [];
       if (allowed.length > 0) {
-        const match = allowed.find((name) => name.toLowerCase() === trimmed.toLowerCase());
+        const match = allowed.find(
+          (name) => name.toLowerCase() === trimmed.toLowerCase(),
+        );
         if (!match) return fail(`must be one of: ${allowed.join(", ")}`);
         return pass(match);
       }
       const hex = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed);
       if (!hex) return fail("must be a hex color (#RGB or #RRGGBB)");
       let digits = trimmed.slice(1).toLowerCase();
-      if (digits.length === 3) digits = digits.split("").map((c) => c + c).join("");
+      if (digits.length === 3)
+        digits = digits
+          .split("")
+          .map((c) => c + c)
+          .join("");
       return pass(`#${digits}`);
     }
     case "dimensions": {
-      if (!isPlainObject(value)) return fail("must be an object { length, width, height, unit }");
+      if (!isPlainObject(value))
+        return fail("must be an object { length, width, height, unit }");
       const keys = Object.keys(value);
-      if (keys.some((k) => !["length", "width", "height", "unit"].includes(k))) {
-        return fail("must be an object { length, width, height, unit } with no other keys");
+      if (
+        keys.some((k) => !["length", "width", "height", "unit"].includes(k))
+      ) {
+        return fail(
+          "must be an object { length, width, height, unit } with no other keys",
+        );
       }
       const out = {};
       for (const part of ["length", "width", "height"]) {
         const partValue = value[part];
-        if (typeof partValue !== "number" || !Number.isFinite(partValue) || partValue <= 0) {
+        if (
+          typeof partValue !== "number" ||
+          !Number.isFinite(partValue) ||
+          partValue <= 0
+        ) {
           return fail(`${part} must be a positive number`);
         }
         out[part] = partValue;
       }
-      const accepted = definition.acceptedUnits && definition.acceptedUnits.length > 0
-        ? definition.acceptedUnits
-        : definition.unit
-          ? [definition.unit]
-          : LENGTH_UNITS;
-      const unit = value.unit === undefined ? definition.unit || "cm" : value.unit;
+      const accepted =
+        definition.acceptedUnits && definition.acceptedUnits.length > 0
+          ? definition.acceptedUnits
+          : definition.unit
+            ? [definition.unit]
+            : LENGTH_UNITS;
+      const unit =
+        value.unit === undefined ? definition.unit || "cm" : value.unit;
       if (typeof unit !== "string" || !accepted.includes(unit)) {
         return fail(`unit must be one of: ${accepted.join(", ")}`);
       }
@@ -243,9 +284,13 @@ function validateValue(definition, value) {
 function validateCatalogAttributesMap(definitionsByKey, attrs) {
   if (!isPlainObject(attrs)) return fail("catalogAttributes must be an object");
   const pollution = findPollutionKey(attrs);
-  if (pollution) return fail(`catalogAttributes contains a forbidden key: "${pollution}"`);
+  if (pollution)
+    return fail(`catalogAttributes contains a forbidden key: "${pollution}"`);
   const keys = Object.keys(attrs);
-  if (keys.length > MAX_ATTRIBUTES) return fail(`catalogAttributes cannot hold more than ${MAX_ATTRIBUTES} attributes`);
+  if (keys.length > MAX_ATTRIBUTES)
+    return fail(
+      `catalogAttributes cannot hold more than ${MAX_ATTRIBUTES} attributes`,
+    );
   const normalized = {};
   for (const key of keys) {
     if (!ATTRIBUTE_KEY_PATTERN.test(key)) {
@@ -258,7 +303,9 @@ function validateCatalogAttributesMap(definitionsByKey, attrs) {
     // `storage` defaults to "catalogAttributes" on the model; a
     // plain-object definition without the field means the same.
     if ((definition.storage || "catalogAttributes") !== "catalogAttributes") {
-      return fail(`Attribute "${key}" is a product field, not a catalog attribute`);
+      return fail(
+        `Attribute "${key}" is a product field, not a catalog attribute`,
+      );
     }
     const result = validateValue(definition, attrs[key]);
     if (!result.ok) {
@@ -279,7 +326,7 @@ function missingRequiredAttributes(resolvedAttributes, attrs) {
       (entry) =>
         entry.required &&
         entry.storage === "catalogAttributes" &&
-        (values[entry.key] === undefined || values[entry.key] === null)
+        (values[entry.key] === undefined || values[entry.key] === null),
     )
     .map((entry) => entry.key);
 }

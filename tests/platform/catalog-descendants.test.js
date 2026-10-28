@@ -22,15 +22,37 @@ const { stubModule, mockRes, mockNext, until } = require("../audit/helpers");
 
 function recordingQuery(result, record) {
   const q = {
-    populate() { return q; },
-    select() { return q; },
-    session() { return q; },
-    sort(s) { record.sort = s; return q; },
-    skip(n) { record.skip = n; return q; },
-    limit(n) { record.limit = n; return q; },
-    lean() { record.lean = true; return q; },
-    then(onF, onR) { return Promise.resolve(result).then(onF, onR); },
-    catch(onR) { return Promise.resolve(result).catch(onR); },
+    populate() {
+      return q;
+    },
+    select() {
+      return q;
+    },
+    session() {
+      return q;
+    },
+    sort(s) {
+      record.sort = s;
+      return q;
+    },
+    skip(n) {
+      record.skip = n;
+      return q;
+    },
+    limit(n) {
+      record.limit = n;
+      return q;
+    },
+    lean() {
+      record.lean = true;
+      return q;
+    },
+    then(onF, onR) {
+      return Promise.resolve(result).then(onF, onR);
+    },
+    catch(onR) {
+      return Promise.resolve(result).catch(onR);
+    },
   };
   return q;
 }
@@ -56,7 +78,10 @@ stubModule("models/category.model", {
   find: (filter) => {
     if (filter && filter.slug && Array.isArray(filter.slug.$in)) {
       const wanted = new Set(filter.slug.$in);
-      return recordingQuery(CATS.filter((c) => wanted.has(c.slug)), {});
+      return recordingQuery(
+        CATS.filter((c) => wanted.has(c.slug)),
+        {},
+      );
     }
     return recordingQuery(CATS, {});
   },
@@ -80,7 +105,10 @@ stubModule("models/category.model", {
   },
 });
 stubModule("models/product.model", {
-  find: (filter) => { calls.productFind.push(filter); return recordingQuery(DOCS, {}); },
+  find: (filter) => {
+    calls.productFind.push(filter);
+    return recordingQuery(DOCS, {});
+  },
   countDocuments: async () => DOCS.length,
 });
 stubModule("middleware/upload.middleware", {
@@ -92,10 +120,15 @@ const productCtrl = require("../../controllers/product.controller");
 
 async function runProducts(query) {
   calls.productFind = [];
-  const res = mockRes(); const next = mockNext();
+  const res = mockRes();
+  const next = mockNext();
   productCtrl.getAllProducts({ query }, res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getAllProducts errored: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getAllProducts errored: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   return { res, filter: calls.productFind[0] };
 }
@@ -115,7 +148,11 @@ test("descendants: leaf slug stays a single-category filter", async () => {
 
 test("descendants: multiple slugs union their subtrees", async () => {
   const { filter } = await runProducts({ categories: "sofas,beds" });
-  assert.deepEqual(asSet(filter.category.$in), ["c-3seat", "c-beds", "c-sofas"]);
+  assert.deepEqual(asSet(filter.category.$in), [
+    "c-3seat",
+    "c-beds",
+    "c-sofas",
+  ]);
 });
 
 test("descendants: a resolvable slug wins over a bogus one in the same list", async () => {
@@ -139,12 +176,19 @@ test("descendants: legacy category id for a leaf stays a single-category filter"
 });
 
 test("descendants: categories (slugs) still overwrites category (ids) when a slug resolves", async () => {
-  const { filter } = await runProducts({ category: "c-beds", categories: "sofas" });
+  const { filter } = await runProducts({
+    category: "c-beds",
+    categories: "sofas",
+  });
   assert.deepEqual(asSet(filter.category.$in), ["c-3seat", "c-sofas"]);
 });
 
 test("descendants: cursor mode applies the expanded filter and still returns nextCursor", async () => {
-  const { res, filter } = await runProducts({ categories: "living-room", cursor: "", limit: "2" });
+  const { res, filter } = await runProducts({
+    categories: "living-room",
+    cursor: "",
+    limit: "2",
+  });
   assert.deepEqual(asSet(filter.category.$in), LIVING_SUBTREE);
   assert.equal(res.body.data.products.length, 2);
   assert.equal(typeof res.body.data.nextCursor, "string");

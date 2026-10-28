@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
@@ -9,7 +12,8 @@ const { protect } = require("../middleware/auth.middleware");
 
 router.use(protect);
 router.param("id", (req, res, next, id) => {
-  if (!/^[a-f0-9]{24}$/i.test(id)) return next(new AppError("Invalid address ID", 400));
+  if (!/^[a-f0-9]{24}$/i.test(id))
+    return next(new AppError("Invalid address ID", 400));
   next();
 });
 

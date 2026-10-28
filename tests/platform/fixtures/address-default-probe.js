@@ -13,11 +13,15 @@ const fs = require("node:fs");
 const REPO = path.resolve(__dirname, "../../..");
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "addr-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri("aura_address_default_test");
 
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
@@ -43,11 +47,24 @@ async function main() {
   });
   const [a, b, c] = await Address.create([mk(1), mk(2), mk(3)]);
 
-  const targets = [a._id, b._id, c._id, a._id, c._id, b._id, a._id, b._id, c._id, a._id];
+  const targets = [
+    a._id,
+    b._id,
+    c._id,
+    a._id,
+    c._id,
+    b._id,
+    a._id,
+    b._id,
+    c._id,
+    a._id,
+  ];
   await Promise.all(targets.map((t) => Address.switchDefault(userId, t)));
 
   const defaults = await Address.find({ user: userId, isDefault: true }).lean();
-  console.log(`RESULT defaultCount=${defaults.length} defaultId=${defaults.length === 1 ? String(defaults[0]._id) : "n/a"}`);
+  console.log(
+    `RESULT defaultCount=${defaults.length} defaultId=${defaults.length === 1 ? String(defaults[0]._id) : "n/a"}`,
+  );
 
   await mongoose.disconnect();
   await mongod.stop({ doCleanup: true, force: true });
@@ -55,5 +72,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

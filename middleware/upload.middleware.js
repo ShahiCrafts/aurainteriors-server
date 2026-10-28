@@ -2,13 +2,22 @@ const multer = require("multer");
 const nosqlSanitize = require("./nosqlSanitize.middleware");
 // FA-61: multipart bodies only exist AFTER multer parses them, so each
 // upload middleware re-runs the operator-key check on the parsed body.
-const withSanitize = (mw) => (req, res, next) => mw(req, res, (err) => (err ? next(err) : nosqlSanitize(req, res, next)));
+const withSanitize = (mw) => (req, res, next) =>
+  mw(req, res, (err) => (err ? next(err) : nosqlSanitize(req, res, next)));
 const sharp = require("sharp");
 const path = require("path");
 const crypto = require("crypto");
 const AppError = require("../utils/AppError");
-const { uploadToCloudinary, deleteFromCloudinary } = require("../config/cloudinary");
-const { detectImageType, detectDocumentType, matchesModelFile, isDocxBuffer } = require("../utils/fileSniff");
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} = require("../config/cloudinary");
+const {
+  detectImageType,
+  detectDocumentType,
+  matchesModelFile,
+  isDocxBuffer,
+} = require("../utils/fileSniff");
 const { mapWithConcurrency } = require("../utils/promisePool");
 
 // AR-12: per-file sharp + Cloudinary pipelines fan out per request.
@@ -23,17 +32,25 @@ const UPLOAD_PIPELINE_CONCURRENCY = 3;
 // 50 MB (52428800), so a budget applies even when the env var is
 // unset; only a non-positive resolved value disables enforcement.
 const getUploadMaxTotalBytes = (env = process.env) => {
-  const n = Number(require("../config/appConfig").getInt("UPLOAD_MAX_TOTAL_BYTES", env));
+  const n = Number(
+    require("../config/appConfig").getInt("UPLOAD_MAX_TOTAL_BYTES", env),
+  );
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 const totalUploadBytes = (files) =>
-  (files || []).reduce((sum, file) => sum + (file?.buffer?.length ?? file?.size ?? 0), 0);
+  (files || []).reduce(
+    (sum, file) => sum + (file?.buffer?.length ?? file?.size ?? 0),
+    0,
+  );
 const uploadTotalBytesError = (files) => {
   const max = getUploadMaxTotalBytes();
   if (max === null) return null;
   const total = totalUploadBytes(files);
   return total > max
-    ? new AppError(`Uploaded files total ${total} bytes, which exceeds the per-request limit of ${max} bytes`, 400)
+    ? new AppError(
+        `Uploaded files total ${total} bytes, which exceeds the per-request limit of ${max} bytes`,
+        400,
+      )
     : null;
 };
 
@@ -67,7 +84,10 @@ const modelFileFilter = (req, file, cb) => {
     if (file.mimetype.startsWith("image")) {
       cb(null, true);
     } else {
-      cb(new AppError("Please upload only images for the images field", 400), false);
+      cb(
+        new AppError("Please upload only images for the images field", 400),
+        false,
+      );
     }
   } else if (file.fieldname === "modelFiles") {
     const allowedExtensions = [".glb", ".gltf", ".usdz"];
@@ -75,7 +95,13 @@ const modelFileFilter = (req, file, cb) => {
     if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new AppError("Please upload only .glb, .gltf, or .usdz files for 3D models", 400), false);
+      cb(
+        new AppError(
+          "Please upload only .glb, .gltf, or .usdz files for 3D models",
+          400,
+        ),
+        false,
+      );
     }
   } else {
     // Fail closed: a field this upload does not declare gets no file.
@@ -103,7 +129,7 @@ const productUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024, files: 15, fields: 30, parts: 40 },
 });
 
-exports.uploadAvatar = withSanitize( upload.single("avatar"));
+exports.uploadAvatar = withSanitize(upload.single("avatar"));
 
 exports.resizeAvatar = async (req, res, next) => {
   const badImage = imageContentError(req.file);
@@ -133,9 +159,9 @@ exports.resizeAvatar = async (req, res, next) => {
   }
 };
 
-exports.uploadCategoryImage = withSanitize( upload.single("image"));
+exports.uploadCategoryImage = withSanitize(upload.single("image"));
 
-exports.uploadBlogImage = withSanitize( upload.single("featuredImage"));
+exports.uploadBlogImage = withSanitize(upload.single("featuredImage"));
 
 exports.resizeBlogImage = async (req, res, next) => {
   const badImage = imageContentError(req.file);
@@ -182,11 +208,16 @@ exports.resizeCategoryImage = async (req, res, next) => {
     // (the legacy "allow: store as-is" behaviour is removed).
     let uploadBuffer = req.file.buffer;
     if (detectImageType(req.file.buffer) === "svg") {
-      const policy = String(require("../config/appConfig").getString("CATEGORY_SVG_POLICY") || "reencode").toLowerCase();
+      const policy = String(
+        require("../config/appConfig").getString("CATEGORY_SVG_POLICY") ||
+          "reencode",
+      ).toLowerCase();
       if (policy === "reencode") {
         uploadBuffer = await sharp(req.file.buffer).png().toBuffer();
       } else {
-        return next(new AppError("SVG images are not accepted for categories", 400));
+        return next(
+          new AppError("SVG images are not accepted for categories", 400),
+        );
       }
     }
 
@@ -206,12 +237,14 @@ exports.resizeCategoryImage = async (req, res, next) => {
   }
 };
 
-exports.uploadProductImages = withSanitize( upload.array("images", 10));
+exports.uploadProductImages = withSanitize(upload.array("images", 10));
 
-exports.uploadProductFiles = withSanitize(productUpload.fields([
-  { name: "images", maxCount: 10 },
-  { name: "modelFiles", maxCount: 5 },
-]));
+exports.uploadProductFiles = withSanitize(
+  productUpload.fields([
+    { name: "images", maxCount: 10 },
+    { name: "modelFiles", maxCount: 5 },
+  ]),
+);
 
 // AR-31(d): the ONE shared per-file product-image pipeline.
 // resizeProductImages and processProductFiles previously carried
@@ -237,7 +270,7 @@ const processProductImageFile = async (file) => {
   const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(1);
 
   console.log(
-    `[Product Image Compression] ${file.originalname}: ${(originalSize / 1024).toFixed(1)}KB → ${(compressedSize / 1024).toFixed(1)}KB (${reduction}% reduction)`
+    `[Product Image Compression] ${file.originalname}: ${(originalSize / 1024).toFixed(1)}KB → ${(compressedSize / 1024).toFixed(1)}KB (${reduction}% reduction)`,
   );
 
   const result = await uploadToCloudinary(resizedBuffer, {
@@ -251,7 +284,9 @@ const processProductImageFile = async (file) => {
 };
 
 exports.resizeProductImages = async (req, res, next) => {
-  const overBudget = uploadTotalBytesError(Array.isArray(req.files) ? req.files : []);
+  const overBudget = uploadTotalBytesError(
+    Array.isArray(req.files) ? req.files : [],
+  );
   if (overBudget) return next(overBudget);
   if (Array.isArray(req.files)) {
     for (const file of req.files) {
@@ -262,7 +297,11 @@ exports.resizeProductImages = async (req, res, next) => {
   try {
     if (!req.files || req.files.length === 0) return next();
 
-    await mapWithConcurrency(req.files, UPLOAD_PIPELINE_CONCURRENCY, processProductImageFile);
+    await mapWithConcurrency(
+      req.files,
+      UPLOAD_PIPELINE_CONCURRENCY,
+      processProductImageFile,
+    );
 
     next();
   } catch (error) {
@@ -273,7 +312,10 @@ exports.resizeProductImages = async (req, res, next) => {
 
 exports.processProductFiles = async (req, res, next) => {
   // AR-12: the aggregate budget spans BOTH file groups of this request.
-  const overBudget = uploadTotalBytesError([...(req.files?.images || []), ...(req.files?.modelFiles || [])]);
+  const overBudget = uploadTotalBytesError([
+    ...(req.files?.images || []),
+    ...(req.files?.modelFiles || []),
+  ]);
   if (overBudget) return next(overBudget);
   if (req.files?.images) {
     for (const file of req.files.images) {
@@ -286,21 +328,35 @@ exports.processProductFiles = async (req, res, next) => {
     // matches it (glTF magic for .glb, zip magic for .usdz, JSON with
     // an asset header for .gltf) before anything is stored (B-03).
     for (const file of req.files.modelFiles) {
-      const ext = path.extname(file.originalname).toLowerCase().replace(".", "");
+      const ext = path
+        .extname(file.originalname)
+        .toLowerCase()
+        .replace(".", "");
       if (!matchesModelFile(file.buffer, ext)) {
-        return next(new AppError(`File ${file.originalname} is not a valid .${ext} model`, 400));
+        return next(
+          new AppError(
+            `File ${file.originalname} is not a valid .${ext} model`,
+            400,
+          ),
+        );
       }
     }
   }
   try {
     if (req.files?.images && req.files.images.length > 0) {
       // AR-31(d): shared per-file pipeline (see processProductImageFile).
-      await mapWithConcurrency(req.files.images, UPLOAD_PIPELINE_CONCURRENCY, processProductImageFile);
+      await mapWithConcurrency(
+        req.files.images,
+        UPLOAD_PIPELINE_CONCURRENCY,
+        processProductImageFile,
+      );
     }
 
     if (req.files?.modelFiles && req.files.modelFiles.length > 0) {
       await mapWithConcurrency(
-        req.files.modelFiles, UPLOAD_PIPELINE_CONCURRENCY, async (file) => {
+        req.files.modelFiles,
+        UPLOAD_PIPELINE_CONCURRENCY,
+        async (file) => {
           const ext = path.extname(file.originalname).toLowerCase();
           const cleanExt = ext.replace(".", "");
           const publicId = `${generatePublicId("model")}.${cleanExt}`;
@@ -323,7 +379,7 @@ exports.processProductFiles = async (req, res, next) => {
           } else {
             file.platform = "universal";
           }
-        }
+        },
       );
     }
 
@@ -341,14 +397,22 @@ exports.deleteFile = async (publicId, resourceType = "image") => {
 exports.deleteFiles = async (publicIds, resourceType = "image") => {
   // AR-12: deletes fan out to Cloudinary too — bound them with the
   // same pool so a long id list cannot burst unbounded calls.
-  await mapWithConcurrency(publicIds, UPLOAD_PIPELINE_CONCURRENCY, (id) => deleteFromCloudinary(id, resourceType));
+  await mapWithConcurrency(publicIds, UPLOAD_PIPELINE_CONCURRENCY, (id) =>
+    deleteFromCloudinary(id, resourceType),
+  );
 };
 
 exports.UPLOAD_PIPELINE_CONCURRENCY = UPLOAD_PIPELINE_CONCURRENCY;
 exports.getUploadMaxTotalBytes = getUploadMaxTotalBytes;
 
 const chatAttachmentFilter = (req, file, cb) => {
-  const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+  const allowedImageTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+  ];
   const allowedDocTypes = [
     "application/pdf",
     "application/msword",
@@ -360,15 +424,18 @@ const chatAttachmentFilter = (req, file, cb) => {
     "application/json",
   ];
 
-  if (allowedImageTypes.includes(file.mimetype) || allowedDocTypes.includes(file.mimetype)) {
+  if (
+    allowedImageTypes.includes(file.mimetype) ||
+    allowedDocTypes.includes(file.mimetype)
+  ) {
     cb(null, true);
   } else {
     cb(
       new AppError(
         "Only images (JPEG, PNG, GIF, WebP) and documents (PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, JSON) are allowed",
-        400
+        400,
       ),
-      false
+      false,
     );
   }
 };
@@ -395,11 +462,8 @@ const documentFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(
-      new AppError(
-        "Only PDF, DOCX, TXT, and CSV documents are allowed",
-        400
-      ),
-      false
+      new AppError("Only PDF, DOCX, TXT, and CSV documents are allowed", 400),
+      false,
     );
   }
 };
@@ -410,7 +474,7 @@ const documentUpload = multer({
   limits: { fileSize: 20 * 1024 * 1024, files: 1, fields: 20, parts: 25 },
 });
 
-exports.uploadDocumentFile = withSanitize( documentUpload.single("file"));
+exports.uploadDocumentFile = withSanitize(documentUpload.single("file"));
 
 exports.processDocumentFile = async (req, res, next) => {
   try {
@@ -424,22 +488,42 @@ exports.processDocumentFile = async (req, res, next) => {
     // previously any text-bytes file (e.g. .html) was stored under its
     // original extension in the Cloudinary public_id.
     if (!["pdf", "docx", "txt", "csv"].includes(cleanExt)) {
-      return next(new AppError("Only .pdf, .docx, .txt and .csv documents are accepted", 400));
+      return next(
+        new AppError(
+          "Only .pdf, .docx, .txt and .csv documents are accepted",
+          400,
+        ),
+      );
     }
     // The stored fileType is derived from the DETECTED content, so first
     // prove the bytes match it: PDF bytes named .docx (or a binary named
     // .txt) are rejected instead of reaching the wrong ingestion parser.
     const detected = detectDocumentType(req.file.buffer);
-    const expected = cleanExt === "pdf" ? "pdf" : cleanExt === "docx" ? "docx" : "text";
+    const expected =
+      cleanExt === "pdf" ? "pdf" : cleanExt === "docx" ? "docx" : "text";
     if (detected !== expected) {
-      return next(new AppError(`File content does not match the .${cleanExt} document type`, 400));
+      return next(
+        new AppError(
+          `File content does not match the .${cleanExt} document type`,
+          400,
+        ),
+      );
     }
     // FA-79: "docx" detection is only ZIP magic - verify the container
     // really is a Word document before accepting the classification.
     if (detected === "docx" && !(await isDocxBuffer(req.file.buffer))) {
-      return next(new AppError("The uploaded .docx is not a valid Word document", 400));
+      return next(
+        new AppError("The uploaded .docx is not a valid Word document", 400),
+      );
     }
-    const storedExt = detected === "pdf" ? "pdf" : detected === "docx" ? "docx" : cleanExt === "csv" ? "csv" : "txt";
+    const storedExt =
+      detected === "pdf"
+        ? "pdf"
+        : detected === "docx"
+          ? "docx"
+          : cleanExt === "csv"
+            ? "csv"
+            : "txt";
     const publicId = `${generatePublicId("doc")}.${storedExt}`;
 
     const result = await uploadToCloudinary(req.file.buffer, {
@@ -462,4 +546,3 @@ exports.processDocumentFile = async (req, res, next) => {
     next(new AppError("Error uploading document to Cloudinary", 500));
   }
 };
-

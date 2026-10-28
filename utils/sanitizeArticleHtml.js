@@ -12,21 +12,79 @@
 // them.
 
 const DROP_WITH_CONTENTS = new Set([
-  "script", "style", "iframe", "object", "form", "noscript",
-  "svg", "math", "template", "title", "textarea", "button", "nav",
-  "aside", "footer", "header", "select", "frameset", "applet", "xmp",
-  "noembed", "noframes",
+  "script",
+  "style",
+  "iframe",
+  "object",
+  "form",
+  "noscript",
+  "svg",
+  "math",
+  "template",
+  "title",
+  "textarea",
+  "button",
+  "nav",
+  "aside",
+  "footer",
+  "header",
+  "select",
+  "frameset",
+  "applet",
+  "xmp",
+  "noembed",
+  "noframes",
 ]);
 
 // Void elements with no contents to swallow: drop the tag alone
 // (waiting for a closing tag would eat the rest of the document).
-const DROP_TAG_ONLY = new Set(["embed", "input", "link", "meta", "base", "frame"]);
+const DROP_TAG_ONLY = new Set([
+  "embed",
+  "input",
+  "link",
+  "meta",
+  "base",
+  "frame",
+]);
 
 const ALLOWED_TAGS = new Set([
-  "p", "a", "img", "ul", "ol", "li", "strong", "em", "b", "i", "u", "s",
-  "h2", "h3", "h4", "h5", "h6", "blockquote", "figure", "figcaption",
-  "br", "hr", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-  "span", "div", "pre", "code", "small", "sub", "sup", "caption",
+  "p",
+  "a",
+  "img",
+  "ul",
+  "ol",
+  "li",
+  "strong",
+  "em",
+  "b",
+  "i",
+  "u",
+  "s",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "blockquote",
+  "figure",
+  "figcaption",
+  "br",
+  "hr",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "th",
+  "td",
+  "span",
+  "div",
+  "pre",
+  "code",
+  "small",
+  "sub",
+  "sup",
+  "caption",
 ]);
 
 const VOID_TAGS = new Set(["img", "br", "hr"]);
@@ -41,11 +99,17 @@ const ALLOWED_ATTRS = {
 // FA-52: out-of-range code points made String.fromCodePoint throw - a
 // single crafted &#xFFFFFFFF; in an attribute crashed feed ingestion.
 const fromCodePointClamped = (cp, literal) =>
-  Number.isFinite(cp) && cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : literal;
+  Number.isFinite(cp) && cp >= 0 && cp <= 0x10ffff
+    ? String.fromCodePoint(cp)
+    : literal;
 const decodeEntities = (value) =>
   String(value)
-    .replace(/&#x([0-9a-fA-F]+);?/g, (m, hex) => fromCodePointClamped(parseInt(hex, 16), m))
-    .replace(/&#(\d+);?/g, (m, dec) => fromCodePointClamped(parseInt(dec, 10), m))
+    .replace(/&#x([0-9a-fA-F]+);?/g, (m, hex) =>
+      fromCodePointClamped(parseInt(hex, 16), m),
+    )
+    .replace(/&#(\d+);?/g, (m, dec) =>
+      fromCodePointClamped(parseInt(dec, 10), m),
+    )
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -53,7 +117,11 @@ const decodeEntities = (value) =>
     .replace(/&apos;/g, "'");
 
 const escapeAttr = (value) =>
-  String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 function sanitizeUrl(rawValue, { image = false } = {}) {
   if (typeof rawValue !== "string") return null;
@@ -68,7 +136,8 @@ function sanitizeUrl(rawValue, { image = false } = {}) {
 
 function parseAttrs(attrText) {
   const attrs = {};
-  const pattern = /([a-zA-Z][a-zA-Z0-9-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+  const pattern =
+    /([a-zA-Z][a-zA-Z0-9-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
   let match;
   while ((match = pattern.exec(attrText)) !== null) {
     const name = match[1].toLowerCase();
@@ -79,7 +148,8 @@ function parseAttrs(attrText) {
 
 function sanitizeArticleHtml(html) {
   const input = String(html || "").replace(/<!--[\s\S]*?-->/g, "");
-  const tagPattern = /<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|([^<]+)/g;
+  const tagPattern =
+    /<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|([^<]+)/g;
   let out = "";
   let match;
   let dropDepth = 0; // inside a DROP_WITH_CONTENTS element
@@ -99,8 +169,10 @@ function sanitizeArticleHtml(html) {
       // FA-53 recovery: an unclosed drop element must not swallow the
       // rest of the article - abandon the drop after 100k chars and
       // resume normal (still allowlist-filtered) processing.
-      if (match.index - dropStart > 100000) { dropDepth = 0; dropTag = null; }
-      else {
+      if (match.index - dropStart > 100000) {
+        dropDepth = 0;
+        dropTag = null;
+      } else {
         if (tag === dropTag) dropDepth += isClosing ? -1 : 1;
         continue;
       }
@@ -109,7 +181,11 @@ function sanitizeArticleHtml(html) {
     if (DROP_WITH_CONTENTS.has(tag)) {
       // FA-53: a self-closing drop tag (<script ... />) opens nothing.
       const selfClosing = /\/\s*$/.test(attrText || "");
-      if (!isClosing && !selfClosing) { dropDepth = 1; dropTag = tag; dropStart = match.index; }
+      if (!isClosing && !selfClosing) {
+        dropDepth = 1;
+        dropTag = tag;
+        dropStart = match.index;
+      }
       continue;
     }
     if (!ALLOWED_TAGS.has(tag)) continue; // unwrap: drop the tag, keep contents
@@ -129,8 +205,14 @@ function sanitizeArticleHtml(html) {
         } else if (name === "src") {
           const url = sanitizeUrl(attrs[name], { image: true });
           if (url) attrOut += ` src="${escapeAttr(url)}"`;
-        } else if (name === "colspan" || name === "rowspan" || name === "width" || name === "height") {
-          if (/^\d{1,3}$/.test(attrs[name])) attrOut += ` ${name}="${attrs[name]}"`;
+        } else if (
+          name === "colspan" ||
+          name === "rowspan" ||
+          name === "width" ||
+          name === "height"
+        ) {
+          if (/^\d{1,3}$/.test(attrs[name]))
+            attrOut += ` ${name}="${attrs[name]}"`;
         } else {
           attrOut += ` ${name}="${escapeAttr(decodeEntities(attrs[name]))}"`;
         }

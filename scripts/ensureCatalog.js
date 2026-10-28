@@ -1,7 +1,9 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const { connectDatabase } = require("../config/database");
-const { ensureCatalogRegistry } = require("../services/catalogBootstrap.service");
+const {
+  ensureCatalogRegistry,
+} = require("../services/catalogBootstrap.service");
 
 // Operator command (Phase 1): idempotently ensure the canonical
 // catalog registries (product types; rooms/collections as their

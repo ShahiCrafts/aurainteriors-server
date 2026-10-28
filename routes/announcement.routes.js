@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
@@ -23,13 +26,13 @@ router.get(
   "/public",
   protect,
   validate(getPublicAnnouncementsQuerySchema, "query"),
-  announcementController.getPublicAnnouncements
+  announcementController.getPublicAnnouncements,
 );
 
 router.get(
   "/public/:id",
   protect,
-  announcementController.getPublicAnnouncement
+  announcementController.getPublicAnnouncement,
 );
 
 // ==================== ADMIN ROUTES ====================
@@ -45,14 +48,14 @@ router.get("/stats", announcementController.getAnnouncementStats);
 router.get(
   "/",
   validate(getAnnouncementsQuerySchema, "query"),
-  announcementController.getAllAnnouncements
+  announcementController.getAllAnnouncements,
 );
 
 // Create announcement (Admin)
 router.post(
   "/",
   validate(createAnnouncementSchema),
-  announcementController.createAnnouncement
+  announcementController.createAnnouncement,
 );
 
 // Get single announcement (Admin)
@@ -62,7 +65,7 @@ router.get("/:id", announcementController.getAnnouncement);
 router.patch(
   "/:id",
   validate(updateAnnouncementSchema),
-  announcementController.updateAnnouncement
+  announcementController.updateAnnouncement,
 );
 
 // Delete announcement (Admin)
@@ -75,7 +78,7 @@ router.post("/:id/publish", announcementController.publishAnnouncement);
 router.post(
   "/:id/schedule",
   validate(scheduleAnnouncementSchema),
-  announcementController.scheduleAnnouncement
+  announcementController.scheduleAnnouncement,
 );
 
 // Archive announcement (Admin)

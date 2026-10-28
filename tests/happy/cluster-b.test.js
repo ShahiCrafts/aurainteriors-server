@@ -12,7 +12,13 @@
 // its handler (node --test runs top-level tests sequentially).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("../audit/helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("../audit/helpers");
 
 // 24-char hex ids (wishlist addToWishlist feeds these to
 // new mongoose.Types.ObjectId(...), so they must be valid ObjectIds).
@@ -34,7 +40,13 @@ const productState = { doc: null, count: 0 };
 const orderState = { found: null, aggregateResult: [], count: 0 };
 const cartState = { cart: null };
 const wishlistState = { doc: null, afterAdd: null };
-const reviewState = { findOneResult: null, listResult: [], total: 0, created: null, updated: null };
+const reviewState = {
+  findOneResult: null,
+  listResult: [],
+  total: 0,
+  created: null,
+  updated: null,
+};
 
 function makeProductDoc() {
   return {
@@ -149,14 +161,26 @@ const systemRouter = require("../../routes/system.routes");
 // Shared fixtures / helpers
 // ---------------------------------------------------------------------------
 const userReq = (extra = {}) => ({
-  user: { _id: USER_ID, id: USER_ID, role: "customer", firstName: "Asha", lastName: "Rai" },
+  user: {
+    _id: USER_ID,
+    id: USER_ID,
+    role: "customer",
+    firstName: "Asha",
+    lastName: "Rai",
+  },
   params: {},
   query: {},
   body: {},
   ...extra,
 });
 const adminReq = (extra = {}) => ({
-  user: { _id: ADMIN_ID, id: ADMIN_ID, role: "admin", firstName: "Admin", lastName: "User" },
+  user: {
+    _id: ADMIN_ID,
+    id: ADMIN_ID,
+    role: "admin",
+    firstName: "Admin",
+    lastName: "User",
+  },
   params: {},
   query: {},
   body: {},
@@ -260,8 +284,11 @@ test("HAPPY PATCH /api/v1/addresses/:id -> updateAddress", async () => {
   addressState.found = doc;
   const res = mockRes();
   await addressCtrl.updateAddress(
-    userReq({ params: { id: ADDRESS_ID }, body: { city: "Pokhara", phone: "9811111111" } }),
-    res
+    userReq({
+      params: { id: ADDRESS_ID },
+      body: { city: "Pokhara", phone: "9811111111" },
+    }),
+    res,
   );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
@@ -282,7 +309,10 @@ test("HAPPY PATCH /api/v1/addresses/:id/set-default -> setDefaultAddress", async
   const doc = makeAddressDoc({ isDefault: false });
   addressState.found = doc;
   const res = mockRes();
-  await addressCtrl.setDefaultAddress(userReq({ params: { id: ADDRESS_ID } }), res);
+  await addressCtrl.setDefaultAddress(
+    userReq({ params: { id: ADDRESS_ID } }),
+    res,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.address.isDefault, true);
@@ -298,7 +328,11 @@ test("HAPPY GET /api/v1/users/:id -> getUser", async () => {
   const next = mockNext();
   userCtrl.getUser(adminReq({ params: { id: TARGET_USER_ID } }), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getUser must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getUser must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.user._id, TARGET_USER_ID);
@@ -312,10 +346,14 @@ test("HAPPY PATCH /api/v1/users/:id/status -> updateUserStatus", async () => {
   userCtrl.updateUserStatus(
     adminReq({ params: { id: TARGET_USER_ID }, body: { isActive: true } }),
     res,
-    next
+    next,
   );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `updateUserStatus must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `updateUserStatus must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(target.isActive, true);
@@ -329,7 +367,11 @@ test("HAPPY DELETE /api/v1/users/:id -> deleteUser", async () => {
   const next = mockNext();
   userCtrl.deleteUser(adminReq({ params: { id: TARGET_USER_ID } }), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `deleteUser must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `deleteUser must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.message, "User deleted successfully");
@@ -346,9 +388,17 @@ test("HAPPY DELETE /api/v1/cart/items/:itemId -> removeFromCart", async () => {
   cartState.cart = cart;
   const res = mockRes();
   const next = mockNext();
-  cartCtrl.removeFromCart(userReq({ params: { itemId: CART_ITEM_ID } }), res, next);
+  cartCtrl.removeFromCart(
+    userReq({ params: { itemId: CART_ITEM_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `removeFromCart must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `removeFromCart must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.success, true);
   assert.equal(res.body.message, "Item removed from cart");
@@ -364,7 +414,11 @@ test("HAPPY DELETE /api/v1/cart -> clearCart", async () => {
   const next = mockNext();
   cartCtrl.clearCart(userReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `clearCart must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `clearCart must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.success, true);
   assert.equal(res.body.message, "Cart cleared");
@@ -393,7 +447,11 @@ test("HAPPY GET /api/v1/wishlist -> getWishlist", async () => {
   const next = mockNext();
   wishlistCtrl.getWishlist(userReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getWishlist must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getWishlist must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.wishlist.itemCount, 1);
@@ -404,13 +462,27 @@ test("HAPPY POST /api/v1/wishlist -> addToWishlist", async () => {
   productState.doc = makeProductDoc();
   wishlistState.afterAdd = {
     _id: "wl-1",
-    products: [{ _id: "wl-item-1", product: PRODUCT_ID, addedAt: new Date("2026-10-02T00:00:00.000Z") }],
+    products: [
+      {
+        _id: "wl-item-1",
+        product: PRODUCT_ID,
+        addedAt: new Date("2026-10-02T00:00:00.000Z"),
+      },
+    ],
   };
   const res = mockRes();
   const next = mockNext();
-  wishlistCtrl.addToWishlist(userReq({ body: { productId: PRODUCT_ID } }), res, next);
+  wishlistCtrl.addToWishlist(
+    userReq({ body: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `addToWishlist must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `addToWishlist must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.inWishlist, true);
@@ -426,9 +498,17 @@ test("HAPPY GET /api/v1/wishlist/check/:productId -> checkWishlist", async () =>
   };
   const res = mockRes();
   const next = mockNext();
-  wishlistCtrl.checkWishlist(userReq({ params: { productId: PRODUCT_ID } }), res, next);
+  wishlistCtrl.checkWishlist(
+    userReq({ params: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `checkWishlist must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `checkWishlist must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.inWishlist, true);
@@ -437,9 +517,17 @@ test("HAPPY GET /api/v1/wishlist/check/:productId -> checkWishlist", async () =>
 test("HAPPY DELETE /api/v1/wishlist/:productId -> removeFromWishlist", async () => {
   const res = mockRes();
   const next = mockNext();
-  wishlistCtrl.removeFromWishlist(userReq({ params: { productId: PRODUCT_ID } }), res, next);
+  wishlistCtrl.removeFromWishlist(
+    userReq({ params: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `removeFromWishlist must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `removeFromWishlist must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.inWishlist, false);
@@ -457,7 +545,11 @@ test("HAPPY DELETE /api/v1/wishlist -> clearWishlist", async () => {
   const next = mockNext();
   wishlistCtrl.clearWishlist(userReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `clearWishlist must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `clearWishlist must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.message, "Wishlist cleared");
@@ -474,9 +566,17 @@ test("HAPPY GET /api/v1/products/:productId/reviews -> getProductReviews", async
   reviewState.total = 1;
   const res = mockRes();
   const next = mockNext();
-  reviewCtrl.getProductReviews(userReq({ params: { productId: PRODUCT_ID } }), res, next);
+  reviewCtrl.getProductReviews(
+    userReq({ params: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getProductReviews must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getProductReviews must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.reviews.length, 1);
@@ -489,9 +589,17 @@ test("HAPPY GET /api/v1/products/:productId/reviews/my-review -> getUserReview",
   reviewState.findOneResult = makeReviewDoc();
   const res = mockRes();
   const next = mockNext();
-  reviewCtrl.getUserReview(userReq({ params: { productId: PRODUCT_ID } }), res, next);
+  reviewCtrl.getUserReview(
+    userReq({ params: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getUserReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getUserReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.review._id, REVIEW_ID);
@@ -499,12 +607,24 @@ test("HAPPY GET /api/v1/products/:productId/reviews/my-review -> getUserReview",
 
 test("HAPPY GET /api/v1/products/:productId/reviews/can-review -> canReview", async () => {
   reviewState.findOneResult = null; // no existing review
-  orderState.found = { _id: "order-1", user: USER_ID, orderStatus: "delivered" };
+  orderState.found = {
+    _id: "order-1",
+    user: USER_ID,
+    orderStatus: "delivered",
+  };
   const res = mockRes();
   const next = mockNext();
-  reviewCtrl.canReview(userReq({ params: { productId: PRODUCT_ID } }), res, next);
+  reviewCtrl.canReview(
+    userReq({ params: { productId: PRODUCT_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `canReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `canReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.canReview, true);
@@ -515,7 +635,11 @@ test("HAPPY GET /api/v1/products/:productId/reviews/can-review -> canReview", as
 test("HAPPY POST /api/v1/products/:productId/reviews -> createReview", async () => {
   productState.doc = makeProductDoc();
   reviewState.findOneResult = null; // no existing review
-  orderState.found = { _id: "order-1", user: USER_ID, orderStatus: "delivered" };
+  orderState.found = {
+    _id: "order-1",
+    user: USER_ID,
+    orderStatus: "delivered",
+  };
   reviewState.created = makeReviewDoc();
   const res = mockRes();
   const next = mockNext();
@@ -525,10 +649,14 @@ test("HAPPY POST /api/v1/products/:productId/reviews -> createReview", async () 
       body: { rating: 5, title: "Great", comment: "Lovely sofa" },
     }),
     res,
-    next
+    next,
   );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `createReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `createReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 201);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.review._id, REVIEW_ID);
@@ -545,10 +673,14 @@ test("HAPPY PATCH /api/v1/products/:productId/reviews/:reviewId -> updateReview"
       body: { rating: 4, title: "Updated title" },
     }),
     res,
-    next
+    next,
   );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `updateReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `updateReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.review.rating, 4);
@@ -562,10 +694,14 @@ test("HAPPY DELETE /api/v1/products/:productId/reviews/:reviewId -> deleteReview
   reviewCtrl.deleteReview(
     userReq({ params: { productId: PRODUCT_ID, reviewId: REVIEW_ID } }),
     res,
-    next
+    next,
   );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `deleteReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `deleteReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.message, "Review deleted successfully");
@@ -573,20 +709,33 @@ test("HAPPY DELETE /api/v1/products/:productId/reviews/:reviewId -> deleteReview
 
 test("HAPPY POST /api/v1/reviews/:reviewId/response -> addAdminResponse", async () => {
   reviewState.updated = makeReviewDoc({
-    adminResponse: { comment: "Thanks for your feedback!", respondedAt: new Date() },
+    adminResponse: {
+      comment: "Thanks for your feedback!",
+      respondedAt: new Date(),
+    },
   });
   const res = mockRes();
   const next = mockNext();
   reviewCtrl.addAdminResponse(
-    adminReq({ params: { reviewId: REVIEW_ID }, body: { comment: "Thanks for your feedback!" } }),
+    adminReq({
+      params: { reviewId: REVIEW_ID },
+      body: { comment: "Thanks for your feedback!" },
+    }),
     res,
-    next
+    next,
   );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `addAdminResponse must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `addAdminResponse must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
-  assert.equal(res.body.data.review.adminResponse.comment, "Thanks for your feedback!");
+  assert.equal(
+    res.body.data.review.adminResponse.comment,
+    "Thanks for your feedback!",
+  );
 });
 
 test("HAPPY PATCH /api/v1/reviews/:reviewId/toggle-approval -> toggleApproval", async () => {
@@ -594,9 +743,17 @@ test("HAPPY PATCH /api/v1/reviews/:reviewId/toggle-approval -> toggleApproval", 
   reviewState.findOneResult = doc;
   const res = mockRes();
   const next = mockNext();
-  reviewCtrl.toggleApproval(adminReq({ params: { reviewId: REVIEW_ID } }), res, next);
+  reviewCtrl.toggleApproval(
+    adminReq({ params: { reviewId: REVIEW_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `toggleApproval must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `toggleApproval must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.message, "Review approved");
@@ -610,7 +767,11 @@ test("HAPPY GET /api/v1/reviews -> getAllReviews", async () => {
   const next = mockNext();
   reviewCtrl.getAllReviews(adminReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getAllReviews must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getAllReviews must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.results, 1);
@@ -622,9 +783,17 @@ test("HAPPY GET /api/v1/reviews/:reviewId -> getReview", async () => {
   reviewState.findOneResult = makeReviewDoc();
   const res = mockRes();
   const next = mockNext();
-  reviewCtrl.getReview(adminReq({ params: { reviewId: REVIEW_ID } }), res, next);
+  reviewCtrl.getReview(
+    adminReq({ params: { reviewId: REVIEW_ID } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getReview must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getReview must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.review._id, REVIEW_ID);
@@ -643,7 +812,11 @@ test("HAPPY GET /api/v1/analytics/stats -> getDashboardStats", async () => {
   const next = mockNext();
   analyticsCtrl.getDashboardStats(adminReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getDashboardStats must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getDashboardStats must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.totalRevenue, 12345);
@@ -659,9 +832,17 @@ test("HAPPY GET /api/v1/analytics/revenue -> getRevenueAnalytics", async () => {
   ];
   const res = mockRes();
   const next = mockNext();
-  analyticsCtrl.getRevenueAnalytics(adminReq({ query: { days: "30" } }), res, next);
+  analyticsCtrl.getRevenueAnalytics(
+    adminReq({ query: { days: "30" } }),
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getRevenueAnalytics must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getRevenueAnalytics must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.deepEqual(res.body.data.chartData, [
@@ -676,21 +857,37 @@ test("HAPPY GET /api/v1/analytics/categories -> getCategorySales", async () => {
   const next = mockNext();
   analyticsCtrl.getCategorySales(adminReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getCategorySales must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getCategorySales must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
-  assert.deepEqual(res.body.data.salesByCategory, [{ name: "Sofas", value: 12, revenue: 6000 }]);
+  assert.deepEqual(res.body.data.salesByCategory, [
+    { name: "Sofas", value: 12, revenue: 6000 },
+  ]);
 });
 
 test("HAPPY GET /api/v1/analytics/top-products -> getTopProducts", async () => {
   orderState.aggregateResult = [
-    { _id: PRODUCT_ID, name: "Sofa", image: "sofa.jpg", sales: 9, revenue: 9000 },
+    {
+      _id: PRODUCT_ID,
+      name: "Sofa",
+      image: "sofa.jpg",
+      sales: 9,
+      revenue: 9000,
+    },
   ];
   const res = mockRes();
   const next = mockNext();
   analyticsCtrl.getTopProducts(adminReq(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getTopProducts must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getTopProducts must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, "success");
   assert.equal(res.body.data.topProducts.length, 1);
@@ -715,7 +912,9 @@ test("HAPPY GET /api/v1/system/keep-alive-status -> inline handler", async () =>
   });
   try {
     const { port } = server.address();
-    const resp = await fetch(`http://127.0.0.1:${port}/api/v1/system/keep-alive-status`);
+    const resp = await fetch(
+      `http://127.0.0.1:${port}/api/v1/system/keep-alive-status`,
+    );
     assert.equal(resp.status, 200);
     const body = await resp.json();
     assert.equal(body.success, true);

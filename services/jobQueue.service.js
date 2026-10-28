@@ -67,7 +67,9 @@ async function enqueue(type, payload = {}, opts = {}) {
     return await Job.create(doc);
   } catch (error) {
     if (error && error.code === 11000 && opts.idempotencyKey) {
-      const existing = await Job.findOne({ idempotencyKey: opts.idempotencyKey });
+      const existing = await Job.findOne({
+        idempotencyKey: opts.idempotencyKey,
+      });
       if (existing) return existing;
     }
     throw error;
@@ -85,17 +87,26 @@ async function claimNext(workerId, { types, visibilityMs } = {}) {
       $or: [
         { status: "pending", runAt: { $lte: now } },
         { status: "processing", heartbeatAt: { $lte: staleBefore } },
-        { status: "processing", heartbeatAt: null, claimedAt: { $lte: staleBefore } },
+        {
+          status: "processing",
+          heartbeatAt: null,
+          claimedAt: { $lte: staleBefore },
+        },
       ],
       ...(types && types.length ? { type: { $in: types } } : {}),
     };
     const job = await Job.findOneAndUpdate(
       filter,
       {
-        $set: { status: "processing", claimedBy: workerId, claimedAt: now, heartbeatAt: now },
+        $set: {
+          status: "processing",
+          claimedBy: workerId,
+          claimedAt: now,
+          heartbeatAt: now,
+        },
         $inc: { attempts: 1 },
       },
-      { new: true, sort: { runAt: 1 } }
+      { new: true, sort: { runAt: 1 } },
     );
     if (!job) return null;
     if (job.attempts > job.maxAttempts) {
@@ -105,9 +116,11 @@ async function claimNext(workerId, { types, visibilityMs } = {}) {
           $set: {
             status: "dead",
             claimedBy: null,
-            lastError: job.lastError || `Attempts exhausted (${job.maxAttempts}) - last worker never settled the job`,
+            lastError:
+              job.lastError ||
+              `Attempts exhausted (${job.maxAttempts}) - last worker never settled the job`,
           },
-        }
+        },
       );
       continue;
     }
@@ -118,7 +131,7 @@ async function claimNext(workerId, { types, visibilityMs } = {}) {
 async function heartbeat(jobId, workerId) {
   const res = await Job.updateOne(
     { _id: jobId, status: "processing", claimedBy: workerId },
-    { $set: { heartbeatAt: new Date() } }
+    { $set: { heartbeatAt: new Date() } },
   );
   return res.matchedCount === 1;
 }
@@ -126,19 +139,26 @@ async function heartbeat(jobId, workerId) {
 async function complete(jobId, workerId) {
   const res = await Job.updateOne(
     { _id: jobId, status: "processing", claimedBy: workerId },
-    { $set: { status: "completed", completedAt: new Date(), claimedBy: null } }
+    { $set: { status: "completed", completedAt: new Date(), claimedBy: null } },
   );
   return res.matchedCount === 1;
 }
 
 async function fail(jobId, workerId, error) {
-  const job = await Job.findOne({ _id: jobId, status: "processing", claimedBy: workerId });
+  const job = await Job.findOne({
+    _id: jobId,
+    status: "processing",
+    claimedBy: workerId,
+  });
   if (!job) return false;
-  const message = error && error.message ? String(error.message).slice(0, 1000) : String(error).slice(0, 1000);
+  const message =
+    error && error.message
+      ? String(error.message).slice(0, 1000)
+      : String(error).slice(0, 1000);
   if (job.attempts >= job.maxAttempts) {
     await Job.updateOne(
       { _id: jobId, claimedBy: workerId },
-      { $set: { status: "dead", lastError: message, claimedBy: null } }
+      { $set: { status: "dead", lastError: message, claimedBy: null } },
     );
     return true;
   }
@@ -151,7 +171,7 @@ async function fail(jobId, workerId, error) {
         claimedBy: null,
         runAt: new Date(Date.now() + backoffMs(job.attempts)),
       },
-    }
+    },
   );
   return true;
 }
@@ -161,9 +181,13 @@ async function fail(jobId, workerId, error) {
 // restarting - and re-sending - from zero.
 async function updateProgress(jobId, workerId, payloadPatch) {
   const $set = {};
-  for (const [key, value] of Object.entries(payloadPatch || {})) $set[`payload.${key}`] = value;
+  for (const [key, value] of Object.entries(payloadPatch || {}))
+    $set[`payload.${key}`] = value;
   if (!Object.keys($set).length) return false;
-  const res = await Job.updateOne({ _id: jobId, status: "processing", claimedBy: workerId }, { $set });
+  const res = await Job.updateOne(
+    { _id: jobId, status: "processing", claimedBy: workerId },
+    { $set },
+  );
   return res.matchedCount === 1;
 }
 
@@ -175,20 +199,36 @@ function registeredTypes() {
   return [...handlers.keys()];
 }
 
-const workerState = { running: false, timer: null, active: 0, id: DEFAULT_WORKER_ID };
+const workerState = {
+  running: false,
+  timer: null,
+  active: 0,
+  id: DEFAULT_WORKER_ID,
+};
 
 async function runClaimed(job, visibilityMs) {
   const handler = handlers.get(job.type);
-  const heartbeatTimer = setInterval(() => {
-    heartbeat(job._id, workerState.id).catch(() => {});
-  }, Math.max(250, Math.floor(visibilityMs / 3)));
+  const heartbeatTimer = setInterval(
+    () => {
+      heartbeat(job._id, workerState.id).catch(() => {});
+    },
+    Math.max(250, Math.floor(visibilityMs / 3)),
+  );
   heartbeatTimer.unref?.();
   try {
-    if (!handler) throw new Error(`No handler registered for job type ${job.type}`);
-    await handler(job, { workerId: workerState.id, heartbeat: () => heartbeat(job._id, workerState.id), updateProgress: (patch) => updateProgress(job._id, workerState.id, patch) });
+    if (!handler)
+      throw new Error(`No handler registered for job type ${job.type}`);
+    await handler(job, {
+      workerId: workerState.id,
+      heartbeat: () => heartbeat(job._id, workerState.id),
+      updateProgress: (patch) => updateProgress(job._id, workerState.id, patch),
+    });
     await complete(job._id, workerState.id);
   } catch (error) {
-    console.error(`[jobs] job ${job._id} (${job.type}) attempt ${job.attempts} failed:`, error.message);
+    console.error(
+      `[jobs] job ${job._id} (${job.type}) attempt ${job.attempts} failed:`,
+      error.message,
+    );
     await fail(job._id, workerState.id, error).catch(() => {});
   } finally {
     clearInterval(heartbeatTimer);

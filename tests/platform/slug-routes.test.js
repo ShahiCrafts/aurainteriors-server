@@ -109,7 +109,9 @@ app.use("/api/v1/categories", categoryRoutes);
 // Mirror the app's error envelope closely enough for status assertions.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  res.status(err.statusCode || 500).json({ status: "error", message: err.message });
+  res
+    .status(err.statusCode || 500)
+    .json({ status: "error", message: err.message });
 });
 
 let server;
@@ -132,7 +134,10 @@ const adminToken = jwt.sign({ id: "admin-1" }, process.env.JWT_SECRET, {
   issuer: "aura-interiors",
   audience: "aura-interiors-api",
 });
-const asAdmin = { authorization: `Bearer ${adminToken}`, "content-type": "application/json" };
+const asAdmin = {
+  authorization: `Bearer ${adminToken}`,
+  "content-type": "application/json",
+};
 
 test("SR-8: GET /products/:slug resolves the product (200)", async () => {
   const res = await fetch(`${base}/api/v1/products/oslo-sofa`);

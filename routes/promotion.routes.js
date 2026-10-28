@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
@@ -24,36 +27,36 @@ router.post(
   "/track",
   userRateLimit(60, "Too many tracking requests. Please try again later."),
   validate(trackEngagementSchema),
-  promotionController.trackEngagement
+  promotionController.trackEngagement,
 );
 router.use(restrictTo("admin"));
 router.get(
   "/",
   validate(getPromotionsQuerySchema, "query"),
-  promotionController.getAllPromotions
+  promotionController.getAllPromotions,
 );
 router.post(
   "/preview",
   validate(previewPromotionSchema),
-  promotionController.previewPromotion
+  promotionController.previewPromotion,
 );
 router.post(
   "/",
   validate(createPromotionSchema),
-  promotionController.createPromotion
+  promotionController.createPromotion,
 );
 router.get("/:id", promotionController.getPromotion);
 router.patch(
   "/:id",
   validate(updatePromotionSchema),
-  promotionController.updatePromotion
+  promotionController.updatePromotion,
 );
 router.delete("/:id", promotionController.deletePromotion);
 router.post("/:id/send", promotionController.sendPromotion);
 router.post(
   "/:id/schedule",
   validate(schedulePromotionSchema),
-  promotionController.schedulePromotion
+  promotionController.schedulePromotion,
 );
 router.post("/:id/cancel", promotionController.cancelPromotion);
 router.get("/:id/analytics", promotionController.getPromotionAnalytics);

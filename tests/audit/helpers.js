@@ -26,18 +26,39 @@ function stubModule(relPath, exportsValue) {
 function makeQuery(result, record = {}) {
   const q = {
     _record: record,
-    session() { return q; },
-    populate() { return q; },
-    select() { return q; },
-    sort() { return q; },
-    lean() { return q; },
-    skip(n) { record.skip = n; return q; },
-    limit(n) { record.limit = n; return q; },
-    maxTimeMS(n) { record.maxTimeMS = n; return q; },
+    session() {
+      return q;
+    },
+    populate() {
+      return q;
+    },
+    select() {
+      return q;
+    },
+    sort() {
+      return q;
+    },
+    lean() {
+      return q;
+    },
+    skip(n) {
+      record.skip = n;
+      return q;
+    },
+    limit(n) {
+      record.limit = n;
+      return q;
+    },
+    maxTimeMS(n) {
+      record.maxTimeMS = n;
+      return q;
+    },
     then(onFulfilled, onRejected) {
       return Promise.resolve(result).then(onFulfilled, onRejected);
     },
-    catch(onRejected) { return Promise.resolve(result).catch(onRejected); },
+    catch(onRejected) {
+      return Promise.resolve(result).catch(onRejected);
+    },
   };
   return q;
 }
@@ -46,13 +67,21 @@ function mockRes() {
   return {
     statusCode: undefined,
     body: undefined,
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.body = payload; return this; },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
   };
 }
 
 function mockNext() {
-  const fn = (err) => { fn.error = err; };
+  const fn = (err) => {
+    fn.error = err;
+  };
   fn.error = undefined;
   return fn;
 }
@@ -62,7 +91,8 @@ function mockNext() {
 async function until(predicate, timeoutMs = 3000) {
   const start = Date.now();
   while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error("until(): timed out waiting for handler to settle");
+    if (Date.now() - start > timeoutMs)
+      throw new Error("until(): timed out waiting for handler to settle");
     await new Promise((r) => setTimeout(r, 5));
   }
 }

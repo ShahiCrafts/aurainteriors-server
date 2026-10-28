@@ -10,16 +10,26 @@ class NotificationService {
     const payload = { ...data };
     // FA-73: stored actionUrl is rendered as a link by clients - only
     // http(s) or site-relative URLs may be stored.
-    if ("actionUrl" in payload) payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
+    if ("actionUrl" in payload)
+      payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
     if (payload.idempotencyKey) {
       // Stable primary key deduplicates campaign retries across processes,
       // without depending on deployment-time creation of a new unique index.
-      payload._id = crypto.createHash("sha256").update(`${payload.recipient}:${payload.idempotencyKey}`).digest("hex").slice(0, 24);
+      payload._id = crypto
+        .createHash("sha256")
+        .update(`${payload.recipient}:${payload.idempotencyKey}`)
+        .digest("hex")
+        .slice(0, 24);
     }
-    try { return await Notification.create(payload); }
-    catch (error) {
+    try {
+      return await Notification.create(payload);
+    } catch (error) {
       if (error.code !== 11000 || !payload.idempotencyKey) throw error;
-      const existing = await Notification.findOne({ _id: payload._id, recipient: payload.recipient, idempotencyKey: payload.idempotencyKey });
+      const existing = await Notification.findOne({
+        _id: payload._id,
+        recipient: payload.recipient,
+        idempotencyKey: payload.idempotencyKey,
+      });
       if (!existing) throw error;
       return existing;
     }
@@ -37,23 +47,43 @@ class NotificationService {
     // per-document createNotification path, which resolves
     // duplicates to the existing record and counts it as sent —
     // so bulk failure semantics match the old loop exactly.
-    let sentCount = 0, failedCount = 0, notificationId = null;
+    let sentCount = 0,
+      failedCount = 0,
+      notificationId = null;
     const emitNew = (notification) => {
       // Offline delivery is persisted; socket availability cannot mark it failed.
-      try { runtimeContext.getIo()?.to(String(notification.recipient)).emit("notification:new", notification); } // AR-33: registry, not global.io
-      catch (_error) { console.error("Notification realtime delivery unavailable"); }
+      try {
+        runtimeContext
+          .getIo()
+          ?.to(String(notification.recipient))
+          .emit("notification:new", notification);
+      } catch (_error) {
+        // AR-33: registry, not global.io
+        console.error("Notification realtime delivery unavailable");
+      }
     };
     const inputFor = (recipient) => ({
-      recipient, type: data.type, title: data.title,
-      message: data.message || data.description, actionUrl: data.actionUrl,
-      data: data.data || {}, expiresAt: data.expiresAt || null,
-      ...(data.idempotencyKey ? { idempotencyKey: `${data.idempotencyKey}:${recipient}` } : {}),
+      recipient,
+      type: data.type,
+      title: data.title,
+      message: data.message || data.description,
+      actionUrl: data.actionUrl,
+      data: data.data || {},
+      expiresAt: data.expiresAt || null,
+      ...(data.idempotencyKey
+        ? { idempotencyKey: `${data.idempotencyKey}:${recipient}` }
+        : {}),
     });
     const docFor = (input) => {
       const payload = { ...input };
-      if ("actionUrl" in payload) payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
+      if ("actionUrl" in payload)
+        payload.actionUrl = sanitizeActionUrl(payload.actionUrl);
       if (payload.idempotencyKey) {
-        payload._id = crypto.createHash("sha256").update(`${payload.recipient}:${payload.idempotencyKey}`).digest("hex").slice(0, 24);
+        payload._id = crypto
+          .createHash("sha256")
+          .update(`${payload.recipient}:${payload.idempotencyKey}`)
+          .digest("hex")
+          .slice(0, 24);
       }
       return payload;
     };
@@ -69,7 +99,8 @@ class NotificationService {
         inserted = await Notification.insertMany(docs, { ordered: false });
       } catch (error) {
         inserted = Array.isArray(error.insertedDocs) ? error.insertedDocs : [];
-        const writeErrors = error.writeErrors || (error.result && error.result.writeErrors) || [];
+        const writeErrors =
+          error.writeErrors || (error.result && error.result.writeErrors) || [];
         if (writeErrors.length > 0) {
           for (const we of writeErrors) {
             if (Number.isInteger(we.index)) failedIndexes.add(we.index);
@@ -92,7 +123,9 @@ class NotificationService {
           notificationId ||= notification._id;
           sentCount++;
           emitNew(notification);
-        } catch (_error) { failedCount++; }
+        } catch (_error) {
+          failedCount++;
+        }
       }
     }
     return { sentCount, failedCount, notificationId };
@@ -107,13 +140,13 @@ class NotificationService {
 
     if (admins.length === 0) return [];
 
-    const notifications = admins.map(admin => ({
+    const notifications = admins.map((admin) => ({
       recipient: admin._id,
       type,
       title,
       message,
       data,
-      actionUrl: sanitizeActionUrl(actionUrl) // FA-73
+      actionUrl: sanitizeActionUrl(actionUrl), // FA-73
     }));
 
     return await Notification.insertMany(notifications);
@@ -125,7 +158,9 @@ class NotificationService {
     const query = { recipient: userId };
     if (typeof filters.isRead === "boolean") query.isRead = filters.isRead;
     const categories = {
-      order: /^order/, promotion: /^promo/, design: /^design/,
+      order: /^order/,
+      promotion: /^promo/,
+      design: /^design/,
       system: /^(?:system|announcement)(?:_|$)/,
     };
     if (categories[filters.category]) query.type = categories[filters.category];
@@ -147,14 +182,14 @@ class NotificationService {
       notifications,
       total,
       page: parseInt(page),
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   }
 
   async getUnreadCount(userId) {
     return await Notification.countDocuments({
       recipient: userId,
-      isRead: false
+      isRead: false,
     });
   }
 
@@ -164,14 +199,14 @@ class NotificationService {
     return await Notification.findOneAndUpdate(
       { _id: notificationId, recipient: userId },
       { isRead: true },
-      { new: true }
+      { new: true },
     );
   }
 
   async markAllAsRead(userId) {
     return await Notification.updateMany(
       { recipient: userId, isRead: false },
-      { isRead: true }
+      { isRead: true },
     );
   }
 }

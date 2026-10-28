@@ -18,7 +18,13 @@
 // fixture in this file is byte-identical before/after the refactor.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("../audit/helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("../audit/helpers");
 
 // --- Stored discount document (as persisted: code already uppercase) ---
 function makeStoredDiscount(overrides = {}) {
@@ -32,20 +38,38 @@ function makeStoredDiscount(overrides = {}) {
     currentUsageCount: 0,
     expiryDate: new Date(Date.now() + 7 * 864e5),
     isActive: true,
-    get isExpired() { return new Date() > this.expiryDate; },
+    get isExpired() {
+      return new Date() > this.expiryDate;
+    },
     get isUsageLimitReached() {
-      return this.maxUsageLimit ? this.currentUsageCount >= this.maxUsageLimit : false;
+      return this.maxUsageLimit
+        ? this.currentUsageCount >= this.maxUsageLimit
+        : false;
     },
     validateForCart(subtotal) {
-      if (!this.isActive) return { valid: false, message: "This discount code is no longer active" };
-      if (this.isExpired) return { valid: false, message: "This discount code has expired" };
-      if (this.isUsageLimitReached) return { valid: false, message: "This discount code has reached its usage limit" };
+      if (!this.isActive)
+        return {
+          valid: false,
+          message: "This discount code is no longer active",
+        };
+      if (this.isExpired)
+        return { valid: false, message: "This discount code has expired" };
+      if (this.isUsageLimitReached)
+        return {
+          valid: false,
+          message: "This discount code has reached its usage limit",
+        };
       if (subtotal < this.minimumOrderAmount) {
-        return { valid: false, message: `Minimum order amount of NRs. ${this.minimumOrderAmount} required` };
+        return {
+          valid: false,
+          message: `Minimum order amount of NRs. ${this.minimumOrderAmount} required`,
+        };
       }
       return { valid: true, message: "Discount code is valid" };
     },
-    calculateDiscount(subtotal) { return Math.round((subtotal * this.discountPercentage) / 100); },
+    calculateDiscount(subtotal) {
+      return Math.round((subtotal * this.discountPercentage) / 100);
+    },
     ...overrides,
   };
 }
@@ -57,7 +81,8 @@ stubModule("models/discount.model", {
   // Query-faithful: matches only an exact code equality, like Mongo.
   findOne: async (filter) => {
     findOneCalls.push(filter);
-    if (storedDiscount && filter && filter.code === storedDiscount.code) return storedDiscount;
+    if (storedDiscount && filter && filter.code === storedDiscount.code)
+      return storedDiscount;
     return null;
   },
   findById: () => makeQuery(null),
@@ -108,12 +133,20 @@ test("AR-31a previewDiscount accepts any casing, identical verdict to apply/vali
     const preview = await run(discountCtrl.previewDiscount, {
       body: { code, items: [{ productId: "p1", quantity: 2 }] },
     });
-    assert.equal(preview.next.error, undefined, `preview(${code}) must not error, got: ${preview.next.error && preview.next.error.message}`);
+    assert.equal(
+      preview.next.error,
+      undefined,
+      `preview(${code}) must not error, got: ${preview.next.error && preview.next.error.message}`,
+    );
     assert.equal(preview.res.statusCode, 200, `preview(${code})`);
     assert.deepEqual(preview.res.body, {
       status: "success",
       data: {
-        discount: { code: "SAVE10", discountPercentage: 10, discountAmount: 20 },
+        discount: {
+          code: "SAVE10",
+          discountPercentage: 10,
+          discountAmount: 20,
+        },
         cart: { subtotal: 200, discountAmount: 20, total: 180 },
       },
     });
@@ -131,7 +164,11 @@ test("AR-31a previewDiscount accepts any casing, identical verdict to apply/vali
       user: { _id: "u1" },
       params: { code },
     });
-    assert.equal(validate.next.error, undefined, `validate(${code}) must not error`);
+    assert.equal(
+      validate.next.error,
+      undefined,
+      `validate(${code}) must not error`,
+    );
     assert.equal(validate.res.statusCode, 200, `validate(${code})`);
     assert.equal(validate.res.body.data.valid, true, `validate(${code})`);
     assert.equal(validate.res.body.data.discount.code, "SAVE10");
@@ -149,27 +186,43 @@ test("AR-31a applyDiscount response shape is pinned", async () => {
   assert.deepEqual(res.body, {
     status: "success",
     data: {
-      discount: { code: "SAVE10", description: "10% off", discountPercentage: 10, discountAmount: 20 },
+      discount: {
+        code: "SAVE10",
+        description: "10% off",
+        discountPercentage: 10,
+        discountAmount: 20,
+      },
       cart: { subtotal: 200, discountAmount: 20, total: 180 },
     },
   });
 });
 
 test("AR-31a applyDiscount without a code -> 400 'Please provide a discount code'", async () => {
-  const { next } = await run(discountCtrl.applyDiscount, { user: { _id: "u1" }, body: {} });
+  const { next } = await run(discountCtrl.applyDiscount, {
+    user: { _id: "u1" },
+    body: {},
+  });
   assert.equal(next.error.message, "Please provide a discount code");
   assert.equal(next.error.statusCode, 400);
 });
 
 test("AR-31a unknown code -> 400 'Invalid discount code' on all three endpoints", async () => {
   storedDiscount = makeStoredDiscount();
-  const apply = await run(discountCtrl.applyDiscount, { user: { _id: "u1" }, body: { code: "NOPE99" } });
+  const apply = await run(discountCtrl.applyDiscount, {
+    user: { _id: "u1" },
+    body: { code: "NOPE99" },
+  });
   assert.equal(apply.next.error.message, "Invalid discount code");
   assert.equal(apply.next.error.statusCode, 400);
-  const validate = await run(discountCtrl.validateDiscount, { user: { _id: "u1" }, params: { code: "NOPE99" } });
+  const validate = await run(discountCtrl.validateDiscount, {
+    user: { _id: "u1" },
+    params: { code: "NOPE99" },
+  });
   assert.equal(validate.next.error.message, "Invalid discount code");
   assert.equal(validate.next.error.statusCode, 400);
-  const preview = await run(discountCtrl.previewDiscount, { body: { code: "NOPE99", items: [{ productId: "p1", quantity: 1 }] } });
+  const preview = await run(discountCtrl.previewDiscount, {
+    body: { code: "NOPE99", items: [{ productId: "p1", quantity: 1 }] },
+  });
   assert.equal(preview.next.error.message, "Invalid discount code");
   assert.equal(preview.next.error.statusCode, 400);
 });
@@ -194,8 +247,14 @@ test("AR-31a validateDiscount with a below-minimum cart -> 200 valid:false, disc
 
 test("AR-31a applyDiscount with a below-minimum cart -> 400 with validateForCart message", async () => {
   storedDiscount = makeStoredDiscount({ minimumOrderAmount: 5000 });
-  const { next } = await run(discountCtrl.applyDiscount, { user: { _id: "u1" }, body: { code: "SAVE10" } });
-  assert.equal(next.error.message, "Minimum order amount of NRs. 5000 required");
+  const { next } = await run(discountCtrl.applyDiscount, {
+    user: { _id: "u1" },
+    body: { code: "SAVE10" },
+  });
+  assert.equal(
+    next.error.message,
+    "Minimum order amount of NRs. 5000 required",
+  );
   assert.equal(next.error.statusCode, 400);
 });
 
@@ -204,7 +263,10 @@ test("AR-31a previewDiscount with a below-minimum subtotal -> 400 with validateF
   const { next } = await run(discountCtrl.previewDiscount, {
     body: { code: "SAVE10", items: [{ productId: "p1", quantity: 2 }] },
   });
-  assert.equal(next.error.message, "Minimum order amount of NRs. 5000 required");
+  assert.equal(
+    next.error.message,
+    "Minimum order amount of NRs. 5000 required",
+  );
   assert.equal(next.error.statusCode, 400);
 });
 

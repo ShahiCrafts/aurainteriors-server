@@ -9,7 +9,13 @@
 // async functions and are awaited directly.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("../audit/helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("../audit/helpers");
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -37,17 +43,33 @@ const validAttachment = {
 stubModule("services/chatService.js", {
   createChat: async () => chatFixture,
   createGuestChat: async () => chatFixture,
-  resolveGuestSession: async () => ({ _id: "guest-session-1", sessionId: "guest_abc" }),
-  getCustomerChats: async () => ({ chats: [chatFixture], pagination: paginationFixture }),
+  resolveGuestSession: async () => ({
+    _id: "guest-session-1",
+    sessionId: "guest_abc",
+  }),
+  getCustomerChats: async () => ({
+    chats: [chatFixture],
+    pagination: paginationFixture,
+  }),
   getChatById: async () => chatFixture,
-  getChatMessages: async () => ({ messages: [messageFixture], pagination: paginationFixture }),
+  getChatMessages: async () => ({
+    messages: [messageFixture],
+    pagination: paginationFixture,
+  }),
   sendMessage: async () => messageFixture,
   markMessagesAsRead: async () => ({ modifiedCount: 4 }),
   closeChat: async () => ({ ...chatFixture, status: "closed" }),
-  getAllChats: async () => ({ chats: [chatFixture], pagination: paginationFixture }),
+  getAllChats: async () => ({
+    chats: [chatFixture],
+    pagination: paginationFixture,
+  }),
   getWaitingQueue: async () => [chatFixture],
   resolveChat: async () => ({ ...chatFixture, status: "resolved" }),
-  getChatStats: async () => ({ totalChats: 10, openChats: 3, resolvedChats: 7 }),
+  getChatStats: async () => ({
+    totalChats: 10,
+    openChats: 3,
+    resolvedChats: 7,
+  }),
   toggleBot: async () => ({ ...chatFixture, botActive: true }),
   authorizeChat: async () => true,
 });
@@ -63,11 +85,20 @@ stubModule("services/chatUpload.service", {
     attachment: validAttachment,
   }),
   retainAttachments: async () => {},
-  actorKey: (userId, guestSessionId) => `actor:${userId || guestSessionId || "anon"}`,
+  actorKey: (userId, guestSessionId) =>
+    `actor:${userId || guestSessionId || "anon"}`,
 });
 
-const chatMessageDoc = { _id: MESSAGE_ID, chat: { _id: CHAT_ID }, attachments: [] };
-const updatedMessageDoc = { _id: MESSAGE_ID, chat: CHAT_ID, attachments: [validAttachment] };
+const chatMessageDoc = {
+  _id: MESSAGE_ID,
+  chat: { _id: CHAT_ID },
+  attachments: [],
+};
+const updatedMessageDoc = {
+  _id: MESSAGE_ID,
+  chat: CHAT_ID,
+  attachments: [validAttachment],
+};
 stubModule("models/chatMessage.model", {
   findOne: () => makeQuery(chatMessageDoc),
   findOneAndUpdate: () => makeQuery(updatedMessageDoc),
@@ -101,7 +132,9 @@ stubModule("services/notificationService", {
 });
 
 stubModule("services/pushTokenService", {
-  getUserDevices: async () => [{ deviceId: "device-1", platform: "android", deviceName: "Pixel" }],
+  getUserDevices: async () => [
+    { deviceId: "device-1", platform: "android", deviceName: "Pixel" },
+  ],
   unregisterDevice: async (userId, deviceId) => ({ deviceId, removed: true }),
   registerPushToken: async (doc) => ({ _id: "token-1", ...doc }),
 });
@@ -152,7 +185,11 @@ async function invokeChat(handler, req) {
 }
 
 function assertSuccess(res, next, statusCode) {
-  assert.equal(next.error, undefined, `handler must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `handler must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, statusCode);
   assert.equal(res.body.status, "success");
 }
@@ -175,7 +212,12 @@ test("POST /chats/:id/attachments — uploadAttachment returns 201 with the uplo
   const req = baseReq({
     params: { id: CHAT_ID },
     attachmentActor: "actor:u1",
-    file: { originalname: "photo.png", mimetype: "image/png", size: 2048, buffer: Buffer.from("x") },
+    file: {
+      originalname: "photo.png",
+      mimetype: "image/png",
+      size: 2048,
+      buffer: Buffer.from("x"),
+    },
   });
   const { res, next } = await invokeChat(chatCtrl.uploadAttachment, req);
   assertSuccess(res, next, 201);
@@ -200,7 +242,10 @@ test("GET /chats/:id — getChatDetails returns 200 with the chat", async () => 
 test("POST /chats/:id/messages — sendMessage returns 202 with the accepted message", async () => {
   const req = baseReq({
     params: { id: CHAT_ID },
-    body: { content: "Hello, I need help with my order", clientMessageId: "cm-1" },
+    body: {
+      content: "Hello, I need help with my order",
+      clientMessageId: "cm-1",
+    },
   });
   const { res, next } = await invokeChat(chatCtrl.sendMessage, req);
   assertSuccess(res, next, 202);
@@ -237,7 +282,10 @@ test("PATCH /chats/:id/messages/:messageId/attachments — updateMessageAttachme
     params: { id: CHAT_ID, messageId: MESSAGE_ID },
     body: { attachments: [validAttachment] },
   });
-  const { res, next } = await invokeChat(chatCtrl.updateMessageAttachments, req);
+  const { res, next } = await invokeChat(
+    chatCtrl.updateMessageAttachments,
+    req,
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.message, "Message attachments updated successfully");
   assert.deepEqual(res.body.data.message, updatedMessageDoc);
@@ -246,7 +294,11 @@ test("PATCH /chats/:id/messages/:messageId/attachments — updateMessageAttachme
 test("GET /chats/admin/stats — getChatStats returns 200 with stats", async () => {
   const { res, next } = await invokeChat(chatCtrl.getChatStats, adminReq());
   assertSuccess(res, next, 200);
-  assert.deepEqual(res.body.data.stats, { totalChats: 10, openChats: 3, resolvedChats: 7 });
+  assert.deepEqual(res.body.data.stats, {
+    totalChats: 10,
+    openChats: 3,
+    resolvedChats: 7,
+  });
 });
 
 test("GET /chats/admin/all — getAllChats returns 200 with chats and pagination", async () => {
@@ -278,7 +330,11 @@ test("PATCH /chats/:id/resolve — resolveChat returns 200 with the resolved cha
 test("GET /notifications — getUserNotifications returns 200 with the notification list", async () => {
   const res = mockRes();
   const next = mockNext();
-  await notifCtrl.getUserNotifications(baseReq({ query: { page: 1, limit: 20 } }), res, next);
+  await notifCtrl.getUserNotifications(
+    baseReq({ query: { page: 1, limit: 20 } }),
+    res,
+    next,
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.total, 1);
   assert.equal(res.body.data.notifications.length, 1);
@@ -314,7 +370,11 @@ test("POST /notifications/mark-multiple-read — markMultipleAsRead returns 200 
 test("PUT /notifications/:id/archive — archiveNotification returns 200 with the deleted message", async () => {
   const res = mockRes();
   const next = mockNext();
-  await notifCtrl.archiveNotification(baseReq({ params: { id: NOTIF_ID_1 } }), res, next);
+  await notifCtrl.archiveNotification(
+    baseReq({ params: { id: NOTIF_ID_1 } }),
+    res,
+    next,
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.message, "Notification deleted");
 });
@@ -341,7 +401,11 @@ test("GET /notifications/push-tokens/devices — getUserDevices returns 200 with
 test("DELETE /notifications/push-tokens/:deviceId — unregisterDevice returns 200 with the removed device", async () => {
   const res = mockRes();
   const next = mockNext();
-  await notifCtrl.unregisterDevice(baseReq({ params: { deviceId: "device-1" } }), res, next);
+  await notifCtrl.unregisterDevice(
+    baseReq({ params: { deviceId: "device-1" } }),
+    res,
+    next,
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.device.deviceId, "device-1");
   assert.equal(res.body.data.device.removed, true);

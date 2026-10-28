@@ -10,14 +10,20 @@ const { stubModule, mockRes } = require("../audit/helpers");
 let findOneCalls = [];
 let findOneAndUpdateCalls = [];
 class FakeUser {
-  static async findOne(filter) { findOneCalls.push(filter); return null; }
+  static async findOne(filter) {
+    findOneCalls.push(filter);
+    return null;
+  }
   static findOneAndUpdate(filter) {
     findOneAndUpdateCalls.push(filter);
     return { select: () => Promise.resolve(null) }; // Query-like, as Mongoose returns
   }
 }
 stubModule("models/user.model.js", FakeUser);
-stubModule("models/revokedToken.model.js", { exists: async () => false, updateOne: async () => ({}) });
+stubModule("models/revokedToken.model.js", {
+  exists: async () => false,
+  updateOne: async () => ({}),
+});
 stubModule("services/email.service.js", {
   sendMagicLinkEmail: () => Promise.resolve(),
   sendOtpEmail: () => Promise.resolve(),
@@ -25,7 +31,8 @@ stubModule("services/email.service.js", {
 const auth = require("../../controllers/auth.controller");
 
 test("CQ-B auth: operator payloads die at the typeof guards, never reaching a query", async () => {
-  findOneCalls = []; findOneAndUpdateCalls = [];
+  findOneCalls = [];
+  findOneAndUpdateCalls = [];
 
   let res = mockRes();
   await auth.sendMagicLink({ body: { email: { $ne: null } } }, res);
@@ -38,17 +45,46 @@ test("CQ-B auth: operator payloads die at the typeof guards, never reaching a qu
   assert.equal(findOneCalls.length, 0);
 
   res = mockRes();
-  await auth.adminLogin({ body: { email: "admin@example.com", password: { $ne: null } } }, res);
-  assert.equal(res.statusCode, 400, "an object password is rejected, not compared");
+  await auth.adminLogin(
+    { body: { email: "admin@example.com", password: { $ne: null } } },
+    res,
+  );
+  assert.equal(
+    res.statusCode,
+    400,
+    "an object password is rejected, not compared",
+  );
   assert.equal(findOneCalls.length, 0);
 
   res = mockRes();
-  await auth.adminVerifyOtp({ body: { email: "admin@example.com", otp: "123456", challengeId: { $ne: null } } }, res);
+  await auth.adminVerifyOtp(
+    {
+      body: {
+        email: "admin@example.com",
+        otp: "123456",
+        challengeId: { $ne: null },
+      },
+    },
+    res,
+  );
   assert.equal(res.statusCode, 400);
-  assert.equal(findOneAndUpdateCalls.length, 0, "an object challengeId must never enter the claim filter");
+  assert.equal(
+    findOneAndUpdateCalls.length,
+    0,
+    "an object challengeId must never enter the claim filter",
+  );
 
   res = mockRes();
-  await auth.adminVerifyOtp({ body: { email: ["admin@example.com"], otp: { $gt: "" }, challengeId: "a".repeat(64) } }, res);
+  await auth.adminVerifyOtp(
+    {
+      body: {
+        email: ["admin@example.com"],
+        otp: { $gt: "" },
+        challengeId: "a".repeat(64),
+      },
+    },
+    res,
+  );
   assert.equal(res.statusCode, 400);
   assert.equal(findOneAndUpdateCalls.length, 0);
 });
@@ -56,9 +92,16 @@ test("CQ-B auth: operator payloads die at the typeof guards, never reaching a qu
 test("CQ-B auth: well-formed shapes reach the query as scalars (control)", async () => {
   findOneAndUpdateCalls = [];
   const res = mockRes();
-  await auth.adminVerifyOtp({
-    body: { email: "Admin@Example.com", otp: "123456", challengeId: "a".repeat(64) },
-  }, res);
+  await auth.adminVerifyOtp(
+    {
+      body: {
+        email: "Admin@Example.com",
+        otp: "123456",
+        challengeId: "a".repeat(64),
+      },
+    },
+    res,
+  );
   assert.equal(res.statusCode, 400, "unknown challenge -> uniform rejection");
   assert.equal(findOneAndUpdateCalls.length, 1);
   const filter = findOneAndUpdateCalls[0];

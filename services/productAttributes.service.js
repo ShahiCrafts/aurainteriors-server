@@ -52,7 +52,7 @@ const parseJsonField = (field) => {
 function missingError(missing) {
   return new AppError(
     `Missing required attribute(s) for this category: ${missing.join(", ")}`,
-    400
+    400,
   );
 }
 

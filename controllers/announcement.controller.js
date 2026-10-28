@@ -10,14 +10,23 @@ const catchAsync = require("../utils/catchAsync");
 exports.getAllAnnouncements = catchAsync(async (req, res, next) => {
   const { page = 1, limit = 20 } = req.query;
 
-  // CQ-B: the filter values are forced through the enum/boolean
-  // helpers at the point of use - an object/array (?status[$ne]=x)
-  // is treated as "no filter", never as a query operator.
   const result = await AnnouncementService.getAllAnnouncements({
     page: parseInt(page, 10),
     limit: parseInt(limit, 10),
-    status: asEnum(req.query.status, ["draft", "scheduled", "published", "archived"]),
-    type: asEnum(req.query.type, ["general", "maintenance", "update", "promotion", "policy", "event"]),
+    status: asEnum(req.query.status, [
+      "draft",
+      "scheduled",
+      "published",
+      "archived",
+    ]),
+    type: asEnum(req.query.type, [
+      "general",
+      "maintenance",
+      "update",
+      "promotion",
+      "policy",
+      "event",
+    ]),
     priority: asEnum(req.query.priority, ["low", "normal", "high", "critical"]),
     isPinned: asBoolean(req.query.isPinned),
   });
@@ -36,7 +45,7 @@ exports.getAllAnnouncements = catchAsync(async (req, res, next) => {
  */
 exports.getAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await AnnouncementService.getAnnouncementById(
-    req.params.id
+    req.params.id,
   );
 
   res.status(200).json({
@@ -81,7 +90,7 @@ exports.createAnnouncement = catchAsync(async (req, res, next) => {
       actionLabel,
       tags,
     },
-    req.user._id
+    req.user._id,
   );
 
   res.status(201).json({
@@ -98,7 +107,7 @@ exports.updateAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await AnnouncementService.updateAnnouncement(
     req.params.id,
     req.body,
-    req.user._id
+    req.user._id,
   );
 
   res.status(200).json({
@@ -114,16 +123,18 @@ exports.updateAnnouncement = catchAsync(async (req, res, next) => {
 exports.publishAnnouncement = catchAsync(async (req, res, next) => {
   const result = await AnnouncementService.publishAnnouncement(
     req.params.id,
-    req.user._id
+    req.user._id,
   );
 
-  // AR-04: queue mode — the announcement is published synchronously
-  // but its notifications are queued; answer 202 with the job id.
   if (result && result.queued) {
     return res.status(202).json({
       status: "success",
       message: "Announcement published; notifications queued",
-      data: { announcement: result.announcement, jobId: result.jobId, queued: true },
+      data: {
+        announcement: result.announcement,
+        jobId: result.jobId,
+        queued: true,
+      },
     });
   }
 
@@ -143,7 +154,7 @@ exports.scheduleAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await AnnouncementService.scheduleAnnouncement(
     req.params.id,
     new Date(scheduledAt),
-    req.user._id
+    req.user._id,
   );
 
   res.status(200).json({
@@ -159,7 +170,7 @@ exports.scheduleAnnouncement = catchAsync(async (req, res, next) => {
 exports.archiveAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await AnnouncementService.archiveAnnouncement(
     req.params.id,
-    req.user._id
+    req.user._id,
   );
 
   res.status(200).json({
@@ -193,8 +204,6 @@ exports.getAnnouncementStats = catchAsync(async (req, res, next) => {
   });
 });
 
-// ==================== PUBLIC OPERATIONS ====================
-
 /**
  * Get active announcements for users (Public)
  */
@@ -223,7 +232,7 @@ exports.getPublicAnnouncements = catchAsync(async (req, res, next) => {
 exports.getPublicAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await AnnouncementService.getPublicAnnouncementById(
     req.params.id,
-    req.user?.role || "customer"
+    req.user?.role || "customer",
   );
 
   res.status(200).json({

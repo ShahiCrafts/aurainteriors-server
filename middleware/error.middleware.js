@@ -26,15 +26,20 @@ const handleValidationErrorDB = (err) => {
   return new AppError(message, 400);
 };
 
-const handleJWTError = () => new AppError("Invalid token. Please log in again.", 401);
+const handleJWTError = () =>
+  new AppError("Invalid token. Please log in again.", 401);
 
-const handleJWTExpiredError = () => new AppError("Your token has expired. Please log in again.", 401);
+const handleJWTExpiredError = () =>
+  new AppError("Your token has expired. Please log in again.", 401);
 
 const handleMulterError = (err) => {
   if (err.code === "LIMIT_FILE_SIZE") {
     // The limit differs per route (10-50MB); quoting a single number
     // here sent users chasing a limit that does not exist (B-17).
-    return new AppError("File too large. The upload exceeds the size limit for this endpoint.", 400);
+    return new AppError(
+      "File too large. The upload exceeds the size limit for this endpoint.",
+      400,
+    );
   }
   if (err.code === "LIMIT_FILE_COUNT") {
     return new AppError("Too many files. Maximum is 10 files.", 400);
@@ -104,7 +109,9 @@ const sendErrorProd = (err, res) => {
 // here than everywhere else. Normalised, they mean development —
 // consistently — and never leak stacks in the production branch.
 const isDevelopment = (value = process.env.NODE_ENV) =>
-  String(value || "").trim().toLowerCase() === "development";
+  String(value || "")
+    .trim()
+    .toLowerCase() === "development";
 
 const errorHandler = (err, req, res, next) => {
   console.error(err); // Always log error for debugging

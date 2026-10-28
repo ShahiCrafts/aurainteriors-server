@@ -71,14 +71,20 @@ const badRequest = (message) => new AppError(message, 400);
 function normalizeColorValue(value) {
   if (!HEX_COLOR_PATTERN.test(value)) return value;
   let hex = value.slice(1).toLowerCase();
-  if (hex.length === 3) hex = hex.split("").map((ch) => ch + ch).join("");
+  if (hex.length === 3)
+    hex = hex
+      .split("")
+      .map((ch) => ch + ch)
+      .join("");
   return `#${hex}`;
 }
 
 function parseNumericItem(key, item) {
   const parsed = Number(item);
   if (!Number.isFinite(parsed)) {
-    throw badRequest(`Attribute filter "${key}" expects a numeric value, got "${item}"`);
+    throw badRequest(
+      `Attribute filter "${key}" expects a numeric value, got "${item}"`,
+    );
   }
   return parsed;
 }
@@ -90,13 +96,15 @@ function parseExactItems(key, definition, items) {
         if (item === "true") return true;
         if (item === "false") return false;
         throw badRequest(
-          `Attribute filter "${key}" is boolean; only 'true' or 'false' are accepted, got "${item}"`
+          `Attribute filter "${key}" is boolean; only 'true' or 'false' are accepted, got "${item}"`,
         );
       });
     case "integer":
       return items.map((item) => {
         if (!/^-?\d+$/.test(item) || !Number.isSafeInteger(Number(item))) {
-          throw badRequest(`Attribute filter "${key}" expects an integer value, got "${item}"`);
+          throw badRequest(
+            `Attribute filter "${key}" expects an integer value, got "${item}"`,
+          );
         }
         return Number(item);
       });
@@ -108,7 +116,7 @@ function parseExactItems(key, definition, items) {
       return items.map(normalizeColorValue);
     case "dimensions":
       throw badRequest(
-        `Attribute "${key}" has type "dimensions" and cannot be filtered by value`
+        `Attribute "${key}" has type "dimensions" and cannot be filtered by value`,
       );
     default:
       // string / enum / multi-enum: literal.
@@ -180,11 +188,13 @@ function parseAttributeFilters(query, definitionsByKey) {
     if (group.minRaw !== undefined || group.maxRaw !== undefined) {
       if (!NUMERIC_TYPES.has(definition.type)) {
         throw badRequest(
-          `Attribute "${key}" of type "${definition.type}" does not accept range filters (.min/.max)`
+          `Attribute "${key}" of type "${definition.type}" does not accept range filters (.min/.max)`,
         );
       }
-      if (group.minRaw !== undefined) condition.min = parseNumericItem(key, group.minRaw.trim());
-      if (group.maxRaw !== undefined) condition.max = parseNumericItem(key, group.maxRaw.trim());
+      if (group.minRaw !== undefined)
+        condition.min = parseNumericItem(key, group.minRaw.trim());
+      if (group.maxRaw !== undefined)
+        condition.max = parseNumericItem(key, group.maxRaw.trim());
       if (
         condition.min !== undefined &&
         condition.max !== undefined &&
@@ -197,14 +207,18 @@ function parseAttributeFilters(query, definitionsByKey) {
     if (group.exactRaw !== undefined) {
       const items = group.exactRaw.split(",").map((item) => item.trim());
       if (items.length > MAX_ITEMS) {
-        throw badRequest(`Attribute filter "${key}" accepts at most ${MAX_ITEMS} values`);
+        throw badRequest(
+          `Attribute filter "${key}" accepts at most ${MAX_ITEMS} values`,
+        );
       }
       for (const item of items) {
         if (item === "") {
           throw badRequest(`Attribute filter "${key}" contains an empty value`);
         }
         if (item.length > MAX_ITEM_LENGTH) {
-          throw badRequest(`Attribute filter "${key}" contains a value that is too long`);
+          throw badRequest(
+            `Attribute filter "${key}" contains a value that is too long`,
+          );
         }
       }
       condition.exactValues = parseExactItems(key, definition, items);
@@ -212,7 +226,9 @@ function parseAttributeFilters(query, definitionsByKey) {
         // Variant options store engine-normalized values STRINGIFIED
         // (Phase 3): String() of the typed value reproduces that
         // canonical form ('4', 'true', '#ff0000', '2.5').
-        condition.exactStrings = condition.exactValues.map((value) => String(value));
+        condition.exactStrings = condition.exactValues.map((value) =>
+          String(value),
+        );
       }
     }
 
@@ -266,19 +282,32 @@ function rangeOps(priceRange) {
 // set. Expressed as $expr + $filter because purchasability
 // compares two fields of the same element, which plain query
 // operators cannot do.
-function variantExistsExpr({ optionConds = [], priceRange = null, availability = false } = {}) {
+function variantExistsExpr({
+  optionConds = [],
+  priceRange = null,
+  availability = false,
+} = {}) {
   const conds = [{ $eq: ["$$v.enabled", true] }];
   for (const condition of optionConds) {
-    conds.push({ $in: [`$$v.options.${condition.key}`, condition.exactStrings] });
+    conds.push({
+      $in: [`$$v.options.${condition.key}`, condition.exactStrings],
+    });
   }
   if (priceRange) {
-    if (priceRange.min !== undefined) conds.push({ $gte: ["$$v.price", priceRange.min] });
-    if (priceRange.max !== undefined) conds.push({ $lte: ["$$v.price", priceRange.max] });
+    if (priceRange.min !== undefined)
+      conds.push({ $gte: ["$$v.price", priceRange.min] });
+    if (priceRange.max !== undefined)
+      conds.push({ $lte: ["$$v.price", priceRange.max] });
   }
   if (availability) {
     conds.push({
       $gt: [
-        { $subtract: [{ $ifNull: ["$$v.stock", 0] }, { $ifNull: ["$$v.reservedStock", 0] }] },
+        {
+          $subtract: [
+            { $ifNull: ["$$v.stock", 0] },
+            { $ifNull: ["$$v.reservedStock", 0] },
+          ],
+        },
         0,
       ],
     });
@@ -322,12 +351,17 @@ function variantExistsExpr({ optionConds = [], priceRange = null, availability =
 //   matches on Product.price; a variant product matches when any
 //   enabled variant's price is in range (purchasable too, when
 //   availability is requested).
-function buildVariantAwareClause({ conditions = [], priceRange = null, inStock = false } = {}) {
+function buildVariantAwareClause({
+  conditions = [],
+  priceRange = null,
+  inStock = false,
+} = {}) {
   const clauses = [];
   const axisConds = conditions.filter((c) => c.axisCapable && c.exactValues);
   const axisKeys = axisConds.map((c) => c.key);
   const nonAxis = conditions.filter((c) => !axisConds.includes(c));
-  for (const condition of nonAxis) clauses.push(conditionProductFragment(condition));
+  for (const condition of nonAxis)
+    clauses.push(conditionProductFragment(condition));
 
   // The price/availability condition as it applies to a product
   // that matched at product level: variant products must satisfy
@@ -359,12 +393,16 @@ function buildVariantAwareClause({ conditions = [], priceRange = null, inStock =
     return clauses;
   }
 
-  const productBranchParts = axisConds.map((condition) => conditionProductFragment(condition));
+  const productBranchParts = axisConds.map((condition) =>
+    conditionProductFragment(condition),
+  );
   productBranchParts.push({ variantOptionKeys: { $nin: axisKeys } });
   const priceOrStock = productLevelPriceOrStock();
   if (priceOrStock) productBranchParts.push(priceOrStock);
   const productBranch =
-    productBranchParts.length === 1 ? productBranchParts[0] : { $and: productBranchParts };
+    productBranchParts.length === 1
+      ? productBranchParts[0]
+      : { $and: productBranchParts };
   const variantBranch = variantExistsExpr({
     optionConds: axisConds,
     priceRange,
@@ -395,7 +433,10 @@ function parseEffectiveSort(sort) {
     .map((token) => token.trim())
     .filter(Boolean)
     .slice(0, 5);
-  if (!tokens.some((t) => t === "effectivePriceAsc" || t === "effectivePriceDesc")) return null;
+  if (
+    !tokens.some((t) => t === "effectivePriceAsc" || t === "effectivePriceDesc")
+  )
+    return null;
   const out = {};
   for (const token of tokens) {
     if (token === "effectivePriceAsc") out.effectivePrice = 1;

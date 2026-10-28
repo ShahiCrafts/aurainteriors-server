@@ -11,22 +11,44 @@ const ALLOWED = ["createdAt", "price", "name", "rating.average"];
 
 test("B-26: safeSort keeps allowlisted fields and directions", () => {
   assert.equal(typeof listQuery.safeSort, "function");
-  assert.deepEqual(listQuery.safeSort("-createdAt", ALLOWED), { createdAt: -1 });
+  assert.deepEqual(listQuery.safeSort("-createdAt", ALLOWED), {
+    createdAt: -1,
+  });
   assert.deepEqual(listQuery.safeSort("price", ALLOWED), { price: 1 });
-  assert.deepEqual(listQuery.safeSort("-price,name", ALLOWED), { price: -1, name: 1 });
-  assert.deepEqual(listQuery.safeSort("-rating.average", ALLOWED), { "rating.average": -1 });
+  assert.deepEqual(listQuery.safeSort("-price,name", ALLOWED), {
+    price: -1,
+    name: 1,
+  });
+  assert.deepEqual(listQuery.safeSort("-rating.average", ALLOWED), {
+    "rating.average": -1,
+  });
 });
 
 test("B-26: safeSort drops unknown and dangerous fields, falling back safely", () => {
-  assert.deepEqual(listQuery.safeSort("passwordHash", ALLOWED), { createdAt: -1 });
-  assert.deepEqual(listQuery.safeSort("-__proto__", ALLOWED), { createdAt: -1 });
+  assert.deepEqual(listQuery.safeSort("passwordHash", ALLOWED), {
+    createdAt: -1,
+  });
+  assert.deepEqual(listQuery.safeSort("-__proto__", ALLOWED), {
+    createdAt: -1,
+  });
   assert.deepEqual(listQuery.safeSort("$where", ALLOWED), { createdAt: -1 });
-  assert.deepEqual(listQuery.safeSort("-createdAt,passwordHash", ALLOWED), { createdAt: -1 });
+  assert.deepEqual(listQuery.safeSort("-createdAt,passwordHash", ALLOWED), {
+    createdAt: -1,
+  });
   assert.deepEqual(listQuery.safeSort(undefined, ALLOWED), { createdAt: -1 });
   assert.deepEqual(listQuery.safeSort({ $gt: "" }, ALLOWED), { createdAt: -1 });
-  assert.deepEqual(listQuery.safeSort("-publishedAt", ["createdAt", "publishedAt"], "-publishedAt"), { publishedAt: -1 });
+  assert.deepEqual(
+    listQuery.safeSort(
+      "-publishedAt",
+      ["createdAt", "publishedAt"],
+      "-publishedAt",
+    ),
+    { publishedAt: -1 },
+  );
   // A fallback outside the allowlist degrades to -createdAt, never to {}.
-  assert.deepEqual(listQuery.safeSort("nope", ALLOWED, "-publishedAt"), { createdAt: -1 });
+  assert.deepEqual(listQuery.safeSort("nope", ALLOWED, "-publishedAt"), {
+    createdAt: -1,
+  });
 });
 
 // Handler level: getAllProducts must hand Mongoose an allowlisted
@@ -35,7 +57,10 @@ let capturedSort;
 function queryChain(result) {
   const chain = {
     populate: () => chain,
-    sort: (s) => { capturedSort = s; return chain; },
+    sort: (s) => {
+      capturedSort = s;
+      return chain;
+    },
     skip: () => chain,
     limit: () => Promise.resolve(result),
   };
@@ -45,7 +70,9 @@ stubModule("models/product.model.js", {
   find: () => queryChain([]),
   countDocuments: async () => 0,
 });
-stubModule("models/category.model.js", { find: () => ({ select: async () => [] }) });
+stubModule("models/category.model.js", {
+  find: () => ({ select: async () => [] }),
+});
 const productController = require("../../controllers/product.controller");
 
 async function runProducts(query) {

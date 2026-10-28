@@ -14,7 +14,8 @@ const productTypeKey = Joi.string()
   .max(60)
   .allow("", null)
   .messages({
-    "string.pattern.base": "Product type must be a registry key (lowercase letters, numbers, hyphens or underscores)",
+    "string.pattern.base":
+      "Product type must be a registry key (lowercase letters, numbers, hyphens or underscores)",
     "string.max": "Product type cannot exceed 60 characters",
   });
 
@@ -25,10 +26,10 @@ const roomSlugsSchema = Joi.alternatives().try(
         .trim()
         .lowercase()
         .pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-        .max(60)
+        .max(60),
     )
     .max(20),
-  Joi.string() // Allow JSON string from form-data
+  Joi.string(), // Allow JSON string from form-data
 );
 
 exports.createCategorySchema = Joi.object({
@@ -72,20 +73,28 @@ exports.updateCategorySchema = Joi.object({
   }),
   productType: productTypeKey,
   roomSlugs: roomSlugsSchema,
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update",
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update",
+  });
 
 // Phase 1: sibling reorder — one call sets sortOrder for a group of
 // categories that share a parent (the controller enforces the
 // same-parent rule; ids are position = new sortOrder).
 exports.reorderCategoriesSchema = Joi.object({
-  ids: Joi.array().items(objectId).min(1).max(500).unique().required().messages({
-    "any.required": "A list of category ids is required",
-    "array.min": "At least one category id is required",
-    "array.max": "Cannot reorder more than 500 categories at once",
-    "array.unique": "Category ids must be unique",
-  }),
+  ids: Joi.array()
+    .items(objectId)
+    .min(1)
+    .max(500)
+    .unique()
+    .required()
+    .messages({
+      "any.required": "A list of category ids is required",
+      "array.min": "At least one category id is required",
+      "array.max": "Cannot reorder more than 500 categories at once",
+      "array.unique": "Category ids must be unique",
+    }),
 });
 
 exports.getCategoriesQuerySchema = Joi.object({
@@ -104,7 +113,8 @@ const attributeKey = Joi.string()
   .pattern(/^[A-Za-z][A-Za-z0-9_]*$/)
   .max(60)
   .messages({
-    "string.pattern.base": "Attribute key must be a camelCase identifier (letters, numbers, underscores)",
+    "string.pattern.base":
+      "Attribute key must be a camelCase identifier (letters, numbers, underscores)",
     "string.max": "Attribute key cannot exceed 60 characters",
   });
 
@@ -120,7 +130,7 @@ exports.setCategoryAttributeAssignmentsSchema = Joi.object({
         displayGroup: Joi.string().trim().max(60),
         sortOrder: Joi.number().integer(),
         active: Joi.boolean(),
-      })
+      }),
     )
     .max(100)
     .required()

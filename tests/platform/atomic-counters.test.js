@@ -34,7 +34,7 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
@@ -55,27 +55,70 @@ const field = (l, name) => {
   return m ? m[1] : null;
 };
 
-test("AR-23 (a): 100 parallel promotion metric events land exactly +100, validation intact", { timeout: 190000 }, async () => {
-  const l = await line("promo");
-  assert.equal(field(l, "sentCount"), "100", `metrics must increase by exactly 100; got: ${l}`);
-  assert.equal(field(l, "errors"), "0", `no increment may fail; got: ${l}`);
-  assert.equal(field(l, "inMemory"), "1", "the caller's own copy mirrors its increment");
-  assert.equal(field(l, "validation"), "threw", "an invalid metric field must still throw");
-});
+test(
+  "AR-23 (a): 100 parallel promotion metric events land exactly +100, validation intact",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("promo");
+    assert.equal(
+      field(l, "sentCount"),
+      "100",
+      `metrics must increase by exactly 100; got: ${l}`,
+    );
+    assert.equal(field(l, "errors"), "0", `no increment may fail; got: ${l}`);
+    assert.equal(
+      field(l, "inMemory"),
+      "1",
+      "the caller's own copy mirrors its increment",
+    );
+    assert.equal(
+      field(l, "validation"),
+      "threw",
+      "an invalid metric field must still throw",
+    );
+  },
+);
 
-test("AR-23 (b): discount increments stop exactly at maxUsageLimit under parallelism", { timeout: 190000 }, async () => {
-  const l = await line("discount");
-  assert.equal(field(l, "finalCount"), "5", `count must end exactly at the limit; got: ${l}`);
-  assert.equal(field(l, "success"), "1", `exactly one of 10 parallel increments may succeed from limit-1; got: ${l}`);
-  assert.equal(field(l, "nulls"), "9", "the other nine must resolve null (limit reached), not throw");
-  assert.equal(field(l, "errors"), "0");
-});
+test(
+  "AR-23 (b): discount increments stop exactly at maxUsageLimit under parallelism",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("discount");
+    assert.equal(
+      field(l, "finalCount"),
+      "5",
+      `count must end exactly at the limit; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "success"),
+      "1",
+      `exactly one of 10 parallel increments may succeed from limit-1; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "nulls"),
+      "9",
+      "the other nine must resolve null (limit reached), not throw",
+    );
+    assert.equal(field(l, "errors"), "0");
+  },
+);
 
-test("AR-23 (c): 50 parallel logins persist loginCount exactly 50 and set lastLogin", { timeout: 190000 }, async () => {
-  const l = await line("login");
-  assert.equal(field(l, "loginCount"), "50", `loginCount must be exact; got: ${l}`);
-  assert.equal(field(l, "lastLoginSet"), "true");
-  assert.equal(field(l, "errors"), "0");
-  assert.equal(field(l, "inMemoryDirty"), "false",
-    "the in-memory mirror must not dirty the document (a later caller save must not rewrite loginCount as a stale absolute value)");
-});
+test(
+  "AR-23 (c): 50 parallel logins persist loginCount exactly 50 and set lastLogin",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("login");
+    assert.equal(
+      field(l, "loginCount"),
+      "50",
+      `loginCount must be exact; got: ${l}`,
+    );
+    assert.equal(field(l, "lastLoginSet"), "true");
+    assert.equal(field(l, "errors"), "0");
+    assert.equal(
+      field(l, "inMemoryDirty"),
+      "false",
+      "the in-memory mirror must not dirty the document (a later caller save must not rewrite loginCount as a stale absolute value)",
+    );
+  },
+);

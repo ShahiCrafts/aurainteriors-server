@@ -17,14 +17,22 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
 
-test("AR-41: activity-anchored TTL keeps the active session and reaps the idle one", { timeout: 150000 }, async () => {
-  const out = await runProbe();
-  const line = out.split("\n").find((l) => l.startsWith("RESULT"));
-  assert.ok(line, `probe must print a RESULT line; got: ${out}`);
-  assert.equal(line, "RESULT remaining=active", `only the active session may survive; got: ${line}`);
-});
+test(
+  "AR-41: activity-anchored TTL keeps the active session and reaps the idle one",
+  { timeout: 150000 },
+  async () => {
+    const out = await runProbe();
+    const line = out.split("\n").find((l) => l.startsWith("RESULT"));
+    assert.ok(line, `probe must print a RESULT line; got: ${out}`);
+    assert.equal(
+      line,
+      "RESULT remaining=active",
+      `only the active session may survive; got: ${line}`,
+    );
+  },
+);

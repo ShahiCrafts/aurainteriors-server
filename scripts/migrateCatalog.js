@@ -37,7 +37,9 @@ const MIGRATIONS = {
     const onlyIndex = process.argv.indexOf("--only");
     const only = onlyIndex === -1 ? null : process.argv[onlyIndex + 1];
     if (only && !MIGRATIONS[only]) {
-      throw new Error(`Unknown migration "${only}" (expected one of: ${Object.keys(MIGRATIONS).join(", ")})`);
+      throw new Error(
+        `Unknown migration "${only}" (expected one of: ${Object.keys(MIGRATIONS).join(", ")})`,
+      );
     }
     await connectDatabase();
     const names = only ? [only] : Object.keys(MIGRATIONS);
@@ -45,7 +47,9 @@ const MIGRATIONS = {
       const report = await MIGRATIONS[name]({ dryRun });
       console.log(JSON.stringify(report, null, 2));
     }
-    console.log(`Catalog migrations complete (${dryRun ? "dry run — nothing written" : "applied"})`);
+    console.log(
+      `Catalog migrations complete (${dryRun ? "dry run — nothing written" : "applied"})`,
+    );
   } catch (error) {
     console.error(`Catalog migration failed: ${error.message}`);
     process.exitCode = 1;

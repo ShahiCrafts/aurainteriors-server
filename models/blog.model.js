@@ -103,7 +103,7 @@ const blogSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Indexes
@@ -118,7 +118,7 @@ blogSchema.index({ tags: 1 });
 // index until the owner runs MIGRATIONS.md M-4 (never auto-run).
 blogSchema.index(
   { title: "text", excerpt: "text", tags: "text" },
-  { name: "blog_search_text", weights: { title: 10, excerpt: 5, tags: 3 } }
+  { name: "blog_search_text", weights: { title: 10, excerpt: 5, tags: 3 } },
 );
 
 // Generate slug from title
@@ -163,18 +163,23 @@ blogSchema.virtual("categoryName").get(function () {
 // decision" note: the remediation tasking directs the change, and
 // tests/perf/blog-model-scope.test.js pins the new shape.
 blogSchema.statics.getPopular = async function (limit = 5) {
-  return this.find()
-    .sort({ views: -1, likes: -1, publishedAt: -1 })
-    .limit(limit)
-    // PERF-B-08: the popular-blogs widget never renders the body;
-    // stop transferring full article content for it.
-    .select("-content")
-    .lean();
+  return (
+    this.find()
+      .sort({ views: -1, likes: -1, publishedAt: -1 })
+      .limit(limit)
+      // PERF-B-08: the popular-blogs widget never renders the body;
+      // stop transferring full article content for it.
+      .select("-content")
+      .lean()
+  );
 };
 
 // Static method to get featured blogs
 blogSchema.statics.getFeatured = async function (limit = 3) {
-  return this.find({ isFeatured: true }).sort({ publishedAt: -1 }).limit(limit).lean();
+  return this.find({ isFeatured: true })
+    .sort({ publishedAt: -1 })
+    .limit(limit)
+    .lean();
 };
 
 // Instance method to increment views

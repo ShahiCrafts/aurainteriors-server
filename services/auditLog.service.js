@@ -22,9 +22,10 @@ const redactValue = (value, depth) => {
   const out = {};
   for (const [key, val] of Object.entries(value)) {
     if (SENSITIVE_KEY.test(key)) continue;
-    out[key] = depth < 1 && val && typeof val === "object" && !Array.isArray(val)
-      ? redactValue(val, depth + 1)
-      : val;
+    out[key] =
+      depth < 1 && val && typeof val === "object" && !Array.isArray(val)
+        ? redactValue(val, depth + 1)
+        : val;
   }
   return out;
 };
@@ -33,7 +34,15 @@ const redact = (snapshot) => redactValue(snapshot, 0);
 
 exports.redact = redact; // exported for tests
 
-exports.record = async ({ actor, action, targetType, targetId, before, after, ip } = {}) => {
+exports.record = async ({
+  actor,
+  action,
+  targetType,
+  targetId,
+  before,
+  after,
+  ip,
+} = {}) => {
   try {
     if (!action) return null;
     // Never buffer-and-hang on a disconnected database: with no live
@@ -41,7 +50,8 @@ exports.record = async ({ actor, action, targetType, targetId, before, after, ip
     // and stall the audited request. Skipping is safe — the audited
     // action's own queries need the same connection.
     const mongoose = require("mongoose");
-    if (!mongoose.connection || mongoose.connection.readyState !== 1) return null;
+    if (!mongoose.connection || mongoose.connection.readyState !== 1)
+      return null;
     const AuditLog = require("../models/auditLog.model");
     return await AuditLog.create({
       actor: actor || undefined,
@@ -54,7 +64,10 @@ exports.record = async ({ actor, action, targetType, targetId, before, after, ip
       at: new Date(),
     });
   } catch (error) {
-    console.error("[auditLog] failed to record audit entry:", error && error.message);
+    console.error(
+      "[auditLog] failed to record audit entry:",
+      error && error.message,
+    );
     return null;
   }
 };

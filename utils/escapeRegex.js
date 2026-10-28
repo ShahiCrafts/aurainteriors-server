@@ -15,6 +15,7 @@ const escapeRegExp = (value) =>
   String(value).slice(0, 100).replace(REGEX_METACHARS, "\\$&");
 
 /** Case-insensitive RegExp that matches the value as literal text. */
-const literalRegExp = (value, flags = "i") => new RegExp(escapeRegExp(value), flags);
+const literalRegExp = (value, flags = "i") =>
+  new RegExp(escapeRegExp(value), flags);
 
 module.exports = { escapeRegExp, escapeRegex: escapeRegExp, literalRegExp };

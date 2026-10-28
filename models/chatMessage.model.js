@@ -25,7 +25,11 @@ const chatMessageSchema = new mongoose.Schema(
         "Message must have a sender unless it is a system message",
       ],
     },
-    senderGuestSession: { type: mongoose.Schema.Types.ObjectId, ref: "GuestSession", default: null },
+    senderGuestSession: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GuestSession",
+      default: null,
+    },
     senderRole: {
       type: String,
       enum: ["customer", "admin", "bot", "system"],
@@ -92,7 +96,7 @@ const chatMessageSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 chatMessageSchema.index({ chat: 1, createdAt: -1 });
@@ -104,7 +108,10 @@ chatMessageSchema.index({ chat: 1, createdAt: -1 });
 // examines more keys) and fast with it — see MIGRATIONS.md M-5.
 chatMessageSchema.index(
   { chat: 1, clientMessageId: 1 },
-  { unique: true, partialFilterExpression: { clientMessageId: { $type: "string" } } }
+  {
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: "string" } },
+  },
 );
 chatMessageSchema.index({ sender: 1 });
 chatMessageSchema.index({ isRead: 1 });
@@ -112,7 +119,7 @@ chatMessageSchema.index({ chat: 1, senderRole: 1, isRead: 1 });
 
 chatMessageSchema.pre("validate", function () {
   if (!this.content && (!this.attachments || this.attachments.length === 0)) {
-    throw (new Error("Message must have content or attachments"));
+    throw new Error("Message must have content or attachments");
   }
   if (!this.deliveredAt) {
     this.deliveredAt = new Date();
@@ -121,7 +128,7 @@ chatMessageSchema.pre("validate", function () {
 
 chatMessageSchema.statics.getChatMessages = async function (
   chatId,
-  options = {}
+  options = {},
 ) {
   const limit = boundedLimit(options.limit, 50);
   const page = boundedPage(options.page);
@@ -132,7 +139,8 @@ chatMessageSchema.statics.getChatMessages = async function (
     deletedAt: null,
   };
 
-  if (options.includeInternalNotes !== true) query.isInternalNote = { $ne: true };
+  if (options.includeInternalNotes !== true)
+    query.isInternalNote = { $ne: true };
 
   const [messages, total] = await Promise.all([
     this.find(query)
@@ -141,7 +149,12 @@ chatMessageSchema.statics.getChatMessages = async function (
       .limit(limit)
       // FA-58: sender email is staff-only; history for customers/guests
       // must not disclose participants' email addresses.
-      .populate("sender", options.includeSenderEmail === true ? "firstName lastName email role avatar" : "firstName lastName role avatar")
+      .populate(
+        "sender",
+        options.includeSenderEmail === true
+          ? "firstName lastName email role avatar"
+          : "firstName lastName role avatar",
+      )
       .lean(),
     this.countDocuments(query),
   ]);
@@ -178,7 +191,7 @@ chatMessageSchema.statics.markAsRead = async function (chatId, senderRole) {
         isRead: true,
         readAt: new Date(),
       },
-    }
+    },
   );
 
   return result.modifiedCount;

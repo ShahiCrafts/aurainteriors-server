@@ -18,7 +18,11 @@ const ProductType = require("../models/productType.model");
 const Room = require("../models/room.model");
 const Collection = require("../models/collection.model");
 const AttributeDefinition = require("../models/attributeDefinition.model");
-const { productTypes, rooms, collections } = require("../config/catalogRegistryData");
+const {
+  productTypes,
+  rooms,
+  collections,
+} = require("../config/catalogRegistryData");
 const { attributeDefinitions } = require("../config/catalogAttributeData");
 
 async function upsertMissing(model, keyField, docs) {
@@ -27,7 +31,7 @@ async function upsertMissing(model, keyField, docs) {
     const result = await model.updateOne(
       { [keyField]: doc[keyField] },
       { $setOnInsert: doc },
-      { upsert: true }
+      { upsert: true },
     );
     if (result.upsertedCount) inserted += result.upsertedCount;
   }

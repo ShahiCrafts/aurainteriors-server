@@ -25,12 +25,18 @@ const {
 } = require("../../validators/catalog.validator");
 
 const ok = (schema, value) => {
-  const { error, value: out } = schema.validate(value, { abortEarly: false, stripUnknown: true });
+  const { error, value: out } = schema.validate(value, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
   assert.equal(error, undefined, error && error.message);
   return out;
 };
 const bad = (schema, value) => {
-  const { error } = schema.validate(value, { abortEarly: false, stripUnknown: true });
+  const { error } = schema.validate(value, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
   assert.ok(error, `expected validation error for ${JSON.stringify(value)}`);
 };
 
@@ -41,28 +47,54 @@ test("SR-P6-2 validators: attributeKeys keep their case on create and update", (
     attributeKeys: ["frameMaterial", "seatingCapacity"],
   });
   assert.deepEqual(created.attributeKeys, ["frameMaterial", "seatingCapacity"]);
-  const updated = ok(updateProductTypeSchema, { attributeKeys: ["frameMaterial"] });
+  const updated = ok(updateProductTypeSchema, {
+    attributeKeys: ["frameMaterial"],
+  });
   assert.deepEqual(updated.attributeKeys, ["frameMaterial"]);
 });
 
 test("SR-P6-2 validators: the type's own key stays a lowercase machine key; malformed attribute keys rejected", () => {
-  const created = ok(createProductTypeSchema, { key: "Lounger", label: "Lounger" });
+  const created = ok(createProductTypeSchema, {
+    key: "Lounger",
+    label: "Lounger",
+  });
   assert.equal(created.key, "lounger");
-  bad(createProductTypeSchema, { key: "lounger", label: "Lounger", attributeKeys: ["frame material"] });
-  bad(createProductTypeSchema, { key: "lounger", label: "Lounger", attributeKeys: ["__proto__"] });
-  bad(createProductTypeSchema, { key: "lounger", label: "Lounger", attributeKeys: ["9lives"] });
+  bad(createProductTypeSchema, {
+    key: "lounger",
+    label: "Lounger",
+    attributeKeys: ["frame material"],
+  });
+  bad(createProductTypeSchema, {
+    key: "lounger",
+    label: "Lounger",
+    attributeKeys: ["__proto__"],
+  });
+  bad(createProductTypeSchema, {
+    key: "lounger",
+    label: "Lounger",
+    attributeKeys: ["9lives"],
+  });
   bad(updateProductTypeSchema, { attributeKeys: ["frame material"] });
 });
 
 function runProbe() {
   return new Promise((resolve, reject) => {
-    execFile(process.execPath, [path.join(__dirname, "fixtures", "catalog-phase65-probe.js")],
+    execFile(
+      process.execPath,
+      [path.join(__dirname, "fixtures", "catalog-phase65-probe.js")],
       { timeout: 240000, maxBuffer: 4 * 1024 * 1024 },
-      (err, stdout) => { if (err && !stdout) return reject(err); resolve(String(stdout)); });
+      (err, stdout) => {
+        if (err && !stdout) return reject(err);
+        resolve(String(stdout));
+      },
+    );
   });
 }
 let cached;
-const probe = async () => { if (!cached) cached = runProbe(); return cached; };
+const probe = async () => {
+  if (!cached) cached = runProbe();
+  return cached;
+};
 const line = async (prefix) => {
   const out = await probe();
   const l = out.split("\n").find((x) => x.startsWith(`RESULT ${prefix}`));
@@ -71,24 +103,45 @@ const line = async (prefix) => {
 };
 
 test("SR-P6-2: keys pass the schema and are stored verbatim", async () => {
-  assert.equal(await line("sr2-schema"), "RESULT sr2-schema keys=frameMaterial,seatingCapacity");
+  assert.equal(
+    await line("sr2-schema"),
+    "RESULT sr2-schema keys=frameMaterial,seatingCapacity",
+  );
   assert.equal(await line("sr2-create"), "RESULT sr2-create status=201");
-  assert.equal(await line("sr2-stored"), "RESULT sr2-stored keys=frameMaterial,seatingCapacity");
+  assert.equal(
+    await line("sr2-stored"),
+    "RESULT sr2-stored keys=frameMaterial,seatingCapacity",
+  );
 });
 
 test("SR-P6-2: resolution for a category of the type surfaces the attributes", async () => {
-  assert.equal(await line("sr2-resolve"), "RESULT sr2-resolve frame=true seating=true source=type");
+  assert.equal(
+    await line("sr2-resolve"),
+    "RESULT sr2-resolve frame=true seating=true source=type",
+  );
 });
 
 test("SR-P6-2: unknown attribute keys are rejected by name on create and update", async () => {
-  assert.equal(await line("sr2-unknown-create"), "RESULT sr2-unknown-create status=400 named=true");
-  assert.equal(await line("sr2-unknown-update"), "RESULT sr2-unknown-update status=400 named=true");
+  assert.equal(
+    await line("sr2-unknown-create"),
+    "RESULT sr2-unknown-create status=400 named=true",
+  );
+  assert.equal(
+    await line("sr2-unknown-update"),
+    "RESULT sr2-unknown-update status=400 named=true",
+  );
   // The rejected update changed nothing.
-  assert.equal(await line("sr2-unknown-update stored"), "RESULT sr2-unknown-update stored=frameMaterial,seatingCapacity");
+  assert.equal(
+    await line("sr2-unknown-update stored"),
+    "RESULT sr2-unknown-update stored=frameMaterial,seatingCapacity",
+  );
 });
 
 test("SR-P6-2: a valid update stores keys verbatim", async () => {
-  assert.equal(await line("sr2-update"), "RESULT sr2-update status=200 stored=frameMaterial");
+  assert.equal(
+    await line("sr2-update"),
+    "RESULT sr2-update status=200 stored=frameMaterial",
+  );
 });
 
 test("SR-P6-3: flat list and tree counts agree (soft-deleted products excluded from both)", async () => {

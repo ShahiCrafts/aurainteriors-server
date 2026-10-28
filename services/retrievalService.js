@@ -7,7 +7,9 @@ const Document = require("../models/document.model");
 function isTimeoutError(error) {
   if (!error) return false;
   if (error.name === "AbortError" || error.name === "TimeoutError") return true;
-  return /abort|timed out|timeout|time limit/i.test(String(error.message || ""));
+  return /abort|timed out|timeout|time limit/i.test(
+    String(error.message || ""),
+  );
 }
 
 class RetrievalService {
@@ -22,7 +24,10 @@ class RetrievalService {
   qdrantClient() {
     if (!this.qdrant) {
       // AR-39: explicit client timeout (SDK default was 300 s).
-      this.qdrant = require("../config/appConfig").createQdrantClient(process.env, { timeout: this.qdrantTimeoutMs() });
+      this.qdrant = require("../config/appConfig").createQdrantClient(
+        process.env,
+        { timeout: this.qdrantTimeoutMs() },
+      );
     }
     return this.qdrant;
   }
@@ -49,13 +54,21 @@ class RetrievalService {
    * Helper to retrieve embedding vector for a given query string
    */
   async getEmbedding(text, inputType = "query", { timeoutMs = 300 } = {}) {
-    const apiKey = process.env.NVIDIA_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey =
+      process.env.NVIDIA_API_KEY ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing API Key for embedding model in environment variables.");
+      throw new Error(
+        "Missing API Key for embedding model in environment variables.",
+      );
     }
 
-    const url = process.env.EMBEDDING_API_URL || "https://integrate.api.nvidia.com/v1/embeddings";
-    const model = process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
+    const url =
+      process.env.EMBEDDING_API_URL ||
+      "https://integrate.api.nvidia.com/v1/embeddings";
+    const model =
+      process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -65,7 +78,7 @@ class RetrievalService {
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           input: [text],
@@ -77,7 +90,9 @@ class RetrievalService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Embedding model responded with status ${response.status}: ${errorText}`);
+        throw new Error(
+          `Embedding model responded with status ${response.status}: ${errorText}`,
+        );
       }
 
       const result = await response.json();
@@ -101,27 +116,47 @@ class RetrievalService {
     let stage = "embedding";
     try {
       console.log(`[RAG] Generating embedding for query: "${query}"`);
-      const queryEmbedding = await this.getEmbedding(query, "query", { timeoutMs });
-
-      stage = "qdrant";
-      console.log(`[RAG] Searching Qdrant collection: "${this.collectionName}"`);
-      const searchResult = await this.qdrantClient().search(this.collectionName, {
-        filter: { must: [{ key: "visibility", match: { value: "public" } }] },
-        vector: queryEmbedding,
-        limit: Math.min(Math.max(Number(limit) || 5, 1), 10),
-        with_payload: true,
-        // AR-39: explicit per-request timeout (seconds, the Qdrant
-        // API's unit for the search request) derived from the same
-        // configured client budget as the constructor timeout.
-        timeout: Math.max(1, Math.ceil(this.qdrantTimeoutMs() / 1000)),
+      const queryEmbedding = await this.getEmbedding(query, "query", {
+        timeoutMs,
       });
 
-      const ids = searchResult.map(hit => hit.payload?.documentId).filter(id => typeof id === "string" && /^[a-f0-9]{24}$/i.test(id));
-      const publicDocuments = await Document.find({ _id: { $in: ids }, visibility: "public", status: "indexed" }).select("_id").lean();
-      const allowed = new Set(publicDocuments.map(doc => String(doc._id)));
+      stage = "qdrant";
+      console.log(
+        `[RAG] Searching Qdrant collection: "${this.collectionName}"`,
+      );
+      const searchResult = await this.qdrantClient().search(
+        this.collectionName,
+        {
+          filter: { must: [{ key: "visibility", match: { value: "public" } }] },
+          vector: queryEmbedding,
+          limit: Math.min(Math.max(Number(limit) || 5, 1), 10),
+          with_payload: true,
+          // AR-39: explicit per-request timeout (seconds, the Qdrant
+          // API's unit for the search request) derived from the same
+          // configured client budget as the constructor timeout.
+          timeout: Math.max(1, Math.ceil(this.qdrantTimeoutMs() / 1000)),
+        },
+      );
+
+      const ids = searchResult
+        .map((hit) => hit.payload?.documentId)
+        .filter((id) => typeof id === "string" && /^[a-f0-9]{24}$/i.test(id));
+      const publicDocuments = await Document.find({
+        _id: { $in: ids },
+        visibility: "public",
+        status: "indexed",
+      })
+        .select("_id")
+        .lean();
+      const allowed = new Set(publicDocuments.map((doc) => String(doc._id)));
       // Filter and map results that meet the minimum confidence score
       const matches = searchResult
-        .filter((hit) => hit.score >= minScore && hit.payload?.visibility === "public" && allowed.has(hit.payload.documentId))
+        .filter(
+          (hit) =>
+            hit.score >= minScore &&
+            hit.payload?.visibility === "public" &&
+            allowed.has(hit.payload.documentId),
+        )
         .map((hit) => ({
           text: hit.payload.text,
           fileName: hit.payload.fileName,
@@ -129,7 +164,9 @@ class RetrievalService {
           score: hit.score,
         }));
 
-      console.log(`[RAG] Found ${matches.length} matching chunks matching score >= ${minScore}`);
+      console.log(
+        `[RAG] Found ${matches.length} matching chunks matching score >= ${minScore}`,
+      );
       return matches;
     } catch (error) {
       // AR-39: an empty result caused by a TIMEOUT gets its own
@@ -137,7 +174,9 @@ class RetrievalService {
       // "rag_retrieve_timeout") so timeout-empty is distinguishable
       // from no-match-empty and from other failures in the logs.
       if (isTimeoutError(error)) {
-        console.log(JSON.stringify({ event: "rag_retrieve_timeout", stage, timeoutMs }));
+        console.log(
+          JSON.stringify({ event: "rag_retrieve_timeout", stage, timeoutMs }),
+        );
       }
       console.error("Qdrant similarity search failed:", error.message);
       // Fallback: return empty array so system does not crash
@@ -146,9 +185,13 @@ class RetrievalService {
   }
   async retrieveContext(query, { timeoutMs = 300 } = {}) {
     const matches = await this.search(query, 5, 0.5, { timeoutMs });
-    return matches.map(({ text, fileName, documentId, score }) => ({ text, fileName, documentId, score }));
+    return matches.map(({ text, fileName, documentId, score }) => ({
+      text,
+      fileName,
+      documentId,
+      score,
+    }));
   }
-
 }
 
 module.exports = new RetrievalService();

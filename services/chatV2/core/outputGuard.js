@@ -8,5 +8,23 @@
 // emits (defense in depth if a future client renders markup), in
 // addition to the URL allowlist below. The client must keep treating
 // model output as untrusted text.
-function guard(text,{toolUrls=[],origins}={}){const allowed=new Set(toolUrls);const allowedOrigins=origins||require('../../../config/appConfig').buildAllowedOrigins();return String(text||'').replace(/https?:\/\/[^\s)\]}]+/g,u=>{try{const x=new URL(u);return allowedOrigins.includes(x.origin)||allowed.has(u)?u:'[link removed]'}catch{return '[link removed]'}}).replace(/<\/?function[^>]*>/gi,'').replace(/<[^>]*>/g,'').trim()}
-module.exports={guard};
+function guard(text, { toolUrls = [], origins } = {}) {
+  const allowed = new Set(toolUrls);
+  const allowedOrigins =
+    origins || require("../../../config/appConfig").buildAllowedOrigins();
+  return String(text || "")
+    .replace(/https?:\/\/[^\s)\]}]+/g, (u) => {
+      try {
+        const x = new URL(u);
+        return allowedOrigins.includes(x.origin) || allowed.has(u)
+          ? u
+          : "[link removed]";
+      } catch {
+        return "[link removed]";
+      }
+    })
+    .replace(/<\/?function[^>]*>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+module.exports = { guard };

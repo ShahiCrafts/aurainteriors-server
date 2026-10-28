@@ -88,7 +88,7 @@ const categorySchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 categorySchema.virtual("subcategories", {
@@ -128,8 +128,15 @@ categorySchema.pre("save", function (next) {
 });
 
 categorySchema.statics.getCategoryTree = async function () {
-  const categories = await this.find({ status: "active" }).sort({ sortOrder: 1, name: 1 }).lean();
-  const nodes = new Map(categories.map(category => [String(category._id), { ...category, subcategories: [] }]));
+  const categories = await this.find({ status: "active" })
+    .sort({ sortOrder: 1, name: 1 })
+    .lean();
+  const nodes = new Map(
+    categories.map((category) => [
+      String(category._id),
+      { ...category, subcategories: [] },
+    ]),
+  );
   const roots = [];
   for (const category of categories) {
     const node = nodes.get(String(category._id));
@@ -153,7 +160,9 @@ categorySchema.statics.getCategoryTree = async function () {
     { $match: { deletedAt: null } },
     { $group: { _id: "$category", count: { $sum: 1 } } },
   ]);
-  const directCounts = new Map(grouped.map((row) => [String(row._id), row.count]));
+  const directCounts = new Map(
+    grouped.map((row) => [String(row._id), row.count]),
+  );
   const rollup = (node) => {
     let total = directCounts.get(String(node._id)) || 0;
     for (const child of node.subcategories) total += rollup(child);
@@ -165,10 +174,10 @@ categorySchema.statics.getCategoryTree = async function () {
 };
 
 categorySchema.statics.getDescendantIds = async function (id) {
-  const categories = await this.find({}, '_id parent').lean();
+  const categories = await this.find({}, "_id parent").lean();
   const children = new Map();
   for (const category of categories) {
-    const key = String(category.parent || '');
+    const key = String(category.parent || "");
     if (!children.has(key)) children.set(key, []);
     children.get(key).push(String(category._id));
   }

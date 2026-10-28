@@ -89,15 +89,17 @@ async function main() {
   console.log(
     apply
       ? "MODE: --apply (indexes WILL be created)"
-      : "MODE: dry-run (nothing will be created; pass --apply to execute)"
+      : "MODE: dry-run (nothing will be created; pass --apply to execute)",
   );
   for (const [collection, keys] of INDEXES) {
     console.log(
-      `${apply ? "createIndex" : "would createIndex"}  ${collection}  ${JSON.stringify(keys)}`
+      `${apply ? "createIndex" : "would createIndex"}  ${collection}  ${JSON.stringify(keys)}`,
     );
   }
   if (!apply) {
-    console.log("\nDry-run only — no connection made. See the header checklist before applying.");
+    console.log(
+      "\nDry-run only — no connection made. See the header checklist before applying.",
+    );
     return;
   }
   const uri = process.env.MONGO_URI;

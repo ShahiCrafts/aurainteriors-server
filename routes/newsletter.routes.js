@@ -1,13 +1,21 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
-const express = require('express');
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
+const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
 router.use(standardWriteLimiter);
-const newsletterController = require('../controllers/newsletter.controller');
-const { subscribeSchema, unsubscribeSchema, confirmSubscriptionSchema, sendTrendSchema } = require('../validators/newsletter.validator');
-const { createAuthLimiter } = require('../middleware/authRateLimit.middleware');
-const validate = require('../middleware/validate.middleware');
-const { protect, restrictTo } = require('../middleware/auth.middleware');
+const newsletterController = require("../controllers/newsletter.controller");
+const {
+  subscribeSchema,
+  unsubscribeSchema,
+  confirmSubscriptionSchema,
+  sendTrendSchema,
+} = require("../validators/newsletter.validator");
+const { createAuthLimiter } = require("../middleware/authRateLimit.middleware");
+const validate = require("../middleware/validate.middleware");
+const { protect, restrictTo } = require("../middleware/auth.middleware");
 
 /**
  * @route   POST /api/newsletter/subscribe
@@ -15,10 +23,10 @@ const { protect, restrictTo } = require('../middleware/auth.middleware');
  * @access  Public
  */
 router.post(
-    '/subscribe',
-    createAuthLimiter('newsletterSubscribe', 3, 20),
-    validate(subscribeSchema),
-    newsletterController.subscribe
+  "/subscribe",
+  createAuthLimiter("newsletterSubscribe", 3, 20),
+  validate(subscribeSchema),
+  newsletterController.subscribe,
 );
 
 /**
@@ -27,10 +35,10 @@ router.post(
  * @access  Public
  */
 router.post(
-    '/unsubscribe',
-    createAuthLimiter('newsletterUnsubscribe', 20, 60),
-    validate(unsubscribeSchema),
-    newsletterController.unsubscribe
+  "/unsubscribe",
+  createAuthLimiter("newsletterUnsubscribe", 20, 60),
+  validate(unsubscribeSchema),
+  newsletterController.unsubscribe,
 );
 
 /**
@@ -38,13 +46,18 @@ router.post(
  * @desc    Get all subscribers (with pagination)
  * @access  Private/Admin
  */
-router.post('/confirm', createAuthLimiter('newsletterConfirm', 20, 60), validate(confirmSubscriptionSchema), newsletterController.confirmSubscription);
+router.post(
+  "/confirm",
+  createAuthLimiter("newsletterConfirm", 20, 60),
+  validate(confirmSubscriptionSchema),
+  newsletterController.confirmSubscription,
+);
 
 router.get(
-    '/subscribers',
-    protect,
-    restrictTo('admin'),
-    newsletterController.getSubscribers
+  "/subscribers",
+  protect,
+  restrictTo("admin"),
+  newsletterController.getSubscribers,
 );
 
 /**
@@ -53,11 +66,11 @@ router.get(
  * @access  Private/Admin
  */
 router.post(
-    '/send-trend',
-    protect,
-    restrictTo('admin'),
-    validate(sendTrendSchema),
-    newsletterController.sendTrend
+  "/send-trend",
+  protect,
+  restrictTo("admin"),
+  validate(sendTrendSchema),
+  newsletterController.sendTrend,
 );
 
 /**
@@ -66,10 +79,10 @@ router.post(
  * @access  Private/Admin
  */
 router.get(
-    '/stats',
-    protect,
-    restrictTo('admin'),
-    newsletterController.getStats
+  "/stats",
+  protect,
+  restrictTo("admin"),
+  newsletterController.getStats,
 );
 
 module.exports = router;

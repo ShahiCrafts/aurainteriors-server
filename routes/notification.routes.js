@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const { protect } = require("../middleware/auth.middleware");
@@ -25,19 +28,23 @@ router.put("/:id/read", notificationController.markAsRead);
 router.post(
   "/mark-multiple-read",
   validateMarkAsRead,
-  notificationController.markMultipleAsRead
+  notificationController.markMultipleAsRead,
 );
 router.put("/:id/archive", notificationController.archiveNotification);
 router.post(
   "/archive-multiple",
   validateArchive,
-  notificationController.archiveMultiple
+  notificationController.archiveMultiple,
 );
-router.post("/push-tokens/register", validatePushTokenRegistration, notificationController.registerPushToken);
+router.post(
+  "/push-tokens/register",
+  validatePushTokenRegistration,
+  notificationController.registerPushToken,
+);
 router.get("/push-tokens/devices", notificationController.getUserDevices);
 router.delete(
   "/push-tokens/:deviceId",
-  notificationController.unregisterDevice
+  notificationController.unregisterDevice,
 );
 router.put("/preferences", notificationController.updatePreferences);
 

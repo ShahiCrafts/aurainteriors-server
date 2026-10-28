@@ -1,4 +1,9 @@
-const { loadEnv, validateEnv, getInt, getString } = require("./config/appConfig");
+const {
+  loadEnv,
+  validateEnv,
+  getInt,
+  getString,
+} = require("./config/appConfig");
 loadEnv();
 {
   const { errors, warnings } = validateEnv();
@@ -22,7 +27,10 @@ const { connectDatabase } = require("./config/database");
 const { assertReplicaSetTopology } = require("./config/topology");
 const NotificationGateway = require("./services/notificationGateway");
 const { initializeDatabaseIfEmpty } = require("./services/databaseSeeder");
-const { startScheduledJobs, stopScheduledJobs } = require("./services/jobWiring");
+const {
+  startScheduledJobs,
+  stopScheduledJobs,
+} = require("./services/jobWiring");
 const runtimeContext = require("./services/runtimeContext");
 const KeepAliveService = require("./services/keepAlive.service");
 
@@ -31,25 +39,32 @@ const NODE_ENV = (getString("NODE_ENV") || "development").trim().toLowerCase(); 
 
 // Verify email configuration at startup
 console.log("[startup] Email config verification:");
-console.log("[startup] BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✓ SET" : "✗ MISSING");
-console.log("[startup] EMAIL_FROM:", process.env.EMAIL_FROM ? "✓ SET" : "✗ MISSING");
+console.log(
+  "[startup] BREVO_API_KEY:",
+  process.env.BREVO_API_KEY ? "✓ SET" : "✗ MISSING",
+);
+console.log(
+  "[startup] EMAIL_FROM:",
+  process.env.EMAIL_FROM ? "✓ SET" : "✗ MISSING",
+);
 
 // Test email service at startup
 const { verifyEmailConfig } = require("./services/email.service");
 verifyEmailConfig()
-  .then(isValid => {
+  .then((isValid) => {
     if (isValid) {
       console.log("[startup] ✓ Email service verified successfully");
     } else {
-      console.error("[startup] ✗ Email service verification failed - check Brevo credentials");
+      console.error(
+        "[startup] ✗ Email service verification failed - check Brevo credentials",
+      );
     }
   })
-  .catch(err => {
+  .catch((err) => {
     console.error("[startup] ✗ Email service error:", err.message);
   });
 
 const startTime = Date.now();
-
 
 const app = createApp();
 
@@ -75,12 +90,15 @@ const startServer = async () => {
     // skipped silently when the DB is stubbed (test preload).
     await assertReplicaSetTopology();
     console.log("Starting server initialization...");
-    
+
     // Demo data is opt-in and is never inserted during production startup.
-    if (process.env.NODE_ENV === "development" && process.env.SEED_DEMO_DATA === "true") {
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.SEED_DEMO_DATA === "true"
+    ) {
       await initializeDatabaseIfEmpty();
     }
-    
+
     console.log("Initializing notification gateway...");
     notificationGateway = new NotificationGateway(httpServer);
     console.log("✓ Notification gateway initialized");
@@ -121,7 +139,9 @@ const startServer = async () => {
     let inFlightRequests = 0;
     httpServer.on("request", (req, res) => {
       inFlightRequests += 1;
-      res.on("close", () => { inFlightRequests -= 1; });
+      res.on("close", () => {
+        inFlightRequests -= 1;
+      });
     });
 
     // AR-45: shutdown runs EXACTLY once. A second signal (or an
@@ -131,12 +151,18 @@ const startServer = async () => {
     let shuttingDown = false;
     const shutdown = async (trigger) => {
       if (shuttingDown) {
-        console.log(`Shutdown already in progress; ignoring trigger: ${trigger}`);
+        console.log(
+          `Shutdown already in progress; ignoring trigger: ${trigger}`,
+        );
         return;
       }
       shuttingDown = true;
       console.log("\nShutting down gracefully...");
-      try { keepAliveService?.stop(); } catch { /* already stopped */ }
+      try {
+        keepAliveService?.stop();
+      } catch {
+        /* already stopped */
+      }
       // AR-33: clears the heartbeat/cleanup/RSS intervals and the
       // initial-RSS timer, then stops background tasks and the
       // in-process job worker (the same teardown as before, one call).
@@ -152,7 +178,9 @@ const startServer = async () => {
           notificationGateway?.close() ?? Promise.resolve(),
           new Promise((resolve) => setTimeout(resolve, 3000)),
         ]);
-      } catch { /* already closed */ }
+      } catch {
+        /* already closed */
+      }
       // Close the HTTP server and the database before exiting so
       // in-flight requests are not truncated by process.exit (B-18);
       // the wait is capped so a hung connection cannot block shutdown.
@@ -166,26 +194,41 @@ const startServer = async () => {
       })();
       let drained = false;
       await Promise.race([
-        new Promise((resolve) => httpServer.close(() => { drained = true; resolve(); })),
+        new Promise((resolve) =>
+          httpServer.close(() => {
+            drained = true;
+            resolve();
+          }),
+        ),
         new Promise((resolve) => setTimeout(resolve, drainTimeoutMs)),
       ]);
       if (!drained) {
         const openConnections = await new Promise((resolve) => {
           httpServer.getConnections((err, count) => resolve(err ? -1 : count));
         });
-        console.error(JSON.stringify({
-          level: "error",
-          event: "shutdown_drain_timeout",
-          trigger,
-          drainTimeoutMs,
-          openConnections,
-          inFlightRequests,
-        }));
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "shutdown_drain_timeout",
+            trigger,
+            drainTimeoutMs,
+            openConnections,
+            inFlightRequests,
+          }),
+        );
         // Force-close whatever survived the cap so a stuck socket
         // cannot hold the process open past the report.
-        try { httpServer.closeAllConnections?.(); } catch { /* ignore */ }
+        try {
+          httpServer.closeAllConnections?.();
+        } catch {
+          /* ignore */
+        }
       }
-      try { await mongoose.connection.close(); } catch { /* ignore */ }
+      try {
+        await mongoose.connection.close();
+      } catch {
+        /* ignore */
+      }
       process.exit(0);
     };
 

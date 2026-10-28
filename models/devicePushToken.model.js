@@ -73,7 +73,7 @@ const devicePushTokenSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // FA-69: uniqueness of (user, deviceId) is enforced by a REAL compound

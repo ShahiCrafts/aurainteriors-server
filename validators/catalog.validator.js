@@ -13,7 +13,8 @@ const machineKey = Joi.string()
   .pattern(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/)
   .max(60)
   .messages({
-    "string.pattern.base": "Key must be lowercase letters, numbers, hyphens or underscores",
+    "string.pattern.base":
+      "Key must be lowercase letters, numbers, hyphens or underscores",
     "string.max": "Key cannot exceed 60 characters",
   });
 
@@ -25,7 +26,8 @@ const attributeKey = Joi.string()
   .pattern(/^[A-Za-z][A-Za-z0-9_]*$/)
   .max(60)
   .messages({
-    "string.pattern.base": "Attribute key must be a camelCase identifier (letters, numbers, underscores)",
+    "string.pattern.base":
+      "Attribute key must be a camelCase identifier (letters, numbers, underscores)",
     "string.max": "Attribute key cannot exceed 60 characters",
   });
 
@@ -72,7 +74,10 @@ exports.createProductTypeSchema = Joi.object({
   // them (frameMaterial -> framematerial) and resolution then
   // silently dropped the attribute.
   attributeKeys: Joi.array().items(attributeKey).max(50).default([]),
-  attributeAssignments: Joi.array().items(typeAttributeAssignment).max(50).default([]),
+  attributeAssignments: Joi.array()
+    .items(typeAttributeAssignment)
+    .max(50)
+    .default([]),
   active: Joi.boolean().default(true),
   sortOrder: Joi.number().integer().min(0).default(0).messages({
     "number.min": "Sort order cannot be negative",
@@ -95,9 +100,11 @@ exports.updateProductTypeSchema = Joi.object({
   sortOrder: Joi.number().integer().min(0).messages({
     "number.min": "Sort order cannot be negative",
   }),
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update",
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update",
+  });
 
 // ------------------------------------------------------------------
 // Attribute definitions (Phase 2)
@@ -116,10 +123,11 @@ const attributeType = Joi.string()
     "measurement",
     "money",
     "color",
-    "dimensions"
+    "dimensions",
   )
   .messages({
-    "any.only": "Attribute type must be one of string, enum, multi-enum, boolean, integer, decimal, measurement, money, color, dimensions",
+    "any.only":
+      "Attribute type must be one of string, enum, multi-enum, boolean, integer, decimal, measurement, money, color, dimensions",
   });
 
 const attributeDefinitionFields = {
@@ -130,7 +138,9 @@ const attributeDefinitionFields = {
   type: attributeType,
   unit: Joi.string().trim().max(20).allow(""),
   acceptedUnits: Joi.array().items(Joi.string().trim().max(20)).max(10),
-  allowedValues: Joi.array().items(Joi.string().trim().min(1).max(100)).max(100),
+  allowedValues: Joi.array()
+    .items(Joi.string().trim().min(1).max(100))
+    .max(100),
   min: Joi.number(),
   max: Joi.number(),
   step: Joi.number().min(0),
@@ -172,9 +182,11 @@ exports.createAttributeDefinitionSchema = Joi.object({
 exports.updateAttributeDefinitionSchema = Joi.object({
   key: attributeKey,
   ...attributeDefinitionFields,
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update",
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update",
+  });
 
 // ------------------------------------------------------------------
 // Rooms
@@ -213,9 +225,11 @@ exports.updateRoomSchema = Joi.object({
   sortOrder: Joi.number().integer().min(0).messages({
     "number.min": "Sort order cannot be negative",
   }),
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update",
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update",
+  });
 
 // ------------------------------------------------------------------
 // Collections
@@ -223,10 +237,17 @@ exports.updateRoomSchema = Joi.object({
 
 const collectionRuleSchema = Joi.object({
   type: Joi.string()
-    .valid("new-arrivals", "best-sellers", "featured", "on-sale", "attribute-match")
+    .valid(
+      "new-arrivals",
+      "best-sellers",
+      "featured",
+      "on-sale",
+      "attribute-match",
+    )
     .required()
     .messages({
-      "any.only": "Rule type must be one of new-arrivals, best-sellers, featured, on-sale, attribute-match",
+      "any.only":
+        "Rule type must be one of new-arrivals, best-sellers, featured, on-sale, attribute-match",
       "any.required": "Rule type is required",
     }),
   // Rule params are rule-specific (windowDays / limit / key+value);
@@ -287,6 +308,8 @@ exports.updateCollectionSchema = Joi.object({
   sortOrder: Joi.number().integer().min(0).messages({
     "number.min": "Sort order cannot be negative",
   }),
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update",
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update",
+  });

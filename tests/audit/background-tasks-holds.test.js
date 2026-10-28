@@ -12,13 +12,26 @@ const { stubModule, makeQuery } = require("../audit/helpers");
 
 let orderFindCalls = 0;
 stubModule("models/order.model", {
-  find: () => { orderFindCalls += 1; return makeQuery([]); },
+  find: () => {
+    orderFindCalls += 1;
+    return makeQuery([]);
+  },
 });
-stubModule("services/orderTransition.service", { transitionOrder: async () => {} });
-stubModule("services/notificationService", { cleanupExpiredNotifications: async () => {} });
-stubModule("services/chatUpload.service", { cleanupExpiredUploads: async () => {} });
-stubModule("services/promotionService", { processScheduledPromotions: async () => {} });
-stubModule("services/announcementService", { processScheduledAnnouncements: async () => {} });
+stubModule("services/orderTransition.service", {
+  transitionOrder: async () => {},
+});
+stubModule("services/notificationService", {
+  cleanupExpiredNotifications: async () => {},
+});
+stubModule("services/chatUpload.service", {
+  cleanupExpiredUploads: async () => {},
+});
+stubModule("services/promotionService", {
+  processScheduledPromotions: async () => {},
+});
+stubModule("services/announcementService", {
+  processScheduledAnnouncements: async () => {},
+});
 
 const tasks = require("../../services/backgroundTasks");
 const ONE_MINUTE = 60 * 1000;
@@ -34,15 +47,26 @@ test("C-5: guest hold release runs hourly from boot and stops with the other tas
     // before the fix it could not exist until the first 02:00 UTC tick.
     t.mock.timers.tick(61 * ONE_MINUTE);
     await new Promise((r) => setImmediate(r));
-    assert.ok(orderFindCalls >= 1, "hold release should run within the first hour after boot");
+    assert.ok(
+      orderFindCalls >= 1,
+      "hold release should run within the first hour after boot",
+    );
 
     tasks.stopBackgroundTasks();
     const callsAtStop = orderFindCalls;
     t.mock.timers.tick(5 * 60 * ONE_MINUTE);
     await new Promise((r) => setImmediate(r));
-    assert.equal(orderFindCalls, callsAtStop, "no interval may survive stopBackgroundTasks");
+    assert.equal(
+      orderFindCalls,
+      callsAtStop,
+      "no interval may survive stopBackgroundTasks",
+    );
   } finally {
-    try { tasks.stopBackgroundTasks(); } catch { /* already stopped */ }
+    try {
+      tasks.stopBackgroundTasks();
+    } catch {
+      /* already stopped */
+    }
     t.mock.timers.reset();
     if (savedEnv === undefined) delete process.env.GUEST_COD_HOLD_RELEASE_HOURS;
     else process.env.GUEST_COD_HOLD_RELEASE_HOURS = savedEnv;

@@ -46,10 +46,15 @@ const AppError = require("../utils/AppError");
 const loadProduct = () => require("../models/product.model");
 const loadStockReservation = () => require("../models/stockReservation.model");
 
-const isEnabled = () => require("../config/appConfig").getString("GUEST_STOCK_RESERVATION") === "on";
+const isEnabled = () =>
+  require("../config/appConfig").getString("GUEST_STOCK_RESERVATION") === "on";
 
 const ttlMs = () => {
-  const minutes = Number(require("../config/appConfig").getInt("GUEST_STOCK_RESERVATION_TTL_MINUTES"));
+  const minutes = Number(
+    require("../config/appConfig").getInt(
+      "GUEST_STOCK_RESERVATION_TTL_MINUTES",
+    ),
+  );
   return (Number.isFinite(minutes) && minutes > 0 ? minutes : 30) * 60 * 1000;
 };
 
@@ -63,14 +68,16 @@ const isConnected = () => {
 };
 
 const logDrift = (hold, toStatus) => {
-  console.error(JSON.stringify({
-    event: "stock_reservation_drift",
-    orderId: hold.order ? String(hold.order) : null,
-    product: hold.product ? String(hold.product) : null,
-    quantity: hold.quantity,
-    holdId: hold._id ? String(hold._id) : null,
-    toStatus,
-  }));
+  console.error(
+    JSON.stringify({
+      event: "stock_reservation_drift",
+      orderId: hold.order ? String(hold.order) : null,
+      product: hold.product ? String(hold.product) : null,
+      quantity: hold.quantity,
+      holdId: hold._id ? String(hold._id) : null,
+      toStatus,
+    }),
+  );
 };
 
 async function reserveForOrder(order, session) {
@@ -80,7 +87,8 @@ async function reserveForOrder(order, session) {
   // service pulls in the catalog model chain, which stub
   // harnesses forbid — and legacy-only orders never need it.
   let variantService = null;
-  const getVariantService = () => (variantService ??= require("./productVariant.service"));
+  const getVariantService = () =>
+    (variantService ??= require("./productVariant.service"));
   // Aggregate repeated lines of the same purchasable unit (the
   // capture service's aggregation pattern) — one gate + one hold
   // per unit. Phase 4: the unit is (product, variantId) for
@@ -106,17 +114,27 @@ async function reserveForOrder(order, session) {
       // Variant unit: the guarded gate runs on the VARIANT's
       // counters (authoritative); the product mirror follows.
       const gate = await getVariantService().reserveVariantStock(
-        entry.product, entry.variantId, entry.quantity, { session }
+        entry.product,
+        entry.variantId,
+        entry.quantity,
+        { session },
       );
       if (gate.matchedCount !== 1) {
         throw new AppError("Insufficient stock to reserve this order", 400);
       }
       await StockReservation.create(
-        [{
-          order: order._id, product: entry.product, variantId: entry.variantId,
-          sku: entry.sku, quantity: entry.quantity, status: "active", expiresAt,
-        }],
-        opts
+        [
+          {
+            order: order._id,
+            product: entry.product,
+            variantId: entry.variantId,
+            sku: entry.sku,
+            quantity: entry.quantity,
+            status: "active",
+            expiresAt,
+          },
+        ],
+        opts,
       );
       mirrored.add(String(entry.product));
       continue;
@@ -128,17 +146,30 @@ async function reserveForOrder(order, session) {
         _id: productId,
         deletedAt: null,
         status: "active",
-        $expr: { $lte: [{ $add: [{ $ifNull: ["$reservedStock", 0] }, quantity] }, "$stock"] },
+        $expr: {
+          $lte: [
+            { $add: [{ $ifNull: ["$reservedStock", 0] }, quantity] },
+            "$stock",
+          ],
+        },
       },
       { $inc: { reservedStock: quantity } },
-      opts
+      opts,
     );
     if (gate.matchedCount !== 1) {
       throw new AppError("Insufficient stock to reserve this order", 400);
     }
     await StockReservation.create(
-      [{ order: order._id, product: productId, quantity, status: "active", expiresAt }],
-      opts
+      [
+        {
+          order: order._id,
+          product: productId,
+          quantity,
+          status: "active",
+          expiresAt,
+        },
+      ],
+      opts,
     );
   }
   for (const productId of mirrored) {
@@ -149,9 +180,16 @@ async function reserveForOrder(order, session) {
 // Shared conditional-flip settlement behind consume/release. The
 // flip is the exactly-once point: only the caller that flips a hold
 // out of "active" decrements the counter for it.
-async function settleHolds(holds, toStatus, session, Product, StockReservation) {
+async function settleHolds(
+  holds,
+  toStatus,
+  session,
+  Product,
+  StockReservation,
+) {
   let variantService = null;
-  const getVariantService = () => (variantService ??= require("./productVariant.service"));
+  const getVariantService = () =>
+    (variantService ??= require("./productVariant.service"));
   const opts = session ? { session } : {};
   let settled = 0;
   const mirrored = new Set();
@@ -159,7 +197,7 @@ async function settleHolds(holds, toStatus, session, Product, StockReservation) 
     const flip = await StockReservation.updateOne(
       { _id: hold._id, status: "active" },
       { $set: { status: toStatus } },
-      opts
+      opts,
     );
     if (flip.matchedCount !== 1) continue;
     settled += 1;
@@ -170,7 +208,10 @@ async function settleHolds(holds, toStatus, session, Product, StockReservation) 
       // untouched). The product counter is only a mirror for
       // variant products, so it re-converges from the variants.
       const decremented = await getVariantService().releaseVariantReserved(
-        hold.product, hold.variantId, hold.quantity, { session }
+        hold.product,
+        hold.variantId,
+        hold.quantity,
+        { session },
       );
       if (decremented.modifiedCount !== 1) logDrift(hold, toStatus);
       mirrored.add(String(hold.product));
@@ -179,7 +220,7 @@ async function settleHolds(holds, toStatus, session, Product, StockReservation) 
     const decremented = await Product.updateOne(
       { _id: hold.product, reservedStock: { $gte: hold.quantity } },
       { $inc: { reservedStock: -hold.quantity } },
-      opts
+      opts,
     );
     if (decremented.matchedCount !== 1) logDrift(hold, toStatus);
   }
@@ -191,7 +232,8 @@ async function settleHolds(holds, toStatus, session, Product, StockReservation) 
 
 async function settleForOrder(orderId, session, toStatus) {
   if (!isConnected()) return 0;
-  let Product; let StockReservation;
+  let Product;
+  let StockReservation;
   try {
     Product = loadProduct();
     StockReservation = loadStockReservation();
@@ -204,19 +246,25 @@ async function settleForOrder(orderId, session, toStatus) {
   return settleHolds(holds, toStatus, session, Product, StockReservation);
 }
 
-const consumeForOrder = (orderId, session) => settleForOrder(orderId, session, "consumed");
-const releaseForOrder = (orderId, session) => settleForOrder(orderId, session, "released");
+const consumeForOrder = (orderId, session) =>
+  settleForOrder(orderId, session, "consumed");
+const releaseForOrder = (orderId, session) =>
+  settleForOrder(orderId, session, "released");
 
 async function expireStaleHolds(now = new Date()) {
   if (!isConnected()) return 0;
-  let Product; let StockReservation;
+  let Product;
+  let StockReservation;
   try {
     Product = loadProduct();
     StockReservation = loadStockReservation();
   } catch {
     return 0;
   }
-  const stale = await StockReservation.find({ status: "active", expiresAt: { $lte: now } }).limit(500);
+  const stale = await StockReservation.find({
+    status: "active",
+    expiresAt: { $lte: now },
+  }).limit(500);
   if (!stale.length) return 0;
   return settleHolds(stale, "expired", null, Product, StockReservation);
 }

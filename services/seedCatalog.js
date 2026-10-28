@@ -41,39 +41,66 @@ const furnitureImages = {
   sofas: [
     "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
     "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
   ],
   beds: [
     "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
     "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
   ],
   dining: [
     "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
   ],
   chairs: [
     "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
   ],
   decor: [
     "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
     "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
   ],
   lighting: [
     "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80"
-  ]
+    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+  ],
 };
 
 // Identical at both entry points (verified by scripted deep-diff).
 const categoriesData = [
-  { name: "Living Room", description: "Designer sofas and accent chairs for a statement living space.", image: furnitureImages.sofas[0], sortOrder: 1 },
-  { name: "Bedroom", description: "Premium beds and nightstands for the ultimate sleep experience.", image: furnitureImages.beds[0], sortOrder: 2 },
-  { name: "Dining", description: "Elegant dining sets and sideboards for shared moments.", image: furnitureImages.dining[0], sortOrder: 3 },
-  { name: "Lighting", description: "Sculptural lighting to illuminate your home with style.", image: furnitureImages.lighting[0], sortOrder: 4 },
-  { name: "Decor", description: "Curated objects and wall art for the finishing touch.", image: furnitureImages.decor[0], sortOrder: 5 }
+  {
+    name: "Living Room",
+    description:
+      "Designer sofas and accent chairs for a statement living space.",
+    image: furnitureImages.sofas[0],
+    sortOrder: 1,
+  },
+  {
+    name: "Bedroom",
+    description:
+      "Premium beds and nightstands for the ultimate sleep experience.",
+    image: furnitureImages.beds[0],
+    sortOrder: 2,
+  },
+  {
+    name: "Dining",
+    description: "Elegant dining sets and sideboards for shared moments.",
+    image: furnitureImages.dining[0],
+    sortOrder: 3,
+  },
+  {
+    name: "Lighting",
+    description: "Sculptural lighting to illuminate your home with style.",
+    image: furnitureImages.lighting[0],
+    sortOrder: 4,
+  },
+  {
+    name: "Decor",
+    description: "Curated objects and wall art for the finishing touch.",
+    image: furnitureImages.decor[0],
+    sortOrder: 5,
+  },
 ];
 
 /**
@@ -118,7 +145,9 @@ const ensureSeedCustomer = async ({ log = console.log, messages }) => {
   if (!customerUser) {
     const { SEED_CUSTOMER_PASSWORD: customerPassword } = process.env;
     if (!customerPassword) {
-      throw new Error("SEED_CUSTOMER_PASSWORD is required to seed the demo customer");
+      throw new Error(
+        "SEED_CUSTOMER_PASSWORD is required to seed the demo customer",
+      );
     }
     customerUser = new User({
       firstName: "Saugat",
@@ -145,7 +174,7 @@ const ensureSeedCustomer = async ({ log = console.log, messages }) => {
 const createSeedCategories = async () => {
   const createdCategories = await Category.create(categoriesData);
   const catMap = {};
-  createdCategories.forEach(c => catMap[c.name] = c._id);
+  createdCategories.forEach((c) => (catMap[c.name] = c._id));
   return { createdCategories, catMap };
 };
 
@@ -176,7 +205,7 @@ const buildSampleOrders = (customerUser, products) => {
         name: prod.name,
         price: prod.price,
         quantity: qty,
-        image: prod.images[0].url
+        image: prod.images[0].url,
       });
       subtotal += prod.price * qty;
     }
@@ -187,7 +216,7 @@ const buildSampleOrders = (customerUser, products) => {
         email: customerUser.email,
         firstName: customerUser.firstName,
         lastName: customerUser.lastName,
-        phone: customerUser.phone || "9800000000"
+        phone: customerUser.phone || "9800000000",
       },
       items: orderItems,
       shippingAddress: {
@@ -196,7 +225,7 @@ const buildSampleOrders = (customerUser, products) => {
         addressLine1: "Baneshwor-10",
         city: "Kathmandu",
         postalCode: "44600",
-        country: "Nepal"
+        country: "Nepal",
       },
       subtotal,
       total: subtotal,
@@ -205,7 +234,7 @@ const buildSampleOrders = (customerUser, products) => {
       orderStatus: i % 10 === 0 ? "delivered" : "processing",
       createdAt: date,
       orderedAt: date,
-      isGuestOrder: false
+      isGuestOrder: false,
     });
   }
 

@@ -39,7 +39,7 @@ function productSummary(product, derived) {
 exports.listVariants = catchAsync(async (req, res, next) => {
   const product = await loadProduct(req);
   const variants = (product.catalogVariants || []).map((variant) =>
-    typeof variant.toObject === "function" ? variant.toObject() : variant
+    typeof variant.toObject === "function" ? variant.toObject() : variant,
   );
   res.status(200).json({
     status: "success",
@@ -54,10 +54,8 @@ exports.listVariants = catchAsync(async (req, res, next) => {
 // POST /products/:id/variants (admin)
 exports.createVariant = catchAsync(async (req, res, next) => {
   const product = await loadProduct(req);
-  const { variant, hasVariants, priceFrom } = await variantService.createVariant(
-    product,
-    req.body
-  );
+  const { variant, hasVariants, priceFrom } =
+    await variantService.createVariant(product, req.body);
   res.status(201).json({
     status: "success",
     data: {
@@ -70,11 +68,8 @@ exports.createVariant = catchAsync(async (req, res, next) => {
 // PATCH /products/:id/variants/:variantId (admin)
 exports.updateVariant = catchAsync(async (req, res, next) => {
   const product = await loadProduct(req);
-  const { variant, hasVariants, priceFrom } = await variantService.updateVariant(
-    product,
-    req.params.variantId,
-    req.body
-  );
+  const { variant, hasVariants, priceFrom } =
+    await variantService.updateVariant(product, req.params.variantId, req.body);
   res.status(200).json({
     status: "success",
     data: {
@@ -89,7 +84,7 @@ exports.deleteVariant = catchAsync(async (req, res, next) => {
   const product = await loadProduct(req);
   const { hasVariants, priceFrom } = await variantService.deleteVariant(
     product,
-    req.params.variantId
+    req.params.variantId,
   );
   res.status(200).json({
     status: "success",

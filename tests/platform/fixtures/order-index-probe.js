@@ -14,7 +14,12 @@ const os = require("node:os");
 const path = require("node:path");
 
 const repo = path.join(__dirname, "..", "..", "..");
-const MMS_SCRATCH = path.join(os.homedir(), "workspace", "aura-audit", "mms-data");
+const MMS_SCRATCH = path.join(
+  os.homedir(),
+  "workspace",
+  "aura-audit",
+  "mms-data",
+);
 
 async function main() {
   const { MongoMemoryServer } = require("mongodb-memory-server");
@@ -23,7 +28,9 @@ async function main() {
   const dbDir = fs.mkdtempSync(path.join(MMS_SCRATCH, "orderidx-"));
   let mongod;
   try {
-    mongod = await MongoMemoryServer.create({ instance: { dbPath: dbDir, storageEngine: "wiredTiger" } });
+    mongod = await MongoMemoryServer.create({
+      instance: { dbPath: dbDir, storageEngine: "wiredTiger" },
+    });
     await mongoose.connect(mongod.getUri("indextest"));
     const Order = require(path.join(repo, "models", "order.model"));
     let threw = null;
@@ -32,9 +39,12 @@ async function main() {
     } catch (err) {
       threw = err;
     }
-    console.log(threw ? `ENSURE_INDEXES_THREW: ${threw.message}` : "ENSURE_INDEXES_OK");
+    console.log(
+      threw ? `ENSURE_INDEXES_THREW: ${threw.message}` : "ENSURE_INDEXES_OK",
+    );
     const indexes = await mongoose.connection.db.collection("orders").indexes();
-    const idem = indexes.find((i) => i.key && i.key.idempotencyKey === 1) || null;
+    const idem =
+      indexes.find((i) => i.key && i.key.idempotencyKey === 1) || null;
     console.log(`IDEMPOTENCY_INDEX: ${JSON.stringify(idem)}`);
     await mongoose.disconnect();
   } finally {
@@ -45,5 +55,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.error(`PROBE_FAIL: ${err.message}`); process.exit(1); },
+  (err) => {
+    console.error(`PROBE_FAIL: ${err.message}`);
+    process.exit(1);
+  },
 );

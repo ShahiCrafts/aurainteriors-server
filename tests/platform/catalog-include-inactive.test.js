@@ -29,13 +29,29 @@ const ROOMS = [
   { slug: "attic", label: "Attic", active: false, sortOrder: 1 },
 ];
 const COLLECTIONS = [
-  { slug: "featured-picks", label: "Featured Picks", active: true, sortOrder: 0, kind: "manual" },
-  { slug: "old-promo", label: "Old Promo", active: false, sortOrder: 1, kind: "manual" },
+  {
+    slug: "featured-picks",
+    label: "Featured Picks",
+    active: true,
+    sortOrder: 0,
+    kind: "manual",
+  },
+  {
+    slug: "old-promo",
+    label: "Old Promo",
+    active: false,
+    sortOrder: 1,
+    kind: "manual",
+  },
 ];
 // The controllers call find({ active: true }) for the public view;
 // the stub applies the same filter the real model would.
 const listFind = (fixtures) => (query) =>
-  makeQuery(query && query.active === true ? fixtures.filter((f) => f.active) : [...fixtures]);
+  makeQuery(
+    query && query.active === true
+      ? fixtures.filter((f) => f.active)
+      : [...fixtures],
+  );
 
 stubModule("models/productType.model.js", { find: listFind(TYPES) });
 stubModule("models/room.model.js", { find: listFind(ROOMS) });
@@ -57,12 +73,26 @@ stubModule("models/product.model.js", {
 });
 const USERS = {
   "admin-1": {
-    _id: "admin-1", role: "admin", isActive: true, deletedAt: null,
-    email: "admin@example.invalid", firstName: "Admin", lastName: "User", avatar: null, phone: null,
+    _id: "admin-1",
+    role: "admin",
+    isActive: true,
+    deletedAt: null,
+    email: "admin@example.invalid",
+    firstName: "Admin",
+    lastName: "User",
+    avatar: null,
+    phone: null,
   },
   "user-1": {
-    _id: "user-1", role: "customer", isActive: true, deletedAt: null,
-    email: "user@example.invalid", firstName: "Regular", lastName: "User", avatar: null, phone: null,
+    _id: "user-1",
+    role: "customer",
+    isActive: true,
+    deletedAt: null,
+    email: "user@example.invalid",
+    firstName: "Regular",
+    lastName: "User",
+    avatar: null,
+    phone: null,
   },
 };
 stubModule("models/user.model.js", {
@@ -70,7 +100,10 @@ stubModule("models/user.model.js", {
 });
 stubModule("models/revokedToken.model.js", { exists: async () => null });
 stubModule("services/collection.service.js", {
-  resolveCollectionProducts: async () => ({ products: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } }),
+  resolveCollectionProducts: async () => ({
+    products: [],
+    pagination: { page: 1, limit: 20, total: 0, pages: 0 },
+  }),
 });
 stubModule("services/attributeResolution.service.js", {
   resolveForCategory: async () => [],
@@ -89,7 +122,9 @@ app.use("/api/v1/catalog", catalogRoutes);
 // Mirror the app's error envelope closely enough for status assertions.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  res.status(err.statusCode || 500).json({ status: "error", message: err.message });
+  res
+    .status(err.statusCode || 500)
+    .json({ status: "error", message: err.message });
 });
 
 let server;
@@ -118,9 +153,27 @@ const asCustomer = { authorization: `Bearer ${sign("user-1")}` };
 const asGarbage = { authorization: "Bearer not-a-real-token" };
 
 const LISTS = [
-  { path: "/product-types", field: "productTypes", idOf: (x) => x.key, active: "sofa", inactive: "pouf" },
-  { path: "/rooms", field: "rooms", idOf: (x) => x.slug, active: "living-room", inactive: "attic" },
-  { path: "/collections", field: "collections", idOf: (x) => x.slug, active: "featured-picks", inactive: "old-promo" },
+  {
+    path: "/product-types",
+    field: "productTypes",
+    idOf: (x) => x.key,
+    active: "sofa",
+    inactive: "pouf",
+  },
+  {
+    path: "/rooms",
+    field: "rooms",
+    idOf: (x) => x.slug,
+    active: "living-room",
+    inactive: "attic",
+  },
+  {
+    path: "/collections",
+    field: "collections",
+    idOf: (x) => x.slug,
+    active: "featured-picks",
+    inactive: "old-promo",
+  },
 ];
 
 async function listIds({ path, field, idOf }, query = "", headers = {}) {
@@ -137,11 +190,20 @@ for (const list of LISTS) {
     assert.deepEqual(await listIds(list, "", asAdmin), [list.active]);
     // Anonymous and non-admin requests get active-only even when
     // they pass the parameter; an invalid token is a guest.
-    assert.deepEqual(await listIds(list, "?includeInactive=true"), [list.active]);
-    assert.deepEqual(await listIds(list, "?includeInactive=true", asCustomer), [list.active]);
-    assert.deepEqual(await listIds(list, "?includeInactive=true", asGarbage), [list.active]);
+    assert.deepEqual(await listIds(list, "?includeInactive=true"), [
+      list.active,
+    ]);
+    assert.deepEqual(await listIds(list, "?includeInactive=true", asCustomer), [
+      list.active,
+    ]);
+    assert.deepEqual(await listIds(list, "?includeInactive=true", asGarbage), [
+      list.active,
+    ]);
     // An authenticated admin asking for it sees every entry,
     // including the deactivated one.
-    assert.deepEqual(await listIds(list, "?includeInactive=true", asAdmin), [list.active, list.inactive]);
+    assert.deepEqual(await listIds(list, "?includeInactive=true", asAdmin), [
+      list.active,
+      list.inactive,
+    ]);
   });
 }

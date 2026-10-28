@@ -13,19 +13,31 @@ const REPO = path.resolve(__dirname, "../../..");
 const DB_NAME = "aura_rate_limit_test";
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "ratelimit-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri(DB_NAME);
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
   await mongoose.connect(uri);
   try {
     let Store = null;
-    try { Store = require(path.join(REPO, "middleware/mongoRateLimitStore")); } catch { Store = null; }
+    try {
+      Store = require(path.join(REPO, "middleware/mongoRateLimitStore"));
+    } catch {
+      Store = null;
+    }
     let Model = null;
-    try { Model = require(path.join(REPO, "models/rateLimitCounter.model")); } catch { Model = null; }
+    try {
+      Model = require(path.join(REPO, "models/rateLimitCounter.model"));
+    } catch {
+      Model = null;
+    }
     console.log(`RESULT modules store=${!!Store} model=${!!Model}`);
     if (!Store || !Model) {
       console.log("RESULT shared skipped=module-missing");
@@ -37,7 +49,11 @@ async function main() {
     }
     await Model.ensureIndexes();
     const WINDOW = 60000;
-    const mk = (prefix) => { const s = new Store(prefix); s.init({ windowMs: WINDOW }); return s; };
+    const mk = (prefix) => {
+      const s = new Store(prefix);
+      s.init({ windowMs: WINDOW });
+      return s;
+    };
 
     // (a) same prefix, two instances: counts are shared.
     const a = mk("shared");
@@ -45,7 +61,9 @@ async function main() {
     const a1 = await a.increment("k1");
     const b2 = await b.increment("k1");
     const a3 = await a.increment("k1");
-    console.log(`RESULT shared a1=${a1.totalHits} b2=${b2.totalHits} a3=${a3.totalHits} resetIsDate=${a1.resetTime instanceof Date}`);
+    console.log(
+      `RESULT shared a1=${a1.totalHits} b2=${b2.totalHits} a3=${a3.totalHits} resetIsDate=${a1.resetTime instanceof Date}`,
+    );
 
     // (b) different prefix: isolated bucket space.
     const c = mk("other");
@@ -54,10 +72,16 @@ async function main() {
 
     // (c) expired window: a counter whose resetAt is in the past is
     // reset by the next increment (hits restart at 1, fresh resetAt).
-    await Model.create({ _id: "exp:oldkey", hits: 5, resetAt: new Date(Date.now() - 1000) });
+    await Model.create({
+      _id: "exp:oldkey",
+      hits: 5,
+      resetAt: new Date(Date.now() - 1000),
+    });
     const exp = mk("exp");
     const e1 = await exp.increment("oldkey");
-    console.log(`RESULT expired totalHits=${e1.totalHits} resetFuture=${e1.resetTime.getTime() > Date.now()}`);
+    console.log(
+      `RESULT expired totalHits=${e1.totalHits} resetFuture=${e1.resetTime.getTime() > Date.now()}`,
+    );
 
     // (d) decrement never goes below 0.
     const d = mk("dec");
@@ -69,7 +93,9 @@ async function main() {
     await d.decrement("k");
     await d.decrement("k");
     const afterFloor = await Model.findById("dec:k").lean();
-    console.log(`RESULT decrement afterDec=${afterDec.hits} afterFloor=${afterFloor.hits}`);
+    console.log(
+      `RESULT decrement afterDec=${afterDec.hits} afterFloor=${afterFloor.hits}`,
+    );
 
     // (e) resetKey clears; the next increment restarts at 1.
     const r = mk("rst");
@@ -77,7 +103,9 @@ async function main() {
     await r.resetKey("k");
     const gone = await Model.findById("rst:k").lean();
     const r1 = await r.increment("k");
-    console.log(`RESULT resetKey cleared=${gone === null} afterResetInc=${r1.totalHits}`);
+    console.log(
+      `RESULT resetKey cleared=${gone === null} afterResetInc=${r1.totalHits}`,
+    );
 
     // (f) resetAll clears the store's counters.
     await r.resetAll();
@@ -89,4 +117,9 @@ async function main() {
   }
 }
 
-main().then(() => process.exit(0)).catch((err) => { console.error("PROBE_ERROR", err); process.exit(1); });
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("PROBE_ERROR", err);
+    process.exit(1);
+  });

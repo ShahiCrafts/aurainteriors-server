@@ -29,7 +29,9 @@ const normalizeDiscountCode = (code) =>
 
 // Find a discount by code (any casing) or throw the shared 400.
 const resolveDiscount = async (code) => {
-  const discount = await Discount.findOne({ code: normalizeDiscountCode(code) });
+  const discount = await Discount.findOne({
+    code: normalizeDiscountCode(code),
+  });
   if (!discount) throw new AppError("Invalid discount code", 400);
   return discount;
 };

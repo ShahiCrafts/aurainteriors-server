@@ -37,7 +37,10 @@ const Order = require("../models/order.model");
 const AttributeDefinition = require("../models/attributeDefinition.model");
 const { catalogPagination, catalogSort } = require("../utils/catalogListQuery");
 
-const PUBLISHED = { deletedAt: null, status: { $in: ["active", "out_of_stock"] } };
+const PUBLISHED = {
+  deletedAt: null,
+  status: { $in: ["active", "out_of_stock"] },
+};
 
 const ATTRIBUTE_KEY_PATTERN = /^[A-Za-z0-9_]+$/;
 
@@ -65,7 +68,9 @@ async function publishedIntersection(orderedIds) {
     .select("_id")
     .lean();
   const publishedIds = new Set(published.map((doc) => String(doc._id)));
-  return wanted.filter((key) => publishedIds.has(key)).map((key) => byString.get(key));
+  return wanted
+    .filter((key) => publishedIds.has(key))
+    .map((key) => byString.get(key));
 }
 
 // Ordered-id resolution shared by manual collections and
@@ -76,14 +81,20 @@ async function pageByOrderedIds(orderedIds, pageNum, limitNum) {
   if (visibleOrdered.length === 0) return { products: [], total: 0 };
 
   const total = visibleOrdered.length;
-  const pageIds = visibleOrdered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+  const pageIds = visibleOrdered.slice(
+    (pageNum - 1) * limitNum,
+    pageNum * limitNum,
+  );
   if (pageIds.length === 0) return { products: [], total };
 
   const docs = await Product.find({ _id: { $in: pageIds } })
     .populate("category", "name slug")
     .lean();
   const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
-  return { products: pageIds.map((id) => byId.get(String(id))).filter(Boolean), total };
+  return {
+    products: pageIds.map((id) => byId.get(String(id))).filter(Boolean),
+    total,
+  };
 }
 
 async function pageByFilter(filter, query, pageNum, limitNum) {
@@ -148,7 +159,9 @@ async function ruleFilterFor(collection) {
               storage: "catalogAttributes",
             })
           : null;
-      return knownDefinition ? { ...PUBLISHED, [`catalogAttributes.${key}`]: value } : null;
+      return knownDefinition
+        ? { ...PUBLISHED, [`catalogAttributes.${key}`]: value }
+        : null;
     }
     default:
       return null;
@@ -160,13 +173,21 @@ async function resolveCollectionProducts(collection, query = {}) {
   let result;
 
   if (collection.kind === "manual") {
-    result = await pageByOrderedIds(collection.productIds || [], pageNum, limitNum);
+    result = await pageByOrderedIds(
+      collection.productIds || [],
+      pageNum,
+      limitNum,
+    );
   } else {
     const ruleType = collection.rule && collection.rule.type;
     const params = (collection.rule && collection.rule.params) || {};
     if (ruleType === "best-sellers") {
       const limit = clampInt(params.limit, 20, 1, 100);
-      result = await pageByOrderedIds(await bestSellerIds(limit), pageNum, limitNum);
+      result = await pageByOrderedIds(
+        await bestSellerIds(limit),
+        pageNum,
+        limitNum,
+      );
     } else {
       const filter = await ruleFilterFor(collection);
       result = filter

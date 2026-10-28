@@ -3,24 +3,25 @@ const ChatService = require("../services/chatService");
 const GuestSession = require("../models/guestSession.model");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
-const runtimeContext = require("../services/runtimeContext"); // AR-33: explicit registry, not globals
+const runtimeContext = require("../services/runtimeContext");
 
-// Guest-session extraction lives in utils/guestSession.js (VULN-001:
-// ONE gated policy shared with middleware/chatUpload.middleware.js,
-// which previously read req.query.guestSessionId directly and bypassed
-// the FA-33 gate). The server also sets the httpOnly guest cookie on
-// startChat (VULN-009). See utils/guestSession.js for the policy text.
-const { getGuestSessionId, setGuestSessionCookie } = require("../utils/guestSession");
-exports._getGuestSessionId = getGuestSessionId; // exported for tests (re-export)
+const {
+  getGuestSessionId,
+  setGuestSessionCookie,
+} = require("../utils/guestSession");
+exports._getGuestSessionId = getGuestSessionId;
 
-// ==================== CUSTOMER OPERATIONS ====================
-
-/**
- * Retired direct-upload endpoint; new attachments use authorized server uploads
- */
-exports.getUploadSignature = (_req, res) => res.status(410).json({ status: "fail", message: "Use the chat attachment upload endpoint" });
+exports.getUploadSignature = (_req, res) =>
+  res.status(410).json({
+    status: "fail",
+    message: "Use the chat attachment upload endpoint",
+  });
 exports.uploadAttachment = catchAsync(async (req, res) => {
-  const data = await require("../services/chatUpload.service").uploadAttachment(req.params.id, req.attachmentActor, req.file);
+  const data = await require("../services/chatUpload.service").uploadAttachment(
+    req.params.id,
+    req.attachmentActor,
+    req.file,
+  );
   res.status(201).json({ status: "success", data });
 });
 
@@ -29,15 +30,15 @@ exports.uploadAttachment = catchAsync(async (req, res) => {
  */
 exports.startChat = catchAsync(async (req, res, next) => {
   const { subject, guestEmail } = req.body;
-  // FA-39: network metadata is derived server-side, never taken from the
-  // request body (a client could otherwise forge another user's IP/UA).
   const metadata = {
     ...(req.body.metadata || {}),
     userAgent: String(req.get?.("user-agent") || "").slice(0, 512),
     ipAddress: req.ip || "",
-    referrer: String(req.get?.("referer") || req.get?.("referrer") || "").slice(0, 512),
+    referrer: String(req.get?.("referer") || req.get?.("referrer") || "").slice(
+      0,
+      512,
+    ),
   };
-
 
   if (req.isAuthenticated) {
     // Authenticated user
@@ -52,9 +53,6 @@ exports.startChat = catchAsync(async (req, res, next) => {
       data: { chat },
     });
   } else {
-    // Guest user - the browser stores a public session key (guest_...), while
-    // Chat.guestSession stores the GuestSession Mongo ObjectId. Resolve/create
-    // the session here and always return the public key to the browser.
     const suppliedGuestSessionId = getGuestSessionId(req);
     let guestSession = suppliedGuestSessionId
       ? await ChatService.resolveGuestSession(suppliedGuestSessionId)
@@ -66,7 +64,10 @@ exports.startChat = catchAsync(async (req, res, next) => {
         email: guestEmail || null,
       });
     } else if (guestEmail && !guestSession.email) {
-      await GuestSession.updateOne({ _id: guestSession._id, email: null }, { $set: { email: guestEmail } });
+      await GuestSession.updateOne(
+        { _id: guestSession._id, email: null },
+        { $set: { email: guestEmail } },
+      );
     }
 
     const chat = await ChatService.createGuestChat(guestSession.sessionId, {
@@ -74,16 +75,12 @@ exports.startChat = catchAsync(async (req, res, next) => {
       metadata,
     });
 
-    // VULN-009: the server sets the guest-session cookie itself
-    // (httpOnly) so the credential survives reloads without ever
-    // being persisted by page script (no localStorage, no
-    // script-set cookie on the client).
     setGuestSessionCookie(res, guestSession.sessionId);
 
     res.status(201).json({
       status: "success",
       message: "Chat started successfully",
-      data: { 
+      data: {
         chat,
         guestSessionId: guestSession.sessionId, // Public key; never expose/reuse Mongo _id as browser identity
       },
@@ -117,12 +114,12 @@ exports.getMyChats = catchAsync(async (req, res, next) => {
  */
 exports.getChatDetails = catchAsync(async (req, res, next) => {
   const guestSessionId = getGuestSessionId(req);
-  
+
   const chat = await ChatService.getChatById(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'guest',
-    guestSessionId
+    req.user?.role || "guest",
+    guestSessionId,
   );
 
   res.status(200).json({
@@ -141,12 +138,12 @@ exports.getChatMessages = catchAsync(async (req, res, next) => {
   const result = await ChatService.getChatMessages(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'guest',
+    req.user?.role || "guest",
     guestSessionId,
     {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
-    }
+    },
   );
 
   res.status(200).json({
@@ -165,13 +162,16 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   const { content, attachments, clientMessageId } = req.body;
   const guestSessionId = getGuestSessionId(req);
 
-  // FA-14: attachments are validated with the SAME strict rules the
-  // update-attachments path enforces (https only, bounded fields, max 3) -
-  // previously any object with a truthy fileUrl/fileName was passed through.
   const { validateChatAttachments } = require("../utils/chatAttachments");
-  const processedAttachments = attachments === undefined ? [] : validateChatAttachments(attachments);
+  const processedAttachments =
+    attachments === undefined ? [] : validateChatAttachments(attachments);
   if (processedAttachments === null) {
-    return next(new AppError("Provide valid uploaded attachments (max 3, https URLs)", 400));
+    return next(
+      new AppError(
+        "Provide valid uploaded attachments (max 3, https URLs)",
+        400,
+      ),
+    );
   }
 
   // Ensure either content or attachments is provided
@@ -180,20 +180,27 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   }
 
   if (processedAttachments.length) {
-    const { actorKey, retainAttachments } = require("../services/chatUpload.service");
-    await retainAttachments(req.params.id, actorKey(req.user?._id, guestSessionId), processedAttachments);
+    const {
+      actorKey,
+      retainAttachments,
+    } = require("../services/chatUpload.service");
+    await retainAttachments(
+      req.params.id,
+      actorKey(req.user?._id, guestSessionId),
+      processedAttachments,
+    );
   }
 
   const message = await ChatService.sendMessage(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'customer',
+    req.user?.role || "customer",
     {
       content,
       attachments: processedAttachments,
       clientMessageId,
     },
-    guestSessionId
+    guestSessionId,
   );
 
   res.status(202).json({
@@ -212,8 +219,8 @@ exports.markMessagesRead = catchAsync(async (req, res, next) => {
   const result = await ChatService.markMessagesAsRead(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'customer',
-    guestSessionId
+    req.user?.role || "customer",
+    guestSessionId,
   );
 
   res.status(200).json({
@@ -232,8 +239,8 @@ exports.closeChat = catchAsync(async (req, res, next) => {
   const chat = await ChatService.closeChat(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'customer',
-    guestSessionId
+    req.user?.role || "customer",
+    guestSessionId,
   );
 
   res.status(200).json({
@@ -315,9 +322,9 @@ exports.toggleBot = catchAsync(async (req, res, next) => {
   const chat = await ChatService.toggleBot(
     req.params.id,
     req.user?._id,
-    req.user?.role || 'customer',
+    req.user?.role || "customer",
     guestSessionId,
-    botActive
+    botActive,
   );
 
   res.status(200).json({
@@ -348,45 +355,60 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
   // FA-14: shared strict validator (utils/chatAttachments).
   const { validateChatAttachments } = require("../utils/chatAttachments");
   const validAttachments = validateChatAttachments(attachments);
-  if (!validAttachments || validAttachments.length < 1) return next(new AppError("Provide 1–3 valid uploaded attachments", 400));
+  if (!validAttachments || validAttachments.length < 1)
+    return next(new AppError("Provide 1–3 valid uploaded attachments", 400));
 
   const ChatMessage = require("../models/chatMessage.model");
-  const message = await ChatMessage.findOne({ _id: messageId, deletedAt: null }).populate("chat");
+  const message = await ChatMessage.findOne({
+    _id: messageId,
+    deletedAt: null,
+  }).populate("chat");
   if (!message?.chat) return next(new AppError("Message not found", 404));
   const chat = message.chat;
-  const authorized = await ChatService.authorizeChat(chat._id, req.user?._id,
-    req.user?.role || "customer", req.user ? null : guestSessionId);
-  if (!authorized) return next(new AppError("You cannot update this message", 403));
+  const authorized = await ChatService.authorizeChat(
+    chat._id,
+    req.user?._id,
+    req.user?.role || "customer",
+    req.user ? null : guestSessionId,
+  );
+  if (!authorized)
+    return next(new AppError("You cannot update this message", 403));
 
-  const ownership = { _id: messageId, chat: chat._id, deletedAt: null, isAiGenerated: false };
+  const ownership = {
+    _id: messageId,
+    chat: chat._id,
+    deletedAt: null,
+    isAiGenerated: false,
+  };
   if (req.user) {
     ownership.sender = req.user._id;
     ownership.senderRole = req.user.role;
     ownership.senderGuestSession = null;
   } else {
     const guest = await ChatService.resolveGuestSession(guestSessionId);
-    if (!guest) return next(new AppError("You cannot update this message", 403));
+    if (!guest)
+      return next(new AppError("You cannot update this message", 403));
     ownership.senderGuestSession = guest._id;
     ownership.senderRole = "customer";
   }
   // Check authorship in the write predicate, including guests whose sender
   // placeholder is shared. Chat participation alone does not authorize edits.
-  const updatedMessage = await ChatMessage.findOneAndUpdate(ownership,
-    { $set: { attachments: validAttachments } }, { new: true, runValidators: true })
-    .populate("sender", "firstName lastName role avatar"); // FA-58: no sender email to chat participants
-  if (!updatedMessage) return next(new AppError("Message not found or not authored by you", 404));
-
-  // Broadcast update via socket. S-9/AR-07: the previous code required
-  // ../services/socketService, which does not exist anywhere in the
-  // repo - the require threw on every call, the broadcast never fired,
-  // and the catch logged "Failed to broadcast socket update". Emit
-  // through the real gateway, the way every other chat broadcast does.
+  const updatedMessage = await ChatMessage.findOneAndUpdate(
+    ownership,
+    { $set: { attachments: validAttachments } },
+    { new: true, runValidators: true },
+  ).populate("sender", "firstName lastName role avatar");
+  if (!updatedMessage)
+    return next(new AppError("Message not found or not authored by you", 404));
   try {
-    runtimeContext.getIo()?.to(`chat:${chat._id.toString()}`).emit('message:attachments:updated', { // AR-33: registry, not global.notificationGateway
-      chatId: chat._id.toString(),
-      message: updatedMessage,
-      messageId: messageId.toString(),
-    });
+    runtimeContext
+      .getIo()
+      ?.to(`chat:${chat._id.toString()}`)
+      .emit("message:attachments:updated", {
+        chatId: chat._id.toString(),
+        message: updatedMessage,
+        messageId: messageId.toString(),
+      });
   } catch (error) {
     console.error("Failed to broadcast socket update:", error.message);
     // Don't fail the response if socket broadcast fails

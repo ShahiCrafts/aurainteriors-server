@@ -2,7 +2,9 @@ const mongoose = require("mongoose");
 const Order = require("../models/order.model");
 const Product = require("../models/product.model");
 const AppError = require("../utils/AppError");
-const { recordGuestStockConfirmFailure } = require("./guestStockMetrics.service");
+const {
+  recordGuestStockConfirmFailure,
+} = require("./guestStockMetrics.service");
 const stockReservation = require("./stockReservation.service");
 // FA-09: the guarded per-item stock commitment for a guest COD order
 // whose deferral ends. The per-item guard (stock >= quantity) makes the
@@ -16,7 +18,8 @@ exports.commitGuestCodStock = async (order, session) => {
   // stockReservation.service lazy-load precedent: load-time model
   // requires on commerce paths break stub-based harnesses).
   let variantService = null;
-  const getVariantService = () => (variantService ??= require("./productVariant.service"));
+  const getVariantService = () =>
+    (variantService ??= require("./productVariant.service"));
   const mirrored = new Set();
   for (const item of order.items) {
     // Phase 4: a variant line deducts from its VARIANT through
@@ -24,8 +27,17 @@ exports.commitGuestCodStock = async (order, session) => {
     // guard is this function's per-item guard, one level down);
     // legacy lines keep the product-level guard byte-identical.
     const deducted = item.variantId
-      ? await getVariantService().deductVariantStock(item.product, item.variantId, item.quantity, { session })
-      : await Product.updateOne({ _id: item.product, stock: { $gte: item.quantity } }, { $inc: { stock: -item.quantity } }, { session });
+      ? await getVariantService().deductVariantStock(
+          item.product,
+          item.variantId,
+          item.quantity,
+          { session },
+        )
+      : await Product.updateOne(
+          { _id: item.product, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { session },
+        );
     if (deducted.matchedCount !== 1) {
       // AR-25 (always-on, both flag states): a guest confirmation
       // that fails on stock is counted + logged BEFORE the existing
@@ -48,12 +60,33 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
   let result;
   try {
     await session.withTransaction(async () => {
-      const order = await Order.findOne(filter).session(session).populate("user", "firstName lastName email");
+      const order = await Order.findOne(filter)
+        .session(session)
+        .populate("user", "firstName lastName email");
       if (!order) throw new AppError("Order not found", 404);
       const previousStatus = order.orderStatus;
-      const transitions = { pending: ["confirmed", "cancelled"], confirmed: ["processing", "shipped", "cancelled"], processing: ["shipped", "cancelled"], shipped: ["delivered"], delivered: [], cancelled: [] };
-      if (!transitions[previousStatus]?.includes(status) || (customer && status !== "cancelled")) throw new AppError("Invalid order status transition", 400);
-      if (status !== "cancelled" && order.paymentMethod === "esewa" && (order.paymentStatus !== "paid" || order.stockDeducted !== true)) throw new AppError("Payment and inventory must be confirmed before fulfillment", 400);
+      const transitions = {
+        pending: ["confirmed", "cancelled"],
+        confirmed: ["processing", "shipped", "cancelled"],
+        processing: ["shipped", "cancelled"],
+        shipped: ["delivered"],
+        delivered: [],
+        cancelled: [],
+      };
+      if (
+        !transitions[previousStatus]?.includes(status) ||
+        (customer && status !== "cancelled")
+      )
+        throw new AppError("Invalid order status transition", 400);
+      if (
+        status !== "cancelled" &&
+        order.paymentMethod === "esewa" &&
+        (order.paymentStatus !== "paid" || order.stockDeducted !== true)
+      )
+        throw new AppError(
+          "Payment and inventory must be confirmed before fulfillment",
+          400,
+        );
       // FA-09 (owner-approved 2026-10-23): a deferred guest COD order
       // commits its stock HERE, at confirmation - the first point
       // where a human/system has accepted the order. The per-item
@@ -61,7 +94,12 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
       // product; if any item can no longer be fulfilled the whole
       // transition aborts and the order stays pending for the admin
       // to resolve (confirm later or cancel).
-      if (status === "confirmed" && order.isGuestOrder === true && order.paymentMethod === "cod" && order.stockDeducted === false) {
+      if (
+        status === "confirmed" &&
+        order.isGuestOrder === true &&
+        order.paymentMethod === "cod" &&
+        order.stockDeducted === false
+      ) {
         await exports.commitGuestCodStock(order, session);
         order.stockDeducted = true;
         // AR-25: the order's stock is now committed for real, so any
@@ -74,7 +112,8 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
         const hadDeductedStock = order.stockDeducted;
         if (order.stockDeducted === true) {
           let variantService = null;
-          const getVariantService = () => (variantService ??= require("./productVariant.service"));
+          const getVariantService = () =>
+            (variantService ??= require("./productVariant.service"));
           const mirrored = new Set();
           for (const item of order.items) {
             if (item.variantId) {
@@ -85,7 +124,12 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
               // the order for inventory review (the same mechanism
               // legacy-undeducted orders use below) rather than
               // failing a cancellation the customer is owed.
-              const restored = await getVariantService().restoreVariantStock(item.product, item.variantId, item.quantity, { session });
+              const restored = await getVariantService().restoreVariantStock(
+                item.product,
+                item.variantId,
+                item.quantity,
+                { session },
+              );
               if (restored.modifiedCount !== 1) {
                 order.inventoryReviewRequired = true;
               } else {
@@ -93,11 +137,18 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
               }
               continue;
             }
-            const restored = await Product.updateOne({ _id: item.product }, { $inc: { stock: item.quantity } }, { session });
-            if (restored.matchedCount !== 1) throw new AppError("Inventory reconciliation required", 409);
+            const restored = await Product.updateOne(
+              { _id: item.product },
+              { $inc: { stock: item.quantity } },
+              { session },
+            );
+            if (restored.matchedCount !== 1)
+              throw new AppError("Inventory reconciliation required", 409);
           }
           for (const productId of mirrored) {
-            await getVariantService().refreshStockMirror(productId, { session });
+            await getVariantService().refreshStockMirror(productId, {
+              session,
+            });
           }
           order.stockDeducted = false;
         } else if (order.stockDeducted === undefined) {
@@ -111,12 +162,20 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
         }
         order.cancelledAt = new Date();
         if (order.paymentStatus === "paid") {
-          order.refundRequest = { status: "pending", requestedAt: new Date(), reason: "Cancelled paid order; refund reconciliation required" };
+          order.refundRequest = {
+            status: "pending",
+            requestedAt: new Date(),
+            reason: "Cancelled paid order; refund reconciliation required",
+          };
         } else if (order.paymentStatus === "pending") {
           order.paymentStatus = "failed"; // unpaid cancellation, never a refund
         }
       }
-      const timestamps = { confirmed: "confirmedAt", shipped: "shippedAt", delivered: "deliveredAt" };
+      const timestamps = {
+        confirmed: "confirmedAt",
+        shipped: "shippedAt",
+        delivered: "deliveredAt",
+      };
       if (timestamps[status]) order[timestamps[status]] = new Date();
       if (status === "delivered" && order.paymentMethod === "cod") {
         order.paymentStatus = "paid";
@@ -127,5 +186,7 @@ exports.transitionOrder = async (filter, status, note, customer = false) => {
       result = { order, previousStatus };
     });
     return result;
-  } finally { await session.endSession(); }
+  } finally {
+    await session.endSession();
+  }
 };

@@ -129,17 +129,22 @@ const parseEmailAddress = (emailStr) => {
   if (match) {
     // FA-57: a display name must never carry CR/LF, quotes or angle
     // brackets into a message header / API sender field.
-    return { name: match[1].replace(/[\r\n"<>]/g, "").trim(), email: match[2].trim() };
+    return {
+      name: match[1].replace(/[\r\n"<>]/g, "").trim(),
+      email: match[2].trim(),
+    };
   }
   // Handle plain email
   return { email: emailStr };
 };
 
 const send = async (to, subject, html) => {
-  console.log(`[email:send] Attempting to send to: ${maskEmail(to)}, subject: ${subject}`);
-  
+  console.log(
+    `[email:send] Attempting to send to: ${maskEmail(to)}, subject: ${subject}`,
+  );
+
   const sender = parseEmailAddress(FROM());
-  
+
   try {
     const response = await brevoClient.post("/smtp/email", {
       to: [{ email: to }],
@@ -147,8 +152,11 @@ const send = async (to, subject, html) => {
       subject,
       htmlContent: html,
     });
-    
-    console.log(`[email:send] ✓ Email sent successfully. Message ID:`, response.data.messageId);
+
+    console.log(
+      `[email:send] ✓ Email sent successfully. Message ID:`,
+      response.data.messageId,
+    );
     return response.data;
   } catch (err) {
     console.error("[email:send] Email delivery failed");
@@ -296,21 +304,21 @@ exports.sendNewsletterWelcomeEmail = (email, nonce) =>
 
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
         ${[
-        ["Interior trends", "Latest design inspirations and styles"],
-        ["Product launches", "Be first to shop exclusive new collections"],
-        ["AR spotlights", "Expert tips to visualize furniture in your home"],
-        ["Member offers", "Early sale access and subscriber-only promotions"],
-      ]
-        .map(
-          ([title, desc]) => `
+          ["Interior trends", "Latest design inspirations and styles"],
+          ["Product launches", "Be first to shop exclusive new collections"],
+          ["AR spotlights", "Expert tips to visualize furniture in your home"],
+          ["Member offers", "Early sale access and subscriber-only promotions"],
+        ]
+          .map(
+            ([title, desc]) => `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid ${BRAND.border}; vertical-align: top;">
               <p style="margin: 0; font-size: 14px; font-weight: 600; color: ${BRAND.dark};">${title}</p>
               <p style="margin: 2px 0 0 0; font-size: 13px; color: ${BRAND.muted};">${desc}</p>
             </td>
           </tr>`,
-        )
-        .join("")}
+          )
+          .join("")}
       </table>
 
       <div style="text-align: center; margin: 32px 0;">
@@ -330,16 +338,18 @@ exports.sendNewsletterBroadcast = async (subscribers, subject, htmlContent) => {
   let failed = 0;
 
   for (let i = 0; i < subscribers.length; i += BATCH) {
-    const batchEmails = subscribers.slice(i, i + BATCH).map(({ email, unsubscribeNonce }) => ({
-      email,
-      htmlContent: baseTemplate(`
+    const batchEmails = subscribers
+      .slice(i, i + BATCH)
+      .map(({ email, unsubscribeNonce }) => ({
+        email,
+        htmlContent: baseTemplate(`
         ${htmlContent}
         <p style="margin-top: 32px; font-size: 12px; color: ${BRAND.muted}; text-align: center;">
           You received this because you subscribed to the Aura Interiors newsletter.
           <a href="${FRONTEND()}/newsletter/unsubscribe?token=${encodeURIComponent(issueNewsletterToken(email, "unsubscribe", unsubscribeNonce, 30 * 24 * 60 * 60 * 1000))}" style="color: ${BRAND.orange}; text-decoration: underline;">Unsubscribe</a>
         </p>
       `),
-    }));
+      }));
 
     const sender = parseEmailAddress(FROM());
 
@@ -353,7 +363,7 @@ exports.sendNewsletterBroadcast = async (subscribers, subject, htmlContent) => {
         }),
       ),
     );
-    
+
     successful += results.filter((r) => r.status === "fulfilled").length;
     failed += results.filter((r) => r.status === "rejected").length;
   }
@@ -381,11 +391,14 @@ exports.sendOrderConfirmationEmail = async (order) => {
   const firstName = guestInfo.firstName || "Customer";
 
   // Format Date
-  const orderDate = new Date(orderedAt || new Date()).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const orderDate = new Date(orderedAt || new Date()).toLocaleDateString(
+    "en-US",
+    {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    },
+  );
 
   // Calculate delivery date (10 days after ordered date)
   const delivery = new Date(orderedAt || new Date());
@@ -398,15 +411,15 @@ exports.sendOrderConfirmationEmail = async (order) => {
 
   // Items list HTML
   const itemsListHtml = items
-    .map(
-      (item) => {
-        const variantStr = item.variant && Object.keys(item.variant).length > 0
+    .map((item) => {
+      const variantStr =
+        item.variant && Object.keys(item.variant).length > 0
           ? ` (${Object.entries(item.variant)
               .filter(([, v]) => v)
               .map(([, v]) => v)
               .join(" | ")})`
           : "";
-        return `
+      return `
           <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #E5E7EB;">
             <div style="font-weight: 600; color: #1A1714; font-size: 15px;">
               ${item.name}${variantStr} &times; ${item.quantity}
@@ -416,8 +429,7 @@ exports.sendOrderConfirmationEmail = async (order) => {
             </div>
           </div>
         `;
-      }
-    )
+    })
     .join("");
 
   // Payment Method and Status
@@ -513,21 +525,43 @@ exports.sendOrderConfirmationEmail = async (order) => {
     </p>
   `;
 
-  return send(email, `Your Aura Interiors Order Has Been Confirmed! 🎉`, baseTemplate(content));
+  return send(
+    email,
+    `Your Aura Interiors Order Has Been Confirmed! 🎉`,
+    baseTemplate(content),
+  );
 };
 
 exports.verifyEmailConfig = async () => {
   try {
     // Test the API key by making a simple request
     const response = await brevoClient.get("/account");
-    console.log("[email] Brevo API config is valid. Account:", maskEmail(response.data.email));
+    console.log(
+      "[email] Brevo API config is valid. Account:",
+      maskEmail(response.data.email),
+    );
     return true;
   } catch (err) {
-    console.error("[email] Brevo API config error:", err.response?.data || err.message);
+    console.error(
+      "[email] Brevo API config error:",
+      err.response?.data || err.message,
+    );
     return false;
   }
 };
-exports.sendNewsletterConfirmationEmail = (email, token) => send(email, "Confirm your Aura Interiors newsletter subscription",
-  baseTemplate(`<p>Confirm your subscription to receive Aura Interiors news.</p>${ctaButton(safeUrl(`${FRONTEND()}/newsletter/confirm?token=${encodeURIComponent(token)}`), "Confirm subscription")}`));
-exports.sendContactResponseEmail = (email, name, message) => send(email, "Aura Interiors response to your enquiry",
-  baseTemplate(`<p>Hello ${escapeHtml(name)},</p><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`));
+exports.sendNewsletterConfirmationEmail = (email, token) =>
+  send(
+    email,
+    "Confirm your Aura Interiors newsletter subscription",
+    baseTemplate(
+      `<p>Confirm your subscription to receive Aura Interiors news.</p>${ctaButton(safeUrl(`${FRONTEND()}/newsletter/confirm?token=${encodeURIComponent(token)}`), "Confirm subscription")}`,
+    ),
+  );
+exports.sendContactResponseEmail = (email, name, message) =>
+  send(
+    email,
+    "Aura Interiors response to your enquiry",
+    baseTemplate(
+      `<p>Hello ${escapeHtml(name)},</p><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`,
+    ),
+  );

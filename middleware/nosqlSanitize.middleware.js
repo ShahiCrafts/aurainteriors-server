@@ -25,7 +25,8 @@ const hasOperatorKey = (value, depth = 0) => {
   if (!value || typeof value !== "object") return false;
   if (depth > MAX_DEPTH) return true; // fail closed (FA-61)
   for (const key of Object.keys(value)) {
-    if (key.startsWith("$") || key.includes(".") || key === "__proto__") return true;
+    if (key.startsWith("$") || key.includes(".") || key === "__proto__")
+      return true;
     if (hasOperatorKey(value[key], depth + 1)) return true;
   }
   return false;
@@ -57,7 +58,8 @@ const PRODUCTS_LIST_PATH = /^\/api\/v1\/products\/?$/;
 
 const isExemptAttrKey = (req, key, value) => {
   if (!req || (req.method !== "GET" && req.method !== "HEAD")) return false;
-  if (typeof req.path !== "string" || !PRODUCTS_LIST_PATH.test(req.path)) return false;
+  if (typeof req.path !== "string" || !PRODUCTS_LIST_PATH.test(req.path))
+    return false;
   if (!ATTR_QUERY_KEY.test(key)) return false;
   if (POLLUTION_SEGMENTS.has(key.split(".")[1])) return false;
   return typeof value === "string";
@@ -68,14 +70,19 @@ const hasOperatorKeyInQuery = (req) => {
   if (!query || typeof query !== "object") return false;
   for (const key of Object.keys(query)) {
     if (isExemptAttrKey(req, key, query[key])) continue;
-    if (key.startsWith("$") || key.includes(".") || key === "__proto__") return true;
+    if (key.startsWith("$") || key.includes(".") || key === "__proto__")
+      return true;
     if (hasOperatorKey(query[key], 1)) return true;
   }
   return false;
 };
 
 const nosqlSanitize = (req, res, next) => {
-  if (hasOperatorKey(req.body) || hasOperatorKeyInQuery(req) || hasOperatorKey(req.params)) {
+  if (
+    hasOperatorKey(req.body) ||
+    hasOperatorKeyInQuery(req) ||
+    hasOperatorKey(req.params)
+  ) {
     return next(new AppError("Invalid request payload", 400));
   }
   return next();

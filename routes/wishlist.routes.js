@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const { performance } = require("node:perf_hooks");
 const express = require("express");
@@ -14,8 +17,10 @@ router.use((req, res, next) => {
   req.wishlistTimings = [];
   const json = res.json;
   res.json = function (body) {
-    const timings = [...req.wishlistTimings,
-      `total;dur=${(performance.now() - start).toFixed(1)}`].join(", ");
+    const timings = [
+      ...req.wishlistTimings,
+      `total;dur=${(performance.now() - start).toFixed(1)}`,
+    ].join(", ");
     // FA-78: per-stage timing headers are a debugging aid - outside
     // production only. In production they stay in the server log
     // (the finish handler below) and off the wire.
@@ -27,16 +32,25 @@ router.use((req, res, next) => {
     return json.call(this, body);
   };
   res.once("finish", () => {
-    console.info(JSON.stringify({ event: "wishlist_request", method: req.method,
-      status: res.statusCode, timings: res.getHeader("X-Wishlist-Timing") ||
-        `total;dur=${(performance.now() - start).toFixed(1)}` }));
+    console.info(
+      JSON.stringify({
+        event: "wishlist_request",
+        method: req.method,
+        status: res.statusCode,
+        timings:
+          res.getHeader("X-Wishlist-Timing") ||
+          `total;dur=${(performance.now() - start).toFixed(1)}`,
+      }),
+    );
   });
   req.wishlistAuthStart = start;
   next();
 });
 router.use(protect);
 router.use((req, res, next) => {
-  req.wishlistTimings.push(`auth;dur=${(performance.now() - req.wishlistAuthStart).toFixed(1)}`);
+  req.wishlistTimings.push(
+    `auth;dur=${(performance.now() - req.wishlistAuthStart).toFixed(1)}`,
+  );
   next();
 });
 

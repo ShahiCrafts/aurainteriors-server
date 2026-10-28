@@ -16,7 +16,13 @@ const chatSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ai_handling", "escalated", "agent_handling", "resolved", "closed"],
+      enum: [
+        "ai_handling",
+        "escalated",
+        "agent_handling",
+        "resolved",
+        "closed",
+      ],
       default: "ai_handling",
       index: true,
     },
@@ -85,7 +91,7 @@ const chatSchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
-      }
+      },
     ],
     closedAt: {
       type: Date,
@@ -104,7 +110,7 @@ const chatSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Validation: chat must have either customer OR guestSession, but not both
@@ -113,11 +119,15 @@ chatSchema.pre("save", async function () {
   const hasGuestSession = !!this.guestSession;
 
   if (!hasCustomer && !hasGuestSession) {
-    throw new Error("Chat must have either customer (authenticated) or guestSession (guest), but not neither");
+    throw new Error(
+      "Chat must have either customer (authenticated) or guestSession (guest), but not neither",
+    );
   }
 
   if (hasCustomer && hasGuestSession) {
-    throw new Error("Chat cannot have both customer and guestSession simultaneously");
+    throw new Error(
+      "Chat cannot have both customer and guestSession simultaneously",
+    );
   }
 });
 
@@ -150,7 +160,7 @@ chatSchema.pre("save", async function () {
 
 chatSchema.statics.getCustomerChats = async function (
   customerId,
-  options = {}
+  options = {},
 ) {
   const { limit = 20, page = 1, status } = options;
   const skip = (page - 1) * limit;
@@ -205,7 +215,11 @@ chatSchema.statics.getAllChats = async function (options = {}) {
   // sortBy is client input: allowlist it (it previously became a sort
   // key verbatim). Direction stays descending, as before.
   const { safeSort } = require("../utils/listQuery");
-  const sortOptions = safeSort(`-${sortBy}`, ["lastMessageAt", "createdAt", "updatedAt", "priority", "status"], "-lastMessageAt");
+  const sortOptions = safeSort(
+    `-${sortBy}`,
+    ["lastMessageAt", "createdAt", "updatedAt", "priority", "status"],
+    "-lastMessageAt",
+  );
 
   const [chats, total] = await Promise.all([
     this.find(query)
@@ -229,17 +243,18 @@ chatSchema.statics.getAllChats = async function (options = {}) {
 };
 
 chatSchema.statics.getWaitingQueue = async function () {
-  return this.find({
-    status: "escalated",
-    deletedAt: null,
-  })
-    .sort({ createdAt: 1 })
-    // PERF-B-05 (U-5): bounded — oldest 200 escalated chats; the
-    // admin queue is a triage view, not an export.
-    .limit(200)
-    .populate("customer", "firstName lastName email avatar")
-    .lean();
+  return (
+    this.find({
+      status: "escalated",
+      deletedAt: null,
+    })
+      .sort({ createdAt: 1 })
+      // PERF-B-05 (U-5): bounded — oldest 200 escalated chats; the
+      // admin queue is a triage view, not an export.
+      .limit(200)
+      .populate("customer", "firstName lastName email avatar")
+      .lean()
+  );
 };
 
 module.exports = mongoose.model("Chat", chatSchema);
-

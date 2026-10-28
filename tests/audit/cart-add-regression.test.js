@@ -58,11 +58,19 @@ test("AR-01: addToCart success path completes the guarded write with the version
   const next = mockNext();
   ctrl.addToCart(req(), res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `addToCart must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `addToCart must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.cart.totalItems, 1);
   assert.equal(updateOneCalls.length, 1, "guarded write executed exactly once");
-  assert.equal(updateOneCalls[0].filter.__v, 3, "guard uses the version snapshot taken at read time");
+  assert.equal(
+    updateOneCalls[0].filter.__v,
+    3,
+    "guard uses the version snapshot taken at read time",
+  );
   assert.equal(cart.__v, 4, "local version bumped after a matched write");
 });
 

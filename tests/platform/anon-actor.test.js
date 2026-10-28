@@ -15,14 +15,20 @@ const { actorFor } = require("../../utils/anonActor");
 const SECRET = "test-anon-secret-" + "x".repeat(32);
 let saved;
 
-beforeEach(() => { saved = process.env.JWT_SECRET; });
+beforeEach(() => {
+  saved = process.env.JWT_SECRET;
+});
 afterEach(() => {
-  if (saved === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = saved;
+  if (saved === undefined) delete process.env.JWT_SECRET;
+  else process.env.JWT_SECRET = saved;
 });
 
 function resSpy() {
   const calls = [];
-  return { calls, cookie: (name, value, opts) => calls.push({ name, value, opts }) };
+  return {
+    calls,
+    cookie: (name, value, opts) => calls.push({ name, value, opts }),
+  };
 }
 const expectedSig = (secret, id) =>
   crypto.createHmac("sha256", secret).update(`anon:${id}`).digest("base64url");
@@ -41,7 +47,10 @@ test("sign/verify: HMAC construction is unchanged when JWT_SECRET is set", () =>
   // HMAC-SHA256(secret).update("anon:" + id).digest("base64url").
   assert.equal(sig, expectedSig(SECRET, id));
   // A request presenting the signed cookie verifies to the same actor.
-  const again = actorFor({ cookies: { aura_anon: res.calls[0].value } }, resSpy());
+  const again = actorFor(
+    { cookies: { aura_anon: res.calls[0].value } },
+    resSpy(),
+  );
   assert.equal(again, actor);
 });
 
@@ -54,16 +63,22 @@ test("sign/verify: forged or malformed cookies are rejected with a fresh id", ()
   const second = actorFor({ cookies: { aura_anon: forged } }, resSpy());
   assert.notEqual(second, first);
   assert.match(second, /^anon:[a-f0-9]{32}$/);
-  const garbage = actorFor({ cookies: { aura_anon: "not-a-cookie" } }, resSpy());
+  const garbage = actorFor(
+    { cookies: { aura_anon: "not-a-cookie" } },
+    resSpy(),
+  );
   assert.match(garbage, /^anon:[a-f0-9]{32}$/);
   assert.notEqual(garbage, first);
 });
 
 test("missing JWT_SECRET fails loudly, naming the variable", () => {
   delete process.env.JWT_SECRET;
-  assert.throws(() => actorFor({ cookies: {} }, resSpy()), /JWT_SECRET is not configured/);
+  assert.throws(
+    () => actorFor({ cookies: {} }, resSpy()),
+    /JWT_SECRET is not configured/,
+  );
   assert.throws(
     () => actorFor({ cookies: { aura_anon: "abcd.efgh" } }, resSpy()),
-    /JWT_SECRET is not configured/
+    /JWT_SECRET is not configured/,
   );
 });

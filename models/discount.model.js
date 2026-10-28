@@ -55,7 +55,7 @@ const discountSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 discountSchema.index({ expiryDate: 1 });
@@ -119,7 +119,7 @@ discountSchema.methods.incrementUsage = async function () {
       ],
     },
     { $inc: { currentUsageCount: 1 } },
-    { new: true }
+    { new: true },
   );
   if (updated) {
     // Mirror without dirtying this copy.

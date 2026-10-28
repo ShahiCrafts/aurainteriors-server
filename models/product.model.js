@@ -20,7 +20,7 @@ const dimensionsSchema = new mongoose.Schema(
       default: "cm",
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Phase 3 (catalog) — purchasable variant subdocument. Promoted
@@ -56,7 +56,7 @@ const catalogVariantSchema = new mongoose.Schema(
     modelUrl: { type: String, trim: true },
     enabled: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const productSchema = new mongoose.Schema(
@@ -159,13 +159,13 @@ const productSchema = new mongoose.Schema(
         },
         format: {
           type: String,
-          enum: ['glb', 'gltf', 'usdz'],
+          enum: ["glb", "gltf", "usdz"],
           required: true,
         },
         platform: {
           type: String,
-          enum: ['android', 'ios', 'universal'],
-          default: 'universal',
+          enum: ["android", "ios", "universal"],
+          default: "universal",
         },
         fileSize: {
           type: Number,
@@ -183,7 +183,11 @@ const productSchema = new mongoose.Schema(
     productType: { type: String, lowercase: true, trim: true, index: true },
     roomSlugs: [{ type: String, lowercase: true, trim: true }],
     collectionSlugs: [{ type: String, lowercase: true, trim: true }],
-    catalogAttributes: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+    catalogAttributes: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     catalogVariants: [catalogVariantSchema],
     // Phase 3 (catalog): the attribute keys that define this
     // product's variant combinations (each variant's option key
@@ -313,7 +317,7 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Indexes for efficient queries (slug index created by unique: true)
@@ -340,7 +344,10 @@ productSchema.index({ deletedAt: 1, status: 1 }); // Soft delete + status filter
 // combinationKey gets a plain index (per-product uniqueness is
 // the service's guarded write — a global unique index would
 // wrongly collide identical combinations across products).
-productSchema.index({ "catalogVariants.sku": 1 }, { unique: true, sparse: true });
+productSchema.index(
+  { "catalogVariants.sku": 1 },
+  { unique: true, sparse: true },
+);
 productSchema.index({ "catalogVariants.combinationKey": 1 });
 // Phase 5 (catalog): the facet engine and the list filters run
 // their pools over the visible-status set. Room filtering and the
@@ -361,7 +368,7 @@ productSchema.index({ status: 1, "rating.average": -1 });
 productSchema.virtual("discountPercentage").get(function () {
   if (this.originalPrice && this.originalPrice > this.price) {
     return Math.round(
-      ((this.originalPrice - this.price) / this.originalPrice) * 100
+      ((this.originalPrice - this.price) / this.originalPrice) * 100,
     );
   }
   return 0;
@@ -395,7 +402,8 @@ productSchema.pre("save", function (next) {
 
   // Auto-set arAvailable based on modelUrl or modelFiles
   if (this.isModified("modelUrl") || this.isModified("modelFiles")) {
-    this.arAvailable = !!this.modelUrl || (this.modelFiles && this.modelFiles.length > 0);
+    this.arAvailable =
+      !!this.modelUrl || (this.modelFiles && this.modelFiles.length > 0);
   }
 
   // Auto-update status based on stock
@@ -434,7 +442,16 @@ productSchema.statics.getByCategory = function (categoryId, options = {}) {
     deletedAt: null,
     status: { $in: ["active", "out_of_stock"] },
   })
-    .sort(safeSort(sort, ["createdAt", "price", "originalPrice", "name", "stock", "rating.average"]))
+    .sort(
+      safeSort(sort, [
+        "createdAt",
+        "price",
+        "originalPrice",
+        "name",
+        "stock",
+        "rating.average",
+      ]),
+    )
     .skip((page - 1) * limit)
     .limit(limit)
     .populate("category", "name slug");

@@ -36,13 +36,19 @@ const isConnected = () => mongoose.connection.readyState === 1;
 
 async function tryAcquire(name, holderId, ttlMs) {
   const now = new Date();
-  if (!isConnected()) return { _id: name, holderId, expiresAt: new Date(now.getTime() + ttlMs), local: true };
+  if (!isConnected())
+    return {
+      _id: name,
+      holderId,
+      expiresAt: new Date(now.getTime() + ttlMs),
+      local: true,
+    };
   const expiresAt = new Date(now.getTime() + ttlMs);
   try {
     const doc = await SchedulerLease.findOneAndUpdate(
       { _id: name, $or: [{ expiresAt: { $lte: now } }, { holderId }] },
       { $set: { holderId, expiresAt, updatedAt: now } },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
     return doc && doc.holderId === holderId ? doc : null;
   } catch (error) {
@@ -58,7 +64,7 @@ async function renew(name, holderId, ttlMs) {
   const now = new Date();
   const res = await SchedulerLease.updateOne(
     { _id: name, holderId },
-    { $set: { expiresAt: new Date(now.getTime() + ttlMs), updatedAt: now } }
+    { $set: { expiresAt: new Date(now.getTime() + ttlMs), updatedAt: now } },
   );
   return res.matchedCount === 1;
 }
@@ -69,12 +75,20 @@ async function release(name, holderId) {
   return res.deletedCount === 1;
 }
 
-async function withLease(name, ttlMs, fn, { holderId = DEFAULT_HOLDER_ID, releaseOnDone = false } = {}) {
+async function withLease(
+  name,
+  ttlMs,
+  fn,
+  { holderId = DEFAULT_HOLDER_ID, releaseOnDone = false } = {},
+) {
   const lease = await tryAcquire(name, holderId, ttlMs);
   if (!lease) return false;
-  const refresher = setInterval(() => {
-    renew(name, holderId, ttlMs).catch(() => {});
-  }, Math.max(250, Math.floor(ttlMs / 3)));
+  const refresher = setInterval(
+    () => {
+      renew(name, holderId, ttlMs).catch(() => {});
+    },
+    Math.max(250, Math.floor(ttlMs / 3)),
+  );
   refresher.unref?.();
   try {
     await fn();

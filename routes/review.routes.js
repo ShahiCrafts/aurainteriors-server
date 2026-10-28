@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router({ mergeParams: true }); // mergeParams to access productId from parent router
 router.use(standardReadLimiter);
@@ -20,7 +23,7 @@ const {
 router.get(
   "/",
   validate(getReviewsQuerySchema, "query"),
-  reviewController.getProductReviews
+  reviewController.getProductReviews,
 );
 router.use(protect);
 router.get("/my-review", reviewController.getUserReview);
@@ -29,7 +32,7 @@ router.post("/", validate(createReviewSchema), reviewController.createReview);
 router.patch(
   "/:reviewId",
   validate(updateReviewSchema),
-  reviewController.updateReview
+  reviewController.updateReview,
 );
 router.delete("/:reviewId", reviewController.deleteReview);
 router.post("/:reviewId/helpful", reviewController.markHelpful);
@@ -37,7 +40,7 @@ router.use(restrictTo("admin"));
 router.post(
   "/:reviewId/response",
   validate(adminResponseSchema),
-  reviewController.addAdminResponse
+  reviewController.addAdminResponse,
 );
 router.patch("/:reviewId/toggle-approval", reviewController.toggleApproval);
 

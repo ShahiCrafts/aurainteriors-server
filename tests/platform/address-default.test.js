@@ -15,14 +15,22 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
 
-test("AR-42: ten parallel default switches leave exactly one default", { timeout: 150000 }, async () => {
-  const out = await runProbe();
-  const line = out.split("\n").find((l) => l.startsWith("RESULT"));
-  assert.ok(line, `probe must print a RESULT line; got: ${out}`);
-  assert.match(line, /defaultCount=1/, `exactly one default must survive parallel switches; got: ${line}`);
-});
+test(
+  "AR-42: ten parallel default switches leave exactly one default",
+  { timeout: 150000 },
+  async () => {
+    const out = await runProbe();
+    const line = out.split("\n").find((l) => l.startsWith("RESULT"));
+    assert.ok(line, `probe must print a RESULT line; got: ${out}`);
+    assert.match(
+      line,
+      /defaultCount=1/,
+      `exactly one default must survive parallel switches; got: ${line}`,
+    );
+  },
+);

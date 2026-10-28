@@ -10,7 +10,12 @@ function isSafeUrlValue(value) {
   if (!v || v.length > 2048) return false;
   if (/[\u0000-\u0020\u007f]/.test(v)) return false; // no whitespace/control characters anywhere
   if (/^https?:\/\//i.test(v)) {
-    try { new URL(v); return true; } catch { return false; }
+    try {
+      new URL(v);
+      return true;
+    } catch {
+      return false;
+    }
   }
   // Site-relative: exactly one leading slash (not // or /\), no backslash.
   if (/^\/(?![/\\])/.test(v) && !v.includes("\\")) return true;
@@ -26,9 +31,14 @@ function sanitizeActionUrl(value) {
 // Joi schema fragment with the same rule (keeps each validator's own
 // .optional()/.allow() chain intact at the call site).
 function joiSafeUrl(Joi, maxLen = 500) {
-  return Joi.string().max(maxLen).custom((value, helpers) => {
-    return isSafeUrlValue(value) ? value : helpers.error("string.uri");
-  }).messages({ "string.uri": "URL must be an http(s) URL or a site-relative path" });
+  return Joi.string()
+    .max(maxLen)
+    .custom((value, helpers) => {
+      return isSafeUrlValue(value) ? value : helpers.error("string.uri");
+    })
+    .messages({
+      "string.uri": "URL must be an http(s) URL or a site-relative path",
+    });
 }
 
 module.exports = { isSafeUrlValue, sanitizeActionUrl, joiSafeUrl };

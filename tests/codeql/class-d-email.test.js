@@ -21,17 +21,45 @@ const check = async (email) => {
 };
 
 test("CQ-D: valid and invalid sets behave as specified", async () => {
-  for (const ok of ["user@example.com", "first.last@sub.domain.co", "user@aurainteriors.live"]) {
+  for (const ok of [
+    "user@example.com",
+    "first.last@sub.domain.co",
+    "user@aurainteriors.live",
+  ]) {
     assert.equal(await check(ok), true, `should accept ${ok}`);
   }
-  for (const bad of ["not-an-email", "a@b", "@example.com", "a b@example.com", "a@.com", "a@@example.com", ""]) {
-    assert.equal(await check(bad), false, `should reject ${JSON.stringify(bad)}`);
+  for (const bad of [
+    "not-an-email",
+    "a@b",
+    "@example.com",
+    "a b@example.com",
+    "a@.com",
+    "a@@example.com",
+    "",
+  ]) {
+    assert.equal(
+      await check(bad),
+      false,
+      `should reject ${JSON.stringify(bad)}`,
+    );
   }
   // Behavior change (logged): previously rejected valid addresses
-  assert.equal(await check("user+tag@example.com"), true, "plus-tag now accepted");
-  assert.equal(await check("user@example.museum"), true, "long TLD now accepted");
+  assert.equal(
+    await check("user+tag@example.com"),
+    true,
+    "plus-tag now accepted",
+  );
+  assert.equal(
+    await check("user@example.museum"),
+    true,
+    "long TLD now accepted",
+  );
   // Length cap
-  assert.equal(await check(`${"a".repeat(250)}@example.com`), false, "over-254 addresses rejected");
+  assert.equal(
+    await check(`${"a".repeat(250)}@example.com`),
+    false,
+    "over-254 addresses rejected",
+  );
 });
 
 test("CQ-D: adversarial input validates in linear time", async () => {

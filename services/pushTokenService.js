@@ -15,7 +15,7 @@ class PushTokenService {
     if (!userId || !token || !deviceId || !platform) {
       throw new AppError(
         "userId, token, deviceId, and platform are required",
-        400
+        400,
       );
     }
 
@@ -47,7 +47,7 @@ class PushTokenService {
       return await DevicePushToken.findOneAndUpdate(
         { user: userId, deviceId },
         { $set, $setOnInsert: { user: userId, deviceId } },
-        { upsert: true, new: true, runValidators: true }
+        { upsert: true, new: true, runValidators: true },
       );
     } catch (error) {
       if (error.code === 11000) {
@@ -64,7 +64,7 @@ class PushTokenService {
           user: userId,
           isActive: true,
         },
-        { token: 1, deviceName: 1, platform: 1, _id: 1 }
+        { token: 1, deviceName: 1, platform: 1, _id: 1 },
       ).lean();
 
       return tokens;
@@ -83,7 +83,7 @@ class PushTokenService {
           lastFailureAt: new Date(),
           lastFailureReason: reason,
         },
-        { new: true }
+        { new: true },
       );
 
       if (!updated) {
@@ -107,7 +107,7 @@ class PushTokenService {
           lastFailureAt: null,
           lastFailureReason: null,
         },
-        { new: true }
+        { new: true },
       );
 
       if (!updated) {
@@ -154,7 +154,7 @@ class PushTokenService {
           isActive: false,
           updatedAt: new Date(),
         },
-        { new: true }
+        { new: true },
       );
 
       if (!updated) {
@@ -181,7 +181,7 @@ class PushTokenService {
           lastUsedAt: 1,
           registeredAt: 1,
           metadata: 1,
-        }
+        },
       )
         .sort({ lastUsedAt: -1 })
         .lean();
@@ -204,7 +204,7 @@ class PushTokenService {
         {
           isActive: false,
           updatedAt: new Date(),
-        }
+        },
       );
 
       const deleteResult = await DevicePushToken.deleteMany({

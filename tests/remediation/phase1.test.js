@@ -11,13 +11,17 @@ const read = (rel) => fs.readFileSync(path.join(repo, rel), "utf8");
 
 // ---------- VULN-001: shared gated guest-session extractor ----------
 
-const { getGuestSessionId, setGuestSessionCookie } = require(path.join(repo, "utils/guestSession"));
+const { getGuestSessionId, setGuestSessionCookie } = require(
+  path.join(repo, "utils/guestSession"),
+);
 
 const withEnv = (key, value, fn) => {
   const prev = process.env[key];
   if (value === undefined) delete process.env[key];
   else process.env[key] = value;
-  try { return fn(); } finally {
+  try {
+    return fn();
+  } finally {
     if (prev === undefined) delete process.env[key];
     else process.env[key] = prev;
   }
@@ -25,7 +29,12 @@ const withEnv = (key, value, fn) => {
 
 test("VULN-001: query-only guest id is NOT honoured when GUEST_SESSION_ALLOW_QUERY is off", () => {
   withEnv("GUEST_SESSION_ALLOW_QUERY", undefined, () => {
-    const req = { query: { guestSessionId: "guest_abc" }, headers: {}, cookies: {}, body: {} };
+    const req = {
+      query: { guestSessionId: "guest_abc" },
+      headers: {},
+      cookies: {},
+      body: {},
+    };
     assert.equal(getGuestSessionId(req), undefined);
   });
 });
@@ -33,19 +42,34 @@ test("VULN-001: query-only guest id is NOT honoured when GUEST_SESSION_ALLOW_QUE
 test("VULN-001: header and cookie sources are always honoured", () => {
   withEnv("GUEST_SESSION_ALLOW_QUERY", undefined, () => {
     assert.equal(
-      getGuestSessionId({ headers: { "x-guest-session-id": "guest_h" }, cookies: {}, body: {}, query: {} }),
-      "guest_h"
+      getGuestSessionId({
+        headers: { "x-guest-session-id": "guest_h" },
+        cookies: {},
+        body: {},
+        query: {},
+      }),
+      "guest_h",
     );
     assert.equal(
-      getGuestSessionId({ headers: {}, cookies: { guestSessionId: "guest_c" }, body: {}, query: {} }),
-      "guest_c"
+      getGuestSessionId({
+        headers: {},
+        cookies: { guestSessionId: "guest_c" },
+        body: {},
+        query: {},
+      }),
+      "guest_c",
     );
   });
 });
 
 test("VULN-001: query source works only with the explicit opt-in flag", () => {
   withEnv("GUEST_SESSION_ALLOW_QUERY", "1", () => {
-    const req = { query: { guestSessionId: "guest_q" }, headers: {}, cookies: {}, body: {} };
+    const req = {
+      query: { guestSessionId: "guest_q" },
+      headers: {},
+      cookies: {},
+      body: {},
+    };
     assert.equal(getGuestSessionId(req), "guest_q");
   });
 });
@@ -53,7 +77,10 @@ test("VULN-001: query source works only with the explicit opt-in flag", () => {
 test("VULN-001: chatUpload middleware uses the shared extractor and never reads req.query directly", () => {
   const src = read("middleware/chatUpload.middleware.js");
   assert.match(src, /getGuestSessionId\(req\)/);
-  assert.ok(!/=\s*req\.query\.guestSessionId/.test(src), "middleware must not read the query credential directly");
+  assert.ok(
+    !/=\s*req\.query\.guestSessionId/.test(src),
+    "middleware must not read the query credential directly",
+  );
 });
 
 test("VULN-001: chat.controller re-exports the same extractor for existing tests", () => {
@@ -66,7 +93,9 @@ test("VULN-001: chat.controller re-exports the same extractor for existing tests
 test("VULN-009: setGuestSessionCookie sets httpOnly + SameSite=Lax + path=/ + 24h, Secure in production", () => {
   const calls = [];
   const res = { cookie: (...args) => calls.push(args) };
-  withEnv("NODE_ENV", "production", () => setGuestSessionCookie(res, "guest_x"));
+  withEnv("NODE_ENV", "production", () =>
+    setGuestSessionCookie(res, "guest_x"),
+  );
   assert.equal(calls.length, 1);
   const [name, value, opts] = calls[0];
   assert.equal(name, "guestSessionId");
@@ -81,7 +110,9 @@ test("VULN-009: setGuestSessionCookie sets httpOnly + SameSite=Lax + path=/ + 24
 test("VULN-009: setGuestSessionCookie is not Secure outside production and ignores junk input", () => {
   const calls = [];
   const res = { cookie: (...args) => calls.push(args) };
-  withEnv("NODE_ENV", "development", () => setGuestSessionCookie(res, "guest_x"));
+  withEnv("NODE_ENV", "development", () =>
+    setGuestSessionCookie(res, "guest_x"),
+  );
   assert.equal(calls[0][2].secure, false);
   setGuestSessionCookie(res, "");
   setGuestSessionCookie(null, "guest_x");
@@ -94,7 +125,10 @@ const cfg = require(path.join(repo, "config/appConfig"));
 
 test("VULN-002: an unknown CATEGORY_SVG_POLICY value fails boot validation", () => {
   const { errors } = cfg.validateEnv({ CATEGORY_SVG_POLICY: "reencde" });
-  assert.ok(errors.some((e) => e.includes("CATEGORY_SVG_POLICY")), `expected enum error, got: ${errors.join("; ")}`);
+  assert.ok(
+    errors.some((e) => e.includes("CATEGORY_SVG_POLICY")),
+    `expected enum error, got: ${errors.join("; ")}`,
+  );
   const ok = cfg.validateEnv({ CATEGORY_SVG_POLICY: "reject" });
   assert.ok(!ok.errors.some((e) => e.includes("CATEGORY_SVG_POLICY")));
   assert.equal(cfg.REGISTRY.CATEGORY_SVG_POLICY.def, "reencode");
@@ -102,8 +136,14 @@ test("VULN-002: an unknown CATEGORY_SVG_POLICY value fails boot validation", () 
 
 test("VULN-002: upload.middleware rejects SVG for any non-reencode policy (no fall-through)", () => {
   const src = read("middleware/upload.middleware.js");
-  const region = src.slice(src.indexOf("detectImageType(req.file.buffer) === \"svg\""), src.indexOf("uploadToCloudinary(uploadBuffer"));
-  assert.match(region, /else \{\s*\n\s*return next\(new AppError\("SVG images are not accepted/);
+  const region = src.slice(
+    src.indexOf('detectImageType(req.file.buffer) === "svg"'),
+    src.indexOf("uploadToCloudinary(uploadBuffer"),
+  );
+  assert.match(
+    region,
+    /else \{\s*\n\s*return next\(new AppError\("SVG images are not accepted/,
+  );
 });
 
 const PROD_BASE = {
@@ -117,15 +157,25 @@ test("VULN-007: OTP_PEPPER is required in production", () => {
   const env = { ...PROD_BASE };
   delete env.OTP_PEPPER;
   const { errors } = cfg.validateEnv(env);
-  assert.ok(errors.some((e) => e.includes("OTP_PEPPER")), `expected required error, got: ${errors.join("; ")}`);
+  assert.ok(
+    errors.some((e) => e.includes("OTP_PEPPER")),
+    `expected required error, got: ${errors.join("; ")}`,
+  );
   const ok = cfg.validateEnv(PROD_BASE);
   assert.ok(!ok.errors.some((e) => e.includes("OTP_PEPPER")));
 });
 
 test("VULN-005/007: production posture warnings fire for weakened/undecided settings", () => {
   const { warnings } = cfg.validateEnv(PROD_BASE);
-  for (const key of ["RATE_LIMIT_STORE", "TRUST_PROXY", "UPLOAD_MAX_TOTAL_BYTES"]) {
-    assert.ok(warnings.some((w) => w.includes(key)), `expected a ${key} warning, got: ${warnings.join("; ")}`);
+  for (const key of [
+    "RATE_LIMIT_STORE",
+    "TRUST_PROXY",
+    "UPLOAD_MAX_TOTAL_BYTES",
+  ]) {
+    assert.ok(
+      warnings.some((w) => w.includes(key)),
+      `expected a ${key} warning, got: ${warnings.join("; ")}`,
+    );
   }
   const weakened = cfg.validateEnv({
     ...PROD_BASE,
@@ -143,19 +193,33 @@ test("VULN-005/007: production posture warnings fire for weakened/undecided sett
 
 test("VULN-005/007: non-production boot gets none of the posture warnings", () => {
   const { warnings } = cfg.validateEnv({ NODE_ENV: "development" });
-  for (const key of ["RATE_LIMIT_STORE", "TRUST_PROXY", "RETURN_TOKEN_IN_BODY", "JWT_REQUIRE_ISS_AUD", "UPLOAD_MAX_TOTAL_BYTES: not set"]) {
-    assert.ok(!warnings.some((w) => w.includes(key)), `unexpected ${key} warning in dev`);
+  for (const key of [
+    "RATE_LIMIT_STORE",
+    "TRUST_PROXY",
+    "RETURN_TOKEN_IN_BODY",
+    "JWT_REQUIRE_ISS_AUD",
+    "UPLOAD_MAX_TOTAL_BYTES: not set",
+  ]) {
+    assert.ok(
+      !warnings.some((w) => w.includes(key)),
+      `unexpected ${key} warning in dev`,
+    );
   }
 });
 
 test("VULN-006: UPLOAD_MAX_TOTAL_BYTES defaults to 50 MB and an explicit value still wins", () => {
   assert.equal(cfg.getInt("UPLOAD_MAX_TOTAL_BYTES", {}), 52428800);
-  assert.equal(cfg.getInt("UPLOAD_MAX_TOTAL_BYTES", { UPLOAD_MAX_TOTAL_BYTES: "1500" }), 1500);
+  assert.equal(
+    cfg.getInt("UPLOAD_MAX_TOTAL_BYTES", { UPLOAD_MAX_TOTAL_BYTES: "1500" }),
+    1500,
+  );
 });
 
 // ---------- VULN-003: NODE_ENV normalisation in the error handler ----------
 
-const errorMiddleware = require(path.join(repo, "middleware/error.middleware.js"));
+const errorMiddleware = require(
+  path.join(repo, "middleware/error.middleware.js"),
+);
 
 test("VULN-003: isDevelopment normalises case and whitespace", () => {
   assert.equal(errorMiddleware.isDevelopment("development"), true);
@@ -174,8 +238,14 @@ const runErrorHandler = (nodeEnv, err) => {
   let payload;
   const res = {
     statusCode: null,
-    status(code) { this.statusCode = code; return this; },
-    json(body) { payload = body; return this; },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      payload = body;
+      return this;
+    },
   };
   try {
     errorMiddleware(err, {}, res, () => {});
@@ -191,9 +261,15 @@ test("VULN-003: 'Development' follows the (normalised) dev branch, 'Production' 
   const err = new Error("boom");
   err.statusCode = 500;
   const devPayload = runErrorHandler("Development", err);
-  assert.ok(devPayload.stack, "normalised dev branch should include the stack, like the rest of the codebase");
+  assert.ok(
+    devPayload.stack,
+    "normalised dev branch should include the stack, like the rest of the codebase",
+  );
   const prodPayload = runErrorHandler("Production", new Error("boom"));
-  assert.ok(!("stack" in prodPayload), "production branch must not leak stacks");
+  assert.ok(
+    !("stack" in prodPayload),
+    "production branch must not leak stacks",
+  );
 });
 
 // ---------- VULN-008: getAllOrders point-of-use coercion ----------
@@ -201,7 +277,14 @@ test("VULN-003: 'Development' follows the (normalised) dev branch, 'Production' 
 const { asEnum } = require(path.join(repo, "utils/params"));
 
 test("VULN-008: asEnum with the getAllOrders enum sets passes valid values and drops everything else", () => {
-  const ORDER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+  const ORDER_STATUSES = [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ];
   const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
   assert.equal(asEnum("shipped", ORDER_STATUSES), "shipped");
   assert.equal(asEnum("paid", PAYMENT_STATUSES), "paid");
@@ -216,16 +299,30 @@ test("VULN-008: getAllOrders coerces both status and paymentStatus via asEnum", 
   const start = src.indexOf("exports.getAllOrders");
   assert.ok(start >= 0);
   const region = src.slice(start, start + 3000);
-  assert.match(region, /asEnum\(status, \["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"\]\)/);
-  assert.match(region, /asEnum\(paymentStatus, \["pending", "paid", "failed", "refunded"\]\)/);
-  assert.ok(!/filter\.orderStatus = status;/.test(region), "raw status must not reach the filter");
-  assert.ok(!/filter\.paymentStatus = paymentStatus;/.test(region), "raw paymentStatus must not reach the filter");
+  assert.match(
+    region,
+    /asEnum\(status, \["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"\]\)/,
+  );
+  assert.match(
+    region,
+    /asEnum\(paymentStatus, \["pending", "paid", "failed", "refunded"\]\)/,
+  );
+  assert.ok(
+    !/filter\.orderStatus = status;/.test(region),
+    "raw status must not reach the filter",
+  );
+  assert.ok(
+    !/filter\.paymentStatus = paymentStatus;/.test(region),
+    "raw paymentStatus must not reach the filter",
+  );
 });
 
 // ---------- VULN-004: audit log service ----------
 
 const AuditLog = require(path.join(repo, "models/auditLog.model.js"));
-const auditLogService = require(path.join(repo, "services/auditLog.service.js"));
+const auditLogService = require(
+  path.join(repo, "services/auditLog.service.js"),
+);
 
 test("VULN-004: redact drops sensitive keys shallowly and one level deep", () => {
   const out = auditLogService.redact({
@@ -245,23 +342,32 @@ const mongoose = require("mongoose");
 const withConnection = async (fn) => {
   const prev = mongoose.connection.readyState;
   mongoose.connection.readyState = 1;
-  try { return await fn(); } finally { mongoose.connection.readyState = prev; }
+  try {
+    return await fn();
+  } finally {
+    mongoose.connection.readyState = prev;
+  }
 };
 
 test("VULN-004: record() writes exactly one redacted row", async () => {
   const original = AuditLog.create;
   const written = [];
-  AuditLog.create = async (doc) => { written.push(doc); return doc; };
+  AuditLog.create = async (doc) => {
+    written.push(doc);
+    return doc;
+  };
   try {
-    await withConnection(() => auditLogService.record({
-      actor: "64b64c2f9f1b2c3d4e5f6071",
-      action: "user.deactivate",
-      targetType: "User",
-      targetId: 12345,
-      before: { isActive: true, magicLinkToken: "should-not-be-stored" },
-      after: { isActive: false },
-      ip: "203.0.113.9",
-    }));
+    await withConnection(() =>
+      auditLogService.record({
+        actor: "64b64c2f9f1b2c3d4e5f6071",
+        action: "user.deactivate",
+        targetType: "User",
+        targetId: 12345,
+        before: { isActive: true, magicLinkToken: "should-not-be-stored" },
+        after: { isActive: false },
+        ip: "203.0.113.9",
+      }),
+    );
   } finally {
     AuditLog.create = original;
   }
@@ -278,12 +384,24 @@ test("VULN-004: record() never throws when the write fails", async () => {
   const original = AuditLog.create;
   const origError = console.error;
   console.error = () => {};
-  AuditLog.create = async () => { throw new Error("db down"); };
+  AuditLog.create = async () => {
+    throw new Error("db down");
+  };
   try {
-    const result = await withConnection(() => auditLogService.record({ action: "discount.delete", targetType: "Discount", targetId: "d1" }));
+    const result = await withConnection(() =>
+      auditLogService.record({
+        action: "discount.delete",
+        targetType: "Discount",
+        targetId: "d1",
+      }),
+    );
     assert.equal(result, null);
     // And while disconnected it skips silently instead of hanging.
-    const skipped = await auditLogService.record({ action: "discount.delete", targetType: "Discount", targetId: "d1" });
+    const skipped = await auditLogService.record({
+      action: "discount.delete",
+      targetType: "Discount",
+      targetId: "d1",
+    });
     assert.equal(skipped, null);
   } finally {
     AuditLog.create = original;
@@ -292,7 +410,9 @@ test("VULN-004: record() never throws when the write fails", async () => {
 });
 
 test("VULN-004: audit model carries the required indexes and no TTL", () => {
-  const indexes = AuditLog.schema.indexes().map(([fields]) => Object.keys(fields).join(","));
+  const indexes = AuditLog.schema
+    .indexes()
+    .map(([fields]) => Object.keys(fields).join(","));
   assert.ok(indexes.includes("targetType,targetId,at"));
   assert.ok(indexes.includes("actor,at"));
   const src = read("models/auditLog.model.js");
@@ -301,17 +421,57 @@ test("VULN-004: audit model carries the required indexes and no TTL", () => {
 
 test("VULN-004: every named admin handler records exactly one audit entry", () => {
   const expectations = [
-    ["controllers/user.controller.js", "exports.updateUserStatus", "user.activate"],
+    [
+      "controllers/user.controller.js",
+      "exports.updateUserStatus",
+      "user.activate",
+    ],
     ["controllers/user.controller.js", "exports.deleteUser", "user.delete"],
-    ["controllers/order.controller.js", "exports.updateOrderStatus", "order.status.update"],
-    ["controllers/order.controller.js", "exports.reconcileRefund", "order.refund.reconcile"],
-    ["controllers/discount.controller.js", "exports.createDiscount", "discount.create"],
-    ["controllers/discount.controller.js", "exports.updateDiscount", "discount.update"],
-    ["controllers/discount.controller.js", "exports.deleteDiscount", "discount.delete"],
-    ["controllers/promotion.controller.js", "exports.createPromotion", "promotion.create"],
-    ["controllers/promotion.controller.js", "exports.updatePromotion", "promotion.update"],
-    ["controllers/promotion.controller.js", "exports.deletePromotion", "promotion.delete"],
-    ["controllers/document.controller.js", "exports.updateVisibility", "document.visibility.update"],
+    [
+      "controllers/order.controller.js",
+      "exports.updateOrderStatus",
+      "order.status.update",
+    ],
+    [
+      "controllers/order.controller.js",
+      "exports.reconcileRefund",
+      "order.refund.reconcile",
+    ],
+    [
+      "controllers/discount.controller.js",
+      "exports.createDiscount",
+      "discount.create",
+    ],
+    [
+      "controllers/discount.controller.js",
+      "exports.updateDiscount",
+      "discount.update",
+    ],
+    [
+      "controllers/discount.controller.js",
+      "exports.deleteDiscount",
+      "discount.delete",
+    ],
+    [
+      "controllers/promotion.controller.js",
+      "exports.createPromotion",
+      "promotion.create",
+    ],
+    [
+      "controllers/promotion.controller.js",
+      "exports.updatePromotion",
+      "promotion.update",
+    ],
+    [
+      "controllers/promotion.controller.js",
+      "exports.deletePromotion",
+      "promotion.delete",
+    ],
+    [
+      "controllers/document.controller.js",
+      "exports.updateVisibility",
+      "document.visibility.update",
+    ],
   ];
   for (const [file, handler, action] of expectations) {
     const src = read(file);

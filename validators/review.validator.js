@@ -60,7 +60,7 @@ exports.getReviewsQuerySchema = Joi.object({
       "-rating",
       "rating",
       "-helpfulCount",
-      "helpfulCount"
+      "helpfulCount",
     )
     .default("-createdAt")
     .messages({

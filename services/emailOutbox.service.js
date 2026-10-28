@@ -19,7 +19,8 @@
 // loads.
 const loadOutboxModel = () => require("../models/emailOutbox.model");
 
-const isOutboxMode = () => require("../config/appConfig").getString("EMAIL_MODE") === "outbox";
+const isOutboxMode = () =>
+  require("../config/appConfig").getString("EMAIL_MODE") === "outbox";
 
 async function sendNow(kind, payload = {}) {
   const emailService = require("./email.service");
@@ -27,15 +28,25 @@ async function sendNow(kind, payload = {}) {
     case "order-confirmation": {
       const Order = require("../models/order.model");
       const order = await Order.findById(payload.orderId);
-      if (!order) throw new Error(`Order ${payload.orderId} not found for confirmation email`);
+      if (!order)
+        throw new Error(
+          `Order ${payload.orderId} not found for confirmation email`,
+        );
       return emailService.sendOrderConfirmationEmail(order);
     }
     case "magic-link":
-      return emailService.sendMagicLinkEmail(payload.email, payload.magicLink, payload.firstName);
+      return emailService.sendMagicLinkEmail(
+        payload.email,
+        payload.magicLink,
+        payload.firstName,
+      );
     case "otp":
       return emailService.sendOtpEmail(payload.email, payload.otp);
     case "newsletter-welcome":
-      return emailService.sendNewsletterWelcomeEmail(payload.email, payload.nonce);
+      return emailService.sendNewsletterWelcomeEmail(
+        payload.email,
+        payload.nonce,
+      );
     default:
       throw new Error(`Unknown email kind: ${kind}`);
   }
@@ -45,32 +56,53 @@ async function sendNow(kind, payload = {}) {
 // magic-link token / OTP and must not sit in the DB after the attempt.
 async function finalizeSent(id) {
   let EmailOutbox;
-  try { EmailOutbox = loadOutboxModel(); } catch { return; }
+  try {
+    EmailOutbox = loadOutboxModel();
+  } catch {
+    return;
+  }
   await EmailOutbox.updateOne(
     { _id: id },
-    { $set: { status: "sent", sentAt: new Date(), lastError: null }, $unset: { payload: 1 } }
+    {
+      $set: { status: "sent", sentAt: new Date(), lastError: null },
+      $unset: { payload: 1 },
+    },
   ).catch(() => {});
 }
 
 async function finalizeFailed(id, error) {
   let EmailOutbox;
-  try { EmailOutbox = loadOutboxModel(); } catch { return; }
+  try {
+    EmailOutbox = loadOutboxModel();
+  } catch {
+    return;
+  }
   await EmailOutbox.updateOne(
     { _id: id },
     {
-      $set: { status: "failed", lastError: String(error?.message || error).slice(0, 1000) },
+      $set: {
+        status: "failed",
+        lastError: String(error?.message || error).slice(0, 1000),
+      },
       $unset: { payload: 1 },
-    }
+    },
   ).catch(() => {});
 }
 
-async function dispatchEmail({ kind, to, payload, dedupeKey }, { session } = {}) {
+async function dispatchEmail(
+  { kind, to, payload, dedupeKey },
+  { session } = {},
+) {
   if (isOutboxMode()) {
     const EmailOutbox = loadOutboxModel();
     let row;
     try {
       const doc = {
-        kind, to, payload, status: "queued", nextAttemptAt: new Date(),
+        kind,
+        to,
+        payload,
+        status: "queued",
+        nextAttemptAt: new Date(),
         ...(dedupeKey ? { dedupeKey } : {}),
       };
       if (session) {
@@ -81,7 +113,8 @@ async function dispatchEmail({ kind, to, payload, dedupeKey }, { session } = {})
     } catch (error) {
       if (error && error.code === 11000 && dedupeKey) {
         const existing = await EmailOutbox.findOne({ dedupeKey });
-        if (existing) return { mode: "outbox", status: "queued", id: existing._id };
+        if (existing)
+          return { mode: "outbox", status: "queued", id: existing._id };
       }
       throw error;
     }
@@ -89,7 +122,9 @@ async function dispatchEmail({ kind, to, payload, dedupeKey }, { session } = {})
     // the worker interval are the reliable paths; this just makes
     // the common case fast.
     setImmediate(() => {
-      drainEmailOutbox().catch((e) => console.error("[email-outbox] opportunistic drain failed:", e.message));
+      drainEmailOutbox().catch((e) =>
+        console.error("[email-outbox] opportunistic drain failed:", e.message),
+      );
     });
     return { mode: "outbox", status: "queued", id: row._id };
   }
@@ -109,21 +144,32 @@ async function dispatchEmail({ kind, to, payload, dedupeKey }, { session } = {})
     }
     const EmailOutbox = loadOutboxModel();
     row = await EmailOutbox.create({
-      kind, to, payload, status: "sending",
+      kind,
+      to,
+      payload,
+      status: "sending",
       ...(dedupeKey ? { dedupeKey } : {}),
     });
   } catch (error) {
     if (error && error.code === 11000 && dedupeKey) {
-      row = await loadOutboxModel().findOne({ dedupeKey }).catch(() => null);
+      row = await loadOutboxModel()
+        .findOne({ dedupeKey })
+        .catch(() => null);
     }
     if (!row) {
       // The bookkeeping write failed — still attempt the send.
-      console.error("[email-outbox] row write failed; sending without a record:", error.message);
+      console.error(
+        "[email-outbox] row write failed; sending without a record:",
+        error.message,
+      );
       try {
         await sendNow(kind, payload);
         return { mode: "direct", status: "sent", id: null };
       } catch (sendError) {
-        console.error("[email-outbox] unrecorded send failed:", sendError.message);
+        console.error(
+          "[email-outbox] unrecorded send failed:",
+          sendError.message,
+        );
         return { mode: "direct", status: "failed", id: null };
       }
     }
@@ -140,7 +186,8 @@ async function dispatchEmail({ kind, to, payload, dedupeKey }, { session } = {})
 
 async function drainEmailOutbox({ limit = 25 } = {}) {
   const mongoose = require("mongoose");
-  if (!mongoose.connection || mongoose.connection.readyState !== 1) return { processed: 0 };
+  if (!mongoose.connection || mongoose.connection.readyState !== 1)
+    return { processed: 0 };
   const EmailOutbox = loadOutboxModel();
   const { backoffMs } = require("./jobQueue.service");
   const staleSendingBefore = new Date(Date.now() - 2 * 60 * 1000);
@@ -155,7 +202,7 @@ async function drainEmailOutbox({ limit = 25 } = {}) {
         ],
       },
       { $set: { status: "sending" } },
-      { new: true, sort: { nextAttemptAt: 1 } }
+      { new: true, sort: { nextAttemptAt: 1 } },
     );
     if (!row) break;
     processed++;
@@ -168,7 +215,10 @@ async function drainEmailOutbox({ limit = 25 } = {}) {
       if (attempts >= (row.maxAttempts || 5)) {
         await EmailOutbox.updateOne(
           { _id: row._id },
-          { $set: { status: "failed", attempts, lastError: message }, $unset: { payload: 1 } }
+          {
+            $set: { status: "failed", attempts, lastError: message },
+            $unset: { payload: 1 },
+          },
         );
       } else {
         await EmailOutbox.updateOne(
@@ -180,7 +230,7 @@ async function drainEmailOutbox({ limit = 25 } = {}) {
               lastError: message,
               nextAttemptAt: new Date(Date.now() + backoffMs(attempts)),
             },
-          }
+          },
         );
       }
     }

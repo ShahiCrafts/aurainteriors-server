@@ -33,15 +33,37 @@ const { stubModule, mockRes, mockNext, until } = require("../audit/helpers");
 // Recording query stub: captures sort/skip/limit/lean and resolves to result.
 function recordingQuery(result, record) {
   const q = {
-    populate() { return q; },
-    select() { return q; },
-    session() { return q; },
-    sort(s) { record.sort = s; return q; },
-    skip(n) { record.skip = n; return q; },
-    limit(n) { record.limit = n; return q; },
-    lean() { record.lean = true; return q; },
-    then(onF, onR) { return Promise.resolve(result).then(onF, onR); },
-    catch(onR) { return Promise.resolve(result).catch(onR); },
+    populate() {
+      return q;
+    },
+    select() {
+      return q;
+    },
+    session() {
+      return q;
+    },
+    sort(s) {
+      record.sort = s;
+      return q;
+    },
+    skip(n) {
+      record.skip = n;
+      return q;
+    },
+    limit(n) {
+      record.limit = n;
+      return q;
+    },
+    lean() {
+      record.lean = true;
+      return q;
+    },
+    then(onF, onR) {
+      return Promise.resolve(result).then(onF, onR);
+    },
+    catch(onR) {
+      return Promise.resolve(result).catch(onR);
+    },
   };
   return q;
 }
@@ -50,13 +72,23 @@ const calls = { productFind: [], productCount: [], categoryFind: [] };
 let findRecord = {};
 
 stubModule("models/product.model", {
-  find: (filter) => { calls.productFind.push(filter); return recordingQuery([], findRecord); },
-  countDocuments: async (filter) => { calls.productCount.push(filter); return 0; },
+  find: (filter) => {
+    calls.productFind.push(filter);
+    return recordingQuery([], findRecord);
+  },
+  countDocuments: async (filter) => {
+    calls.productCount.push(filter);
+    return 0;
+  },
   findOne: async () => null,
 });
 stubModule("models/category.model", {
-  find: (filter) => { calls.categoryFind.push(filter); return recordingQuery([{ _id: "cat-id-1" }], {}); },
-  findOne: () => recordingQuery({ _id: "cat-id-1", name: "Chairs", slug: "chairs" }, {}),
+  find: (filter) => {
+    calls.categoryFind.push(filter);
+    return recordingQuery([{ _id: "cat-id-1" }], {});
+  },
+  findOne: () =>
+    recordingQuery({ _id: "cat-id-1", name: "Chairs", slug: "chairs" }, {}),
   // Phase 0.5 (Cluster A): faithful port of the model's getDescendantIds
   // BFS (models/category.model.js:93) over this harness's fixture
   // universe (one root category, no children), read through the same
@@ -93,30 +125,53 @@ function normalize(value) {
   if (value instanceof RegExp) return `RegExp:${value.source}:${value.flags}`;
   if (Array.isArray(value)) return value.map(normalize);
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, normalize(value[k])]));
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((k) => [k, normalize(value[k])]),
+    );
   }
   return value;
 }
 
 async function runProducts(query, user) {
-  calls.productFind = []; calls.productCount = []; calls.categoryFind = []; findRecord = {};
+  calls.productFind = [];
+  calls.productCount = [];
+  calls.categoryFind = [];
+  findRecord = {};
   // PERF-B-01: anonymous list responses are TTL-cached in-process;
   // isolate each scenario from the cache the way a fresh deploy
   // would be (these tests pin filter construction, not caching).
   require("../../utils/catalogCache").invalidateCatalogCache();
-  const res = mockRes(); const next = mockNext();
+  const res = mockRes();
+  const next = mockNext();
   productCtrl.getAllProducts({ query, user }, res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getAllProducts errored: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getAllProducts errored: ${next.error && next.error.message}`,
+  );
   return { res, filter: calls.productFind[0], record: findRecord };
 }
 
 async function runCategory(query) {
-  calls.productFind = []; calls.productCount = []; findRecord = {};
-  const res = mockRes(); const next = mockNext();
-  categoryCtrl.getCategoryProducts({ params: { id: "chairs" }, query }, res, next);
+  calls.productFind = [];
+  calls.productCount = [];
+  findRecord = {};
+  const res = mockRes();
+  const next = mockNext();
+  categoryCtrl.getCategoryProducts(
+    { params: { id: "chairs" }, query },
+    res,
+    next,
+  );
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `getCategoryProducts errored: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `getCategoryProducts errored: ${next.error && next.error.message}`,
+  );
   return { res, filter: calls.productFind[0], record: findRecord };
 }
 
@@ -145,7 +200,11 @@ for (const c of SHARED_CASES) {
     // effective-price clause, so the fragment itself is pinned per
     // endpoint in the D1/D6 test below.
     for (const key of ["colors", "materials", "rating.average", "$text"]) {
-      assert.deepEqual(cn[key], pn[key], `shared key '${key}' diverged in case '${c.name}'`);
+      assert.deepEqual(
+        cn[key],
+        pn[key],
+        `shared key '${key}' diverged in case '${c.name}'`,
+      );
     }
     assert.deepEqual(
       { skip: cat.record.skip, limit: cat.record.limit, sort: cat.record.sort },
@@ -157,7 +216,10 @@ for (const c of SHARED_CASES) {
 
 test("AR-31b base filters are pinned per endpoint", async () => {
   const p = await runProducts({}, undefined);
-  assert.deepEqual(normalize(p.filter), { deletedAt: null, status: { $in: ["active", "out_of_stock"] } });
+  assert.deepEqual(normalize(p.filter), {
+    deletedAt: null,
+    status: { $in: ["active", "out_of_stock"] },
+  });
   assert.equal(p.record.lean, true); // getAllProducts leans (AR-47)
   const cat = await runCategory({});
   assert.deepEqual(normalize(cat.filter), {
@@ -173,9 +235,20 @@ test("AR-31b base filters are pinned per endpoint", async () => {
   });
   assert.equal(cat.record.lean, undefined); // getCategoryProducts does NOT lean (D4)
   // Response shapes pinned.
-  assert.deepEqual(Object.keys(p.res.body.data).sort(), ["pagination", "products"]);
-  assert.deepEqual(Object.keys(cat.res.body.data).sort(), ["category", "pagination", "products"]);
-  assert.deepEqual(cat.res.body.data.category, { id: "cat-id-1", name: "Chairs", slug: "chairs" });
+  assert.deepEqual(Object.keys(p.res.body.data).sort(), [
+    "pagination",
+    "products",
+  ]);
+  assert.deepEqual(Object.keys(cat.res.body.data).sort(), [
+    "category",
+    "pagination",
+    "products",
+  ]);
+  assert.deepEqual(cat.res.body.data.category, {
+    id: "cat-id-1",
+    name: "Chairs",
+    slug: "chairs",
+  });
 });
 
 // ---------- Pinned divergences (must NOT be silently unified) ----------
@@ -201,9 +274,13 @@ test("AR-31b D1 pinned: minPrice=0 / minRating=0 applied by getAllProducts, skip
 
 test("AR-31b D2 pinned: whitespace in colors — getAllProducts trims, getCategoryProducts does not", async () => {
   const p = await runProducts({ colors: "red, blue" }, undefined);
-  assert.deepEqual(normalize(p.filter).colors, { $in: ["RegExp:^red$:i", "RegExp:^blue$:i"] });
+  assert.deepEqual(normalize(p.filter).colors, {
+    $in: ["RegExp:^red$:i", "RegExp:^blue$:i"],
+  });
   const cat = await runCategory({ colors: "red, blue" });
-  assert.deepEqual(normalize(cat.filter).colors, { $in: ["RegExp:^red$:i", "RegExp:^ blue$:i"] });
+  assert.deepEqual(normalize(cat.filter).colors, {
+    $in: ["RegExp:^red$:i", "RegExp:^ blue$:i"],
+  });
 });
 
 test("AR-31b D2 pinned: colors item cap — getAllProducts 50, getCategoryProducts 20", async () => {
@@ -216,7 +293,12 @@ test("AR-31b D2 pinned: colors item cap — getAllProducts 50, getCategoryProduc
 
 test("AR-31b product-only filters stay product-only", async () => {
   const p = await runProducts(
-    { style: "modern", featured: "true", newArrivals: "true", category: "cat-id-9" },
+    {
+      style: "modern",
+      featured: "true",
+      newArrivals: "true",
+      category: "cat-id-9",
+    },
     undefined,
   );
   const pn = normalize(p.filter);
@@ -228,7 +310,11 @@ test("AR-31b product-only filters stay product-only", async () => {
   assert.deepEqual(normalize(pInStock.filter).stock, { $gt: 0 });
   assert.equal(normalize(pInStock.filter).status, "active"); // inStock REPLACES the status $in
   // Category endpoint ignores these params entirely.
-  const cat = await runCategory({ style: "modern", featured: "true", inStock: "true" });
+  const cat = await runCategory({
+    style: "modern",
+    featured: "true",
+    inStock: "true",
+  });
   const cn = normalize(cat.filter);
   assert.equal(cn.style, undefined);
   assert.equal(cn.isFeatured, undefined);

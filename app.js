@@ -30,7 +30,9 @@ const AppError = require("./utils/AppError");
 const runtimeContext = require("./services/runtimeContext");
 
 function createApp() {
-  const NODE_ENV = (getString("NODE_ENV") || "development").trim().toLowerCase(); // normalized (A-11 class)
+  const NODE_ENV = (getString("NODE_ENV") || "development")
+    .trim()
+    .toLowerCase(); // normalized (A-11 class)
   const APP_VERSION = process.env.npm_package_version || "1.0.0";
 
   const app = express();
@@ -43,7 +45,10 @@ function createApp() {
   // an owner decision (see OWNER_DECISIONS.md).
   if (process.env.TRUST_PROXY !== undefined) {
     const tp = process.env.TRUST_PROXY;
-    app.set("trust proxy", tp === "true" ? true : /^\d+$/.test(tp) ? Number(tp) : tp);
+    app.set(
+      "trust proxy",
+      tp === "true" ? true : /^\d+$/.test(tp) ? Number(tp) : tp,
+    );
   }
 
   // OA-1: env only (FRONTEND_URL + ADMIN_URL + CORS_EXTRA_ORIGINS);
@@ -72,7 +77,11 @@ function createApp() {
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       maxAge: 600,
-      exposedHeaders: ["Server-Timing", "X-Wishlist-Timing", "X-Wishlist-Version"],
+      exposedHeaders: [
+        "Server-Timing",
+        "X-Wishlist-Timing",
+        "X-Wishlist-Version",
+      ],
     }),
   );
 
@@ -168,8 +177,13 @@ function createApp() {
     };
     const detailToken = process.env.HEALTH_DETAIL_TOKEN || "";
     const presented = String(req.headers["x-health-token"] || "");
-    const detailAuthorized = detailToken.length >= 16 && presented.length === detailToken.length &&
-      require("crypto").timingSafeEqual(Buffer.from(presented), Buffer.from(detailToken));
+    const detailAuthorized =
+      detailToken.length >= 16 &&
+      presented.length === detailToken.length &&
+      require("crypto").timingSafeEqual(
+        Buffer.from(presented),
+        Buffer.from(detailToken),
+      );
     if (detailAuthorized) {
       Object.assign(health, {
         uptime: process.uptime(),
@@ -178,7 +192,9 @@ function createApp() {
         host: os.hostname(),
         dependencies: {
           database: dbState,
-          notificationGateway: runtimeContext.getNotificationGateway() ? "up" : "down", // AR-33: registry, not global.notificationGateway
+          notificationGateway: runtimeContext.getNotificationGateway()
+            ? "up"
+            : "down", // AR-33: registry, not global.notificationGateway
         },
         memory: {
           rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),

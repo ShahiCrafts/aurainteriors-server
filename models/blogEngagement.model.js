@@ -11,7 +11,7 @@ const blogEngagementSchema = new mongoose.Schema(
     actor: { type: String, required: true, maxlength: 80 },
     kind: { type: String, enum: ["like", "view"], required: true },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: { createdAt: true, updatedAt: false } },
 );
 
 blogEngagementSchema.index({ blog: 1, actor: 1, kind: 1 }, { unique: true });

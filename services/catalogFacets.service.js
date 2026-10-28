@@ -84,11 +84,12 @@ function countByValuePipeline(pool, valueExpr) {
 // values come from the ENABLED variants instead (a facet must not
 // advertise values no purchasable variant carries).
 function scalarValuesExpr(definition) {
-  const path = definition.storage === "field"
-    ? `$${definition.fieldPath}`
-    : definition.type === "measurement"
-      ? `$catalogAttributes.${definition.key}.value`
-      : `$catalogAttributes.${definition.key}`;
+  const path =
+    definition.storage === "field"
+      ? `$${definition.fieldPath}`
+      : definition.type === "measurement"
+        ? `$catalogAttributes.${definition.key}.value`
+        : `$catalogAttributes.${definition.key}`;
   const productExpr = {
     $cond: [{ $eq: [{ $type: path }, "missing"] }, [], [path]],
   };
@@ -125,9 +126,10 @@ function scalarValuesExpr(definition) {
 
 function valuesExprFor(definition) {
   if (definition.type === "multi-enum") {
-    const path = definition.storage === "field"
-      ? `$${definition.fieldPath}`
-      : `$catalogAttributes.${definition.key}`;
+    const path =
+      definition.storage === "field"
+        ? `$${definition.fieldPath}`
+        : `$catalogAttributes.${definition.key}`;
     return { $ifNull: [path, []] };
   }
   return scalarValuesExpr(definition);
@@ -136,7 +138,9 @@ function valuesExprFor(definition) {
 // Render a grouped string value back to the definition's type.
 function typedFacetValue(definition, raw) {
   if (definition.type === "boolean") return raw === "true";
-  if (["integer", "decimal", "money", "measurement"].includes(definition.type)) {
+  if (
+    ["integer", "decimal", "money", "measurement"].includes(definition.type)
+  ) {
     const num = Number(raw);
     return Number.isFinite(num) ? num : raw;
   }
@@ -149,7 +153,8 @@ function typedFacetValue(definition, raw) {
 function capOptions(rows, selectedValues) {
   const selected = new Set((selectedValues || []).map(String));
   const sorted = [...rows].sort(
-    (a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value))
+    (a, b) =>
+      b.count - a.count || String(a.value).localeCompare(String(b.value)),
   );
   const capped = sorted.slice(0, FACET_VALUE_CAP);
   const inCap = new Set(capped.map((row) => String(row.value)));
@@ -180,7 +185,10 @@ function unionResolved(entryLists) {
   for (const entries of entryLists) {
     for (const entry of entries || []) {
       const existing = byKey.get(entry.key);
-      if (!existing || (existing.filterable !== true && entry.filterable === true)) {
+      if (
+        !existing ||
+        (existing.filterable !== true && entry.filterable === true)
+      ) {
         byKey.set(entry.key, entry);
       }
     }
@@ -188,7 +196,11 @@ function unionResolved(entryLists) {
   return byKey;
 }
 
-async function applicableAttributeFacets({ categoryRoots, scopeMatch, definitions }) {
+async function applicableAttributeFacets({
+  categoryRoots,
+  scopeMatch,
+  definitions,
+}) {
   let resolved;
   if (categoryRoots.length > 0) {
     // PERF-B-06: roots are independent — resolve them in parallel.
@@ -203,7 +215,7 @@ async function applicableAttributeFacets({ categoryRoots, scopeMatch, definition
         if (!doc) return null;
         const entries = await resolveForCategory(doc);
         return Array.isArray(entries) ? entries : null;
-      })
+      }),
     );
     const lists = perRoot.filter(Boolean);
     resolved = unionResolved(lists);
@@ -235,19 +247,26 @@ async function applicableAttributeFacets({ categoryRoots, scopeMatch, definition
       [...types].map(async (typeKey) => {
         const result = await resolveForProductType(typeKey);
         return result ? result.attributes : null;
-      })
+      }),
     );
     const lists = perType.filter(Boolean);
     // Globals (appliesTo "all") always apply, even when the scope
     // carries no typed products at all.
     lists.push(
-      [...definitions.values()].filter((definition) => definition.appliesTo === "all")
+      [...definitions.values()].filter(
+        (definition) => definition.appliesTo === "all",
+      ),
     );
     resolved = unionResolved(lists);
   }
   return [...resolved.values()]
-    .filter((entry) => entry.filterable === true && !DEDICATED_KEYS.has(entry.key))
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.key.localeCompare(b.key));
+    .filter(
+      (entry) => entry.filterable === true && !DEDICATED_KEYS.has(entry.key),
+    )
+    .sort(
+      (a, b) =>
+        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.key.localeCompare(b.key),
+    );
 }
 
 // Category facet: direct per-category counts from the aggregation
@@ -265,9 +284,12 @@ function rollupCategoryFacet(directCounts, categories, categoryRoots) {
     }
   }
   const selectedIds = new Set(categoryRoots.map(String));
-  const roots = categoryRoots.length > 0
-    ? categories.filter((cat) => selectedIds.has(String(cat._id)))
-    : categories.filter((cat) => !cat.parent || !byId.has(String(cat.parent)));
+  const roots =
+    categoryRoots.length > 0
+      ? categories.filter((cat) => selectedIds.has(String(cat._id)))
+      : categories.filter(
+          (cat) => !cat.parent || !byId.has(String(cat.parent)),
+        );
 
   const memo = new Map();
   const subtreeCount = (cat) => {
@@ -289,7 +311,13 @@ function rollupCategoryFacet(directCounts, categories, categoryRoots) {
     const count = subtreeCount(cat);
     const selected = selectedIds.has(key);
     if (count > 0 || selected) {
-      options.push({ value: cat.slug, id: key, name: cat.name, count, selected });
+      options.push({
+        value: cat.slug,
+        id: key,
+        name: cat.name,
+        count,
+        selected,
+      });
     }
     for (const child of children.get(key) || []) walk(child);
   };
@@ -323,7 +351,7 @@ async function computeFacets({
         $in: categoryFragment.category.$in.map((id) =>
           typeof id === "string" && /^[0-9a-fA-F]{24}$/.test(id)
             ? new mongoose.Types.ObjectId(id)
-            : id
+            : id,
         ),
       },
     };
@@ -331,12 +359,16 @@ async function computeFacets({
   const byKey = (key) => conditions.find((c) => c.key === key);
   const conditionsMinus = (key) => conditions.filter((c) => c.key !== key);
   const engine = (list, range, stock) =>
-    buildVariantAwareClause({ conditions: list, priceRange: range, inStock: stock });
+    buildVariantAwareClause({
+      conditions: list,
+      priceRange: range,
+      inStock: stock,
+    });
 
   // $text may only appear as the first pipeline stage: it is part
   // of the stage-1 scope match and is stripped from every pool.
   const poolBase = (scopeFragments || []).filter(
-    (fragment) => !Object.prototype.hasOwnProperty.call(fragment, "$text")
+    (fragment) => !Object.prototype.hasOwnProperty.call(fragment, "$text"),
   );
   const dim = {
     category: categoryFragment ? [categoryFragment] : [],
@@ -347,8 +379,12 @@ async function computeFacets({
     materials: fieldFragments.materials ? [fieldFragments.materials] : [],
   };
   const allDims = () => [
-    ...dim.category, ...dim.room, ...dim.rating,
-    ...dim.style, ...dim.colors, ...dim.materials,
+    ...dim.category,
+    ...dim.room,
+    ...dim.rating,
+    ...dim.style,
+    ...dim.colors,
+    ...dim.materials,
   ];
   const dimsExcept = (...keys) => {
     const skip = new Set(keys);
@@ -380,26 +416,36 @@ async function computeFacets({
   const facetPipelines = {};
   facetPipelines._total = [
     ...matchStage([
-      ...poolBase, ...allDims(), ...availabilityFragments,
+      ...poolBase,
+      ...allDims(),
+      ...availabilityFragments,
       ...engine(conditions, priceRange, inStock),
     ]),
     { $count: "n" },
   ];
   facetPipelines.category = [
     ...matchStage([
-      ...poolBase, ...dimsExcept("category"), ...availabilityFragments,
+      ...poolBase,
+      ...dimsExcept("category"),
+      ...availabilityFragments,
       ...engine(conditions, priceRange, inStock),
     ]),
     { $group: { _id: "$category", n: { $sum: 1 } } },
   ];
   facetPipelines.room = countByValuePipeline(
-    [...poolBase, ...dimsExcept("room"), ...availabilityFragments,
-      ...engine(conditionsMinus("roomSlugs"), priceRange, inStock)],
-    { $ifNull: ["$roomSlugs", []] }
+    [
+      ...poolBase,
+      ...dimsExcept("room"),
+      ...availabilityFragments,
+      ...engine(conditionsMinus("roomSlugs"), priceRange, inStock),
+    ],
+    { $ifNull: ["$roomSlugs", []] },
   );
   facetPipelines.price = [
     ...matchStage([
-      ...poolBase, ...allDims(), ...availabilityFragments,
+      ...poolBase,
+      ...allDims(),
+      ...availabilityFragments,
       ...engine(conditionsMinus("price"), null, inStock),
     ]),
     {
@@ -412,7 +458,9 @@ async function computeFacets({
   ];
   facetPipelines.availability = [
     ...matchStage([
-      ...poolBase, ...allDims(), ...availabilityFragments,
+      ...poolBase,
+      ...allDims(),
+      ...availabilityFragments,
       ...engine(conditions, priceRange, true),
     ]),
     { $count: "n" },
@@ -425,7 +473,9 @@ async function computeFacets({
   }
   facetPipelines.rating = [
     ...matchStage([
-      ...poolBase, ...dimsExcept("rating"), ...availabilityFragments,
+      ...poolBase,
+      ...dimsExcept("rating"),
+      ...availabilityFragments,
       ...engine(conditions, priceRange, inStock),
     ]),
     { $group: ratingGroup },
@@ -437,11 +487,12 @@ async function computeFacets({
     const full = definitions.get(definition.key) || definition;
     const facetDef = {
       ...full,
-      axisCapable: full.storage === "catalogAttributes" && AXIS_TYPES.has(full.type),
+      axisCapable:
+        full.storage === "catalogAttributes" && AXIS_TYPES.has(full.type),
     };
     facetPipelines[`attr:${definition.key}`] = countByValuePipeline(
       attrPool(definition.key),
-      valuesExprFor(facetDef)
+      valuesExprFor(facetDef),
     );
   }
   for (const key of LEGACY_FIELD_KEYS) {
@@ -454,7 +505,7 @@ async function computeFacets({
       if (definition) {
         facetPipelines[`attr:${key}`] = countByValuePipeline(
           attrPool(key),
-          valuesExprFor(definition)
+          valuesExprFor(definition),
         );
       }
     }
@@ -469,20 +520,29 @@ async function computeFacets({
   const total = rows._total?.[0]?.n || 0;
 
   const directCounts = new Map(
-    (rows.category || []).filter((row) => row._id).map((row) => [String(row._id), row.n])
+    (rows.category || [])
+      .filter((row) => row._id)
+      .map((row) => [String(row._id), row.n]),
   );
   const categories = await Category.find({ status: "active" })
     .select("name slug parent")
     .lean();
-  const categoryOptions = rollupCategoryFacet(directCounts, categories, categoryRoots);
+  const categoryOptions = rollupCategoryFacet(
+    directCounts,
+    categories,
+    categoryRoots,
+  );
 
   const rooms = await Room.find({ active: true }).select("slug name").lean();
   const roomNames = new Map(rooms.map((room) => [room.slug, room.name]));
   const roomSelected = roomFragment?.roomSlugs?.$in || [];
   const roomOptions = capOptions(
     (rows.room || []).map((row) => ({ value: row._id, count: row.count })),
-    roomSelected
-  ).map((option) => ({ ...option, label: roomNames.get(option.value) || option.value }));
+    roomSelected,
+  ).map((option) => ({
+    ...option,
+    label: roomNames.get(option.value) || option.value,
+  }));
 
   const priceRow = rows.price?.[0];
   const availabilityCount = rows.availability?.[0]?.n || 0;
@@ -505,7 +565,7 @@ async function computeFacets({
         value: typedFacetValue(definition, row._id),
         count: row.count,
       })),
-      selectedValues
+      selectedValues,
     );
     const facet = {
       key,
@@ -513,20 +573,31 @@ async function computeFacets({
       type: definition.type,
       options,
     };
-    if (condition && (condition.min !== undefined || condition.max !== undefined)) {
-      facet.selectedRange = { min: condition.min ?? null, max: condition.max ?? null };
+    if (
+      condition &&
+      (condition.min !== undefined || condition.max !== undefined)
+    ) {
+      facet.selectedRange = {
+        min: condition.min ?? null,
+        max: condition.max ?? null,
+      };
     }
     attributeFacets.push(facet);
   }
   const sortIndex = new Map(applicable.map((entry, i) => [entry.key, i]));
   attributeFacets.sort(
-    (a, b) => (sortIndex.get(a.key) ?? 999) - (sortIndex.get(b.key) ?? 999)
+    (a, b) => (sortIndex.get(a.key) ?? 999) - (sortIndex.get(b.key) ?? 999),
   );
 
   return {
     total,
     facets: {
-      category: { key: "category", label: "Category", type: "category", options: categoryOptions },
+      category: {
+        key: "category",
+        label: "Category",
+        type: "category",
+        options: categoryOptions,
+      },
       room: { key: "room", label: "Room", type: "enum", options: roomOptions },
       price: {
         key: "price",
@@ -535,15 +606,19 @@ async function computeFacets({
         min: priceRow && priceRow.min !== undefined ? priceRow.min : null,
         max: priceRow && priceRow.max !== undefined ? priceRow.max : null,
         selected: {
-          min: priceRange && priceRange.min !== undefined ? priceRange.min : null,
-          max: priceRange && priceRange.max !== undefined ? priceRange.max : null,
+          min:
+            priceRange && priceRange.min !== undefined ? priceRange.min : null,
+          max:
+            priceRange && priceRange.max !== undefined ? priceRange.max : null,
         },
       },
       availability: {
         key: "availability",
         label: "Availability",
         type: "boolean",
-        options: [{ value: "inStock", count: availabilityCount, selected: inStock }],
+        options: [
+          { value: "inStock", count: availabilityCount, selected: inStock },
+        ],
       },
       rating: {
         key: "rating",

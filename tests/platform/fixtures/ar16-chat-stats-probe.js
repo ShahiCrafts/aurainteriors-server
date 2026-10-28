@@ -19,15 +19,32 @@ const os = require("node:os");
 const path = require("node:path");
 
 const repo = path.join(__dirname, "..", "..", "..");
-const MMS_SCRATCH = path.join(os.homedir(), "workspace", "aura-audit", "mms-data");
+const MMS_SCRATCH = path.join(
+  os.homedir(),
+  "workspace",
+  "aura-audit",
+  "mms-data",
+);
 const T0 = Date.UTC(2025, 0, 1, 12, 0, 0);
-const STATUSES = ["ai_handling", "escalated", "agent_handling", "resolved", "closed"];
+const STATUSES = [
+  "ai_handling",
+  "escalated",
+  "agent_handling",
+  "resolved",
+  "closed",
+];
 const N_CHATS = 200;
 const MSGS_PER_CHAT = 50;
 
-function firstAdminMinutes(i) { return (i % 9) + 2; }
-function hasAdmin(i) { return i % 20 !== 19; }
-function isDeleted(i) { return i % 25 === 24; }
+function firstAdminMinutes(i) {
+  return (i % 9) + 2;
+}
+function hasAdmin(i) {
+  return i % 20 !== 19;
+}
+function isDeleted(i) {
+  return i % 25 === 24;
+}
 
 async function main() {
   const { MongoMemoryServer } = require("mongodb-memory-server");
@@ -36,14 +53,20 @@ async function main() {
   const dbDir = fs.mkdtempSync(path.join(MMS_SCRATCH, "ar16stats-"));
   let mongod;
   try {
-    mongod = await MongoMemoryServer.create({ instance: { dbPath: dbDir, storageEngine: "wiredTiger" } });
+    mongod = await MongoMemoryServer.create({
+      instance: { dbPath: dbDir, storageEngine: "wiredTiger" },
+    });
     await mongoose.connect(mongod.getUri("ar16stats"));
     const Chat = require(path.join(repo, "models", "chat.model"));
     const ChatMessage = require(path.join(repo, "models", "chatMessage.model"));
     await Chat.ensureIndexes();
     await ChatMessage.ensureIndexes();
     // AR-16/M-5: the {senderRole,chat,createdAt} index is a MIGRATIONS.md M-5 owner-run index (not model-declared); build it explicitly so this probe measures the with-migration plan.
-    await ChatMessage.collection.createIndex({ senderRole: 1, chat: 1, createdAt: 1 });
+    await ChatMessage.collection.createIndex({
+      senderRole: 1,
+      chat: 1,
+      createdAt: 1,
+    });
 
     const senderId = new mongoose.Types.ObjectId();
     const chatsCol = mongoose.connection.db.collection("chats");
@@ -69,7 +92,11 @@ async function main() {
       const chatCreated = T0 + i * 3600000;
       const docs = [];
       for (let m = 1; m <= MSGS_PER_CHAT; m++) {
-        const isAdmin = hasAdmin(i) && (m === firstAdminMinutes(i) || m === firstAdminMinutes(i) + 20 || m === firstAdminMinutes(i) + 35);
+        const isAdmin =
+          hasAdmin(i) &&
+          (m === firstAdminMinutes(i) ||
+            m === firstAdminMinutes(i) + 20 ||
+            m === firstAdminMinutes(i) + 35);
         docs.push({
           chat: chatDocs[i]._id,
           sender: senderId,
@@ -89,21 +116,55 @@ async function main() {
 
     // Expected average over eligible chats (not deleted, has an admin reply).
     const eligible = [];
-    for (let i = 0; i < N_CHATS; i++) if (!isDeleted(i) && hasAdmin(i)) eligible.push(firstAdminMinutes(i));
-    const expectedAvgMinutes = Math.round(eligible.reduce((a, b) => a + b, 0) / eligible.length);
+    for (let i = 0; i < N_CHATS; i++)
+      if (!isDeleted(i) && hasAdmin(i)) eligible.push(firstAdminMinutes(i));
+    const expectedAvgMinutes = Math.round(
+      eligible.reduce((a, b) => a + b, 0) / eligible.length,
+    );
     console.log(`RESULT expectedAvgMinutes=${expectedAvgMinutes}`);
     console.log(`RESULT eligibleChats=${eligible.length}`);
 
     // ORIGINAL pipeline, verbatim from pre-fix getChatStats.
     const oldRows = await Chat.aggregate([
       { $match: { status: { $in: STATUSES }, deletedAt: null } },
-      { $lookup: { from: "chatmessages", localField: "_id", foreignField: "chat", as: "messages" } },
-      { $project: { createdAt: 1, firstAdminMessage: { $arrayElemAt: [{ $filter: { input: "$messages", as: "msg", cond: { $eq: ["$$msg.senderRole", "admin"] } } }, 0] } } },
+      {
+        $lookup: {
+          from: "chatmessages",
+          localField: "_id",
+          foreignField: "chat",
+          as: "messages",
+        },
+      },
+      {
+        $project: {
+          createdAt: 1,
+          firstAdminMessage: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: "$messages",
+                  as: "msg",
+                  cond: { $eq: ["$$msg.senderRole", "admin"] },
+                },
+              },
+              0,
+            ],
+          },
+        },
+      },
       { $match: { "firstAdminMessage.createdAt": { $exists: true } } },
-      { $project: { responseTime: { $subtract: ["$firstAdminMessage.createdAt", "$createdAt"] } } },
+      {
+        $project: {
+          responseTime: {
+            $subtract: ["$firstAdminMessage.createdAt", "$createdAt"],
+          },
+        },
+      },
       { $group: { _id: null, avgResponseTime: { $avg: "$responseTime" } } },
     ]);
-    const oldAvgMinutes = oldRows.length ? Math.round(oldRows[0].avgResponseTime / 1000 / 60) : null;
+    const oldAvgMinutes = oldRows.length
+      ? Math.round(oldRows[0].avgResponseTime / 1000 / 60)
+      : null;
     console.log(`RESULT oldAvgMinutes=${oldAvgMinutes}`);
 
     // FIXED service.
@@ -115,13 +176,17 @@ async function main() {
     // Explain of the NEW pipeline.
     if (typeof service._firstAdminResponsePipeline === "function") {
       const pipeline = service._firstAdminResponsePipeline();
-      console.log(`RESULT pipelineFrom=${JSON.stringify(pipeline.map((s) => Object.keys(s)[0]))}`);
-      const explain = await ChatMessage.aggregate(pipeline).explain("executionStats");
+      console.log(
+        `RESULT pipelineFrom=${JSON.stringify(pipeline.map((s) => Object.keys(s)[0]))}`,
+      );
+      const explain =
+        await ChatMessage.aggregate(pipeline).explain("executionStats");
       let docsExamined = 0;
       const walk = (node) => {
         if (!node || typeof node !== "object") return;
         for (const [k, v] of Object.entries(node)) {
-          if (k === "totalDocsExamined" && typeof v === "number") docsExamined += v;
+          if (k === "totalDocsExamined" && typeof v === "number")
+            docsExamined += v;
           else walk(v);
         }
       };
@@ -130,8 +195,12 @@ async function main() {
       // A $lookup INTO chatmessages is the forbidden shape; the string
       // "chatmessages" also appears in the explain as the aggregation's
       // own namespace, so check the pipeline's $lookup targets directly.
-      const lookupFroms = pipeline.filter((s) => s.$lookup).map((s) => s.$lookup.from);
-      console.log(`RESULT pipelineHasChatmessagesLookup=${lookupFroms.includes("chatmessages")}`);
+      const lookupFroms = pipeline
+        .filter((s) => s.$lookup)
+        .map((s) => s.$lookup.from);
+      console.log(
+        `RESULT pipelineHasChatmessagesLookup=${lookupFroms.includes("chatmessages")}`,
+      );
       console.log(`RESULT lookupFroms=${lookupFroms.join(",")}`);
     } else {
       console.log("RESULT pipelineFrom=missing-hook");
@@ -146,5 +215,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.error(`PROBE_FAIL: ${err.stack || err.message}`); process.exit(1); },
+  (err) => {
+    console.error(`PROBE_FAIL: ${err.stack || err.message}`);
+    process.exit(1);
+  },
 );

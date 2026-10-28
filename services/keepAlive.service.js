@@ -1,13 +1,13 @@
 /**
  * Keep-Alive Service
- * 
+ *
  * Prevents Render (or other hosting platforms) from spinning down the server
  * during periods of inactivity. Pings the health endpoint periodically.
- * 
+ *
  * Usage:
  *   - Development: Disabled by default
  *   - Production: Enabled automatically when NODE_ENV=production
- * 
+ *
  * Configuration:
  *   - KEEPALIVE_ENABLED: AR-44 gate — when set to a non-empty value it decides
  *     enablement (true/1/on/yes or false/0/off/no, case-insensitive); this is
@@ -26,7 +26,7 @@ class KeepAliveService {
     // legacy KEEP_ALIVE_ENABLED is exactly "true".
     const isProduction = process.env.NODE_ENV === "production";
     const legacyEnabled =
-      (process.env.KEEP_ALIVE_ENABLED === "true") || isProduction;
+      process.env.KEEP_ALIVE_ENABLED === "true" || isProduction;
 
     // AR-44 (D-E): KEEPALIVE_ENABLED, when set to a non-empty value,
     // overrides the legacy rule. Parsed case-insensitively after trim:
@@ -50,8 +50,7 @@ class KeepAliveService {
     }
 
     // Default: ping every 14 minutes (Render has a 15-minute idle timeout on free tier)
-    this.intervalMinutes =
-      parseInt(process.env.KEEP_ALIVE_INTERVAL) || 14;
+    this.intervalMinutes = parseInt(process.env.KEEP_ALIVE_INTERVAL) || 14;
 
     // OA-1: the localhost last resort is REMOVED. RENDER_EXTERNAL_URL
     // is retained as a middle fallback ONLY because it is a
@@ -59,9 +58,7 @@ class KeepAliveService {
     // default). If neither is set, backendUrl stays null and ping()
     // fails loudly naming BACKEND_URL - never a silent wrong URL.
     this.backendUrl =
-      process.env.BACKEND_URL ||
-      process.env.RENDER_EXTERNAL_URL ||
-      null;
+      process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || null;
 
     this.intervalId = null;
     this.requestCount = 0;
@@ -101,7 +98,9 @@ class KeepAliveService {
       this.ping();
     }, intervalMs);
 
-    console.log(`[KeepAlive] ✓ Service started (pinging every ${this.intervalMinutes}m)`);
+    console.log(
+      `[KeepAlive] ✓ Service started (pinging every ${this.intervalMinutes}m)`,
+    );
   }
 
   /**
@@ -120,7 +119,8 @@ class KeepAliveService {
    */
   async ping() {
     if (!this.backendUrl) {
-      const error = "BACKEND_URL is not configured: set BACKEND_URL (or run on a platform that provides RENDER_EXTERNAL_URL) before using keep-alive";
+      const error =
+        "BACKEND_URL is not configured: set BACKEND_URL (or run on a platform that provides RENDER_EXTERNAL_URL) before using keep-alive";
       console.error(`[KeepAlive] \u2717 ${error}`);
       return { success: false, duration: 0, error, timestamp: new Date() };
     }

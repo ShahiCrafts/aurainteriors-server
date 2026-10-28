@@ -4,7 +4,13 @@
 // reached .split()/parseFloat() raw and produced 500s / NaN filters.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("../audit/helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("../audit/helpers");
 const params = require("../../utils/params");
 
 test("CQ-A: params helpers force scalars and reject containers", () => {
@@ -22,7 +28,10 @@ test("CQ-A: params helpers force scalars and reject containers", () => {
   assert.equal(params.asBoolean({}), undefined);
   assert.equal(params.asEnum("active", ["active", "draft"]), "active");
   assert.equal(params.asEnum({ $ne: null }, ["active"]), undefined);
-  assert.equal(params.asObjectId("507f1f77bcf86cd799439011"), "507f1f77bcf86cd799439011");
+  assert.equal(
+    params.asObjectId("507f1f77bcf86cd799439011"),
+    "507f1f77bcf86cd799439011",
+  );
   assert.equal(params.asObjectId({ $ne: null }), undefined);
   assert.equal(params.asObjectId("not-an-id"), undefined);
   assert.deepEqual(params.asStringList("a, b ,c"), ["a", "b", "c"]);
@@ -32,13 +41,19 @@ test("CQ-A: params helpers force scalars and reject containers", () => {
 
 let capturedFilter;
 stubModule("models/product.model.js", {
-  find: (filter) => { capturedFilter = filter; return makeQuery([]); },
+  find: (filter) => {
+    capturedFilter = filter;
+    return makeQuery([]);
+  },
   countDocuments: async () => 0,
 });
 stubModule("models/category.model.js", {
   find: () => ({ select: () => Promise.resolve([]) }),
 });
-stubModule("middleware/upload.middleware.js", { deleteFile: async () => {}, deleteFiles: async () => {} });
+stubModule("middleware/upload.middleware.js", {
+  deleteFile: async () => {},
+  deleteFiles: async () => {},
+});
 const productController = require("../../controllers/product.controller");
 
 const list = async (query, user) => {
@@ -47,7 +62,11 @@ const list = async (query, user) => {
   const next = mockNext();
   await productController.getAllProducts({ query, user }, res, next);
   await until(() => res.body !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `handler must not error for ${JSON.stringify(query)?.slice(0, 60)}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `handler must not error for ${JSON.stringify(query)?.slice(0, 60)}`,
+  );
   assert.equal(res.statusCode, 200);
   return capturedFilter;
 };
@@ -55,10 +74,18 @@ const list = async (query, user) => {
 test("CQ-A: container payloads cannot crash or steer the product filter", async () => {
   const admin = { role: "admin" };
   let filter = await list({ style: { $ne: "Modern" } }, admin);
-  assert.equal(filter.style, undefined, "object style must be treated as absent");
+  assert.equal(
+    filter.style,
+    undefined,
+    "object style must be treated as absent",
+  );
 
   filter = await list({ status: ["active", "draft"] }, admin);
-  assert.deepEqual(filter.status, { $in: ["active", "out_of_stock"] }, "array status falls back to the default set");
+  assert.deepEqual(
+    filter.status,
+    { $in: ["active", "out_of_stock"] },
+    "array status falls back to the default set",
+  );
 
   filter = await list({ category: { $ne: null } }, admin);
   assert.equal(filter.category, undefined);
@@ -67,12 +94,23 @@ test("CQ-A: container payloads cannot crash or steer the product filter", async 
   assert.equal(filter.$text, undefined, "object search must not reach $text");
 
   filter = await list({ minPrice: { $gte: "0" }, maxPrice: ["999"] }, admin);
-  assert.equal(filter.price, undefined, "container prices must not produce NaN operators");
+  assert.equal(
+    filter.price,
+    undefined,
+    "container prices must not produce NaN operators",
+  );
 });
 
 test("CQ-A: ordinary string parameters behave exactly as before (characterization)", async () => {
   const filter = await list(
-    { style: "Modern, Classic", minPrice: "100", maxPrice: "500", search: "sofa", featured: "true", status: "draft" },
+    {
+      style: "Modern, Classic",
+      minPrice: "100",
+      maxPrice: "500",
+      search: "sofa",
+      featured: "true",
+      status: "draft",
+    },
     { role: "admin" },
   );
   assert.deepEqual(filter.style, { $in: ["Modern", "Classic"] });
@@ -91,6 +129,13 @@ test("CQ-A: ordinary string parameters behave exactly as before (characterizatio
   assert.equal(filter.isFeatured, true);
   assert.deepEqual(filter.status, { $in: ["draft"] });
 
-  const customerFilter = await list({ status: "draft,active" }, { role: "customer" });
-  assert.deepEqual(customerFilter.status, { $in: ["active"] }, "customers still see only visible statuses");
+  const customerFilter = await list(
+    { status: "draft,active" },
+    { role: "customer" },
+  );
+  assert.deepEqual(
+    customerFilter.status,
+    { $in: ["active"] },
+    "customers still see only visible statuses",
+  );
 });

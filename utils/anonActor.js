@@ -18,7 +18,10 @@ const COOKIE = "aura_anon";
 // never touches the secret, so test harnesses and library-style imports
 // keep working.
 const sign = (id) =>
-  crypto.createHmac("sha256", appConfig.requireAtUse("JWT_SECRET")).update(`anon:${id}`).digest("base64url");
+  crypto
+    .createHmac("sha256", appConfig.requireAtUse("JWT_SECRET"))
+    .update(`anon:${id}`)
+    .digest("base64url");
 
 function actorFor(req, res) {
   if (req.user?._id) return `user:${req.user._id}`;
@@ -26,7 +29,12 @@ function actorFor(req, res) {
   if (typeof raw === "string") {
     const [id, sig] = raw.split(".");
     const expected = id ? sign(id) : "";
-    if (/^[a-f0-9]{32}$/.test(id || "") && sig && sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    if (
+      /^[a-f0-9]{32}$/.test(id || "") &&
+      sig &&
+      sig.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+    ) {
       return `anon:${id}`;
     }
   }
@@ -35,7 +43,8 @@ function actorFor(req, res) {
     res.cookie(COOKIE, `${id}.${sign(id)}`, {
       httpOnly: true,
       sameSite: "lax",
-      secure: (process.env.NODE_ENV || "").trim().toLowerCase() === "production",
+      secure:
+        (process.env.NODE_ENV || "").trim().toLowerCase() === "production",
       maxAge: 365 * 24 * 60 * 60 * 1000,
       path: "/",
     });

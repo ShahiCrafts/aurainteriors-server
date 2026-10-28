@@ -52,8 +52,16 @@ test("AR-33: createApp() assembles without starting timers/listeners", () => {
   const before = workHandles();
   const app = createApp();
   assertNoNewHandles(before, workHandles(), "createApp()");
-  assert.equal(typeof app.handle, "function", "createApp() must return an express app");
-  assert.equal(typeof app.listen, "function", "createApp() must return an express app");
+  assert.equal(
+    typeof app.handle,
+    "function",
+    "createApp() must return an express app",
+  );
+  assert.equal(
+    typeof app.listen,
+    "function",
+    "createApp() must return an express app",
+  );
 });
 
 test("AR-33: createApp() wires the platform routes", () => {
@@ -63,9 +71,15 @@ test("AR-33: createApp() wires the platform routes", () => {
   // Express 5 keeps the stack on app.router (lazy); poke a request
   // through the router to force its construction, then read it.
   app.router.stack.forEach((layer) => {
-    if (layer.route) routes.push(`${Object.keys(layer.route.methods).join(",")}:${layer.route.path}`);
+    if (layer.route)
+      routes.push(
+        `${Object.keys(layer.route.methods).join(",")}:${layer.route.path}`,
+      );
   });
   for (const p of ["/", "/health", "/health/ready"]) {
-    assert.ok(routes.includes(`get:${p}`), `expected route GET ${p}; got ${JSON.stringify(routes)}`);
+    assert.ok(
+      routes.includes(`get:${p}`),
+      `expected route GET ${p}; got ${JSON.stringify(routes)}`,
+    );
   }
 });

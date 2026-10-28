@@ -9,8 +9,13 @@ exports.getUserNotifications = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, isRead, category } = req.query;
     const userId = req.user._id;
-    if (isRead !== undefined && !["true", "false"].includes(isRead)) throw new AppError("Invalid read filter", 400);
-    if (category !== undefined && !["order", "promotion", "design", "system"].includes(category)) throw new AppError("Invalid category filter", 400);
+    if (isRead !== undefined && !["true", "false"].includes(isRead))
+      throw new AppError("Invalid read filter", 400);
+    if (
+      category !== undefined &&
+      !["order", "promotion", "design", "system"].includes(category)
+    )
+      throw new AppError("Invalid category filter", 400);
 
     console.log(`Getting notifications for user: ${userId}`);
 
@@ -18,7 +23,10 @@ exports.getUserNotifications = async (req, res, next) => {
       userId,
       page,
       limit,
-      { isRead: isRead === undefined ? undefined : isRead === "true", category }
+      {
+        isRead: isRead === undefined ? undefined : isRead === "true",
+        category,
+      },
     );
 
     console.log(`Found ${result.total} notifications`);
@@ -101,13 +109,15 @@ exports.markMultipleAsRead = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const { notificationIds } = req.body;
-    const result = await Notification.updateMany({ recipient: userId, _id: { $in: notificationIds }, isRead: false },
-      { $set: { isRead: true } });
+    const result = await Notification.updateMany(
+      { recipient: userId, _id: { $in: notificationIds }, isRead: false },
+      { $set: { isRead: true } },
+    );
 
     res.status(200).json({
       status: "success",
       message: "Selected notifications marked as read",
-      modifiedCount: result.modifiedCount
+      modifiedCount: result.modifiedCount,
     });
   } catch (error) {
     next(error);
@@ -128,7 +138,7 @@ exports.registerPushToken = async (req, res, next) => {
       token,
       deviceId,
       deviceName: deviceName || "Unknown Device",
-      platform
+      platform,
     });
 
     res.status(201).json({
@@ -190,10 +200,14 @@ exports.updatePreferences = async (req, res, next) => {
     const userId = req.user._id;
     // AR-31(f): shared with profile.controller via utils/preferenceUpdates.
     const preferenceUpdates = buildPreferenceUpdates(req.body);
-    const user = await User.findByIdAndUpdate(userId, { $set: preferenceUpdates }, {
-      new: true,
-      runValidators: true,
-    }).select("preferences");
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: preferenceUpdates },
+      {
+        new: true,
+        runValidators: true,
+      },
+    ).select("preferences");
 
     res.status(200).json({
       status: "success",
@@ -208,12 +222,16 @@ exports.archiveNotification = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const result = await Notification.deleteOne({ _id: id, recipient: req.user._id });
-    if (!result.deletedCount) return next(new AppError("Notification not found", 404));
+    const result = await Notification.deleteOne({
+      _id: id,
+      recipient: req.user._id,
+    });
+    if (!result.deletedCount)
+      return next(new AppError("Notification not found", 404));
 
     res.status(200).json({
       status: "success",
-      message: "Notification deleted"
+      message: "Notification deleted",
     });
   } catch (error) {
     next(error);
@@ -223,16 +241,26 @@ exports.archiveNotification = async (req, res, next) => {
 exports.archiveMultiple = async (req, res, next) => {
   try {
     const { notificationIds } = req.body;
-    if (!Array.isArray(notificationIds) || notificationIds.length > 100 ||
-        notificationIds.some((id) => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))) {
-      return next(new AppError("Provide up to 100 valid notification IDs", 400));
+    if (
+      !Array.isArray(notificationIds) ||
+      notificationIds.length > 100 ||
+      notificationIds.some(
+        (id) => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id),
+      )
+    ) {
+      return next(
+        new AppError("Provide up to 100 valid notification IDs", 400),
+      );
     }
-    const result = await Notification.deleteMany({ _id: { $in: notificationIds }, recipient: req.user._id });
+    const result = await Notification.deleteMany({
+      _id: { $in: notificationIds },
+      recipient: req.user._id,
+    });
 
     res.status(200).json({
       status: "success",
       message: "Notifications deleted",
-      deletedCount: result.deletedCount
+      deletedCount: result.deletedCount,
     });
   } catch (error) {
     next(error);

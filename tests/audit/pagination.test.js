@@ -5,13 +5,21 @@
 // boundedPage/boundedLimit are the correct pattern.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("./helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("./helpers");
 
 // ---- order controller stubs (module load pulls many services) ----
 let orderRecord;
 stubModule("models/address.model.js", { findOne: () => makeQuery(null) });
 stubModule("models/cart.model.js", { findOne: () => makeQuery(null) });
-stubModule("models/product.model.js", { bulkWrite: async () => ({ modifiedCount: 0 }) });
+stubModule("models/product.model.js", {
+  bulkWrite: async () => ({ modifiedCount: 0 }),
+});
 stubModule("models/discount.model.js", { findOne: () => makeQuery(null) });
 stubModule("models/order.model.js", {
   findOne: () => makeQuery(null),
@@ -20,33 +28,68 @@ stubModule("models/order.model.js", {
   aggregate: async () => [],
   create: async () => [],
 });
-stubModule("services/checkoutItems.service.js", { prepareOrderItems: async () => [] });
-stubModule("services/discountUsage.service.js", { consumeDiscountUsage: async () => {} });
-stubModule("services/orderTransition.service.js", { transitionOrder: async () => {} });
-stubModule("services/email.service.js", { sendOrderConfirmationEmail: async () => true });
-stubModule("services/esewaCapture.service.js", { captureEsewaPayment: async () => {} });
+stubModule("services/checkoutItems.service.js", {
+  prepareOrderItems: async () => [],
+});
+stubModule("services/discountUsage.service.js", {
+  consumeDiscountUsage: async () => {},
+});
+stubModule("services/orderTransition.service.js", {
+  transitionOrder: async () => {},
+});
+stubModule("services/email.service.js", {
+  sendOrderConfirmationEmail: async () => true,
+});
+stubModule("services/esewaCapture.service.js", {
+  captureEsewaPayment: async () => {},
+});
 stubModule("services/esewaVerification.service.js", {
-  getEsewaConfig: () => ({ secretKey: "test-only", merchantId: "TEST", paymentUrl: "https://example.invalid/pay" }),
-  verifyEsewaSignature: () => true, verifyEsewaPayment: async () => ({}), verifyEsewaRefund: async () => ({}),
+  getEsewaConfig: () => ({
+    secretKey: "test-only",
+    merchantId: "TEST",
+    paymentUrl: "https://example.invalid/pay",
+  }),
+  verifyEsewaSignature: () => true,
+  verifyEsewaPayment: async () => ({}),
+  verifyEsewaRefund: async () => ({}),
 });
 stubModule("services/notificationEventEmitter.js", { emit: () => {} });
 stubModule("mongoose", {
-  startSession: async () => ({ startTransaction() {}, abortTransaction: async () => {}, commitTransaction: async () => {}, inTransaction: () => false, endSession: async () => {} }),
+  startSession: async () => ({
+    startTransaction() {},
+    abortTransaction: async () => {},
+    commitTransaction: async () => {},
+    inTransaction: () => false,
+    endSession: async () => {},
+  }),
 });
 const orderController = require("../../controllers/order.controller");
 
 async function myOrders(query) {
   orderRecord = {};
-  const res = mockRes(); const next = mockNext();
-  orderController.getMyOrders({ user: { _id: "111111111111111111111111" }, query }, res, next);
+  const res = mockRes();
+  const next = mockNext();
+  orderController.getMyOrders(
+    { user: { _id: "111111111111111111111111" }, query },
+    res,
+    next,
+  );
   await until(() => res.statusCode !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `unexpected error: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `unexpected error: ${next.error && next.error.message}`,
+  );
   return res;
 }
 
 test("B-25: getMyOrders limit=0 must not mean unlimited", async () => {
   const res = await myOrders({ limit: "0" });
-  assert.equal(orderRecord.limit, 10, "limit=0 should fall back to the default 10");
+  assert.equal(
+    orderRecord.limit,
+    10,
+    "limit=0 should fall back to the default 10",
+  );
   assert.equal(res.body.data.pagination.pages, 1);
 });
 
@@ -77,21 +120,34 @@ stubModule("models/document.model.js", {
   find: () => makeQuery([], docRecord),
   countDocuments: async () => 3,
 });
-stubModule("services/backgroundTasks.js", { runDocumentIngestion: () => {}, startBackgroundTasks: () => {}, stopBackgroundTasks: () => {} });
+stubModule("services/backgroundTasks.js", {
+  runDocumentIngestion: () => {},
+  startBackgroundTasks: () => {},
+  stopBackgroundTasks: () => {},
+});
 stubModule("middleware/upload.middleware.js", { deleteFile: async () => {} });
 const documentController = require("../../controllers/document.controller");
 
 async function listDocs(query) {
   docRecord = {};
-  const res = mockRes(); const next = mockNext();
+  const res = mockRes();
+  const next = mockNext();
   await documentController.listDocuments({ query }, res, next);
-  assert.equal(next.error, undefined, `unexpected error: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `unexpected error: ${next.error && next.error.message}`,
+  );
   return res;
 }
 
 test("B-25: listDocuments limit=0 must not mean unlimited", async () => {
   const res = await listDocs({ limit: "0" });
-  assert.equal(docRecord.limit, 20, "limit=0 should fall back to the default 20");
+  assert.equal(
+    docRecord.limit,
+    20,
+    "limit=0 should fall back to the default 20",
+  );
   assert.ok(Number.isFinite(res.body.data.pagination.totalPages));
 });
 
@@ -114,10 +170,15 @@ const userController = require("../../controllers/user.controller");
 
 async function allUsers(query) {
   userRecord = {};
-  const res = mockRes(); const next = mockNext();
+  const res = mockRes();
+  const next = mockNext();
   userController.getAllUsers({ query }, res, next);
   await until(() => res.statusCode !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `unexpected error: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `unexpected error: ${next.error && next.error.message}`,
+  );
   return res;
 }
 
@@ -139,10 +200,15 @@ const discountController = require("../../controllers/discount.controller");
 
 async function allDiscounts(query) {
   discountRecord = {};
-  const res = mockRes(); const next = mockNext();
+  const res = mockRes();
+  const next = mockNext();
   discountController.getAllDiscounts({ query }, res, next);
   await until(() => res.statusCode !== undefined || next.error !== undefined);
-  assert.equal(next.error, undefined, `unexpected error: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `unexpected error: ${next.error && next.error.message}`,
+  );
   return res;
 }
 

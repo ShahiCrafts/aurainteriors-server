@@ -35,7 +35,10 @@ const auth = require(path.join(repo, "controllers/auth.controller.js"));
 // only come from a request handler.
 let hashSyncCalls = 0;
 const realHashSync = bcrypt.hashSync;
-bcrypt.hashSync = (...args) => { hashSyncCalls += 1; return realHashSync(...args); };
+bcrypt.hashSync = (...args) => {
+  hashSyncCalls += 1;
+  return realHashSync(...args);
+};
 const compareCalls = [];
 const realCompare = bcrypt.compare;
 bcrypt.compare = async (candidate, hash) => {
@@ -45,9 +48,16 @@ bcrypt.compare = async (candidate, hash) => {
 
 const runAdminLogin = async (email, password) => {
   const res = {
-    code: null, body: null,
-    status(c) { this.code = c; return this; },
-    json(b) { this.body = b; return this; },
+    code: null,
+    body: null,
+    status(c) {
+      this.code = c;
+      return this;
+    },
+    json(b) {
+      this.body = b;
+      return this;
+    },
   };
   await auth.adminLogin({ body: { email, password }, headers: {} }, res);
   return res;
@@ -58,11 +68,23 @@ test("AR-34 (a): unknown-email admin login never calls hashSync on the request p
   hashSyncCalls = 0;
   compareCalls.length = 0;
   const res = await runAdminLogin("nobody@example.com", "some-password-123");
-  assert.equal(res.code, 401, `unknown admin email must 401; got ${res.code} ${JSON.stringify(res.body)}`);
-  assert.equal(hashSyncCalls, 0, "bcrypt.hashSync must not run on the request path (it blocks the event loop for ~430 ms)");
+  assert.equal(
+    res.code,
+    401,
+    `unknown admin email must 401; got ${res.code} ${JSON.stringify(res.body)}`,
+  );
+  assert.equal(
+    hashSyncCalls,
+    0,
+    "bcrypt.hashSync must not run on the request path (it blocks the event loop for ~430 ms)",
+  );
   assert.equal(compareCalls.length, 1, "exactly one (dummy) compare must run");
   const dummy = await auth._getDummyPasswordHash();
-  assert.equal(compareCalls[0].hash, dummy, "the compare must use the precomputed dummy hash");
+  assert.equal(
+    compareCalls[0].hash,
+    dummy,
+    "the compare must use the precomputed dummy hash",
+  );
 });
 
 test("AR-34 (b): timing equalization is preserved - the dummy compare still runs for unknown and non-admin users", async () => {
@@ -70,22 +92,45 @@ test("AR-34 (b): timing equalization is preserved - the dummy compare still runs
   nextUser = null;
   compareCalls.length = 0;
   await runAdminLogin("ghost@example.com", "whatever-123");
-  assert.equal(compareCalls.length, 1, "unknown user must still burn one bcrypt compare");
+  assert.equal(
+    compareCalls.length,
+    1,
+    "unknown user must still burn one bcrypt compare",
+  );
 
   // Known user who is not an admin (has a real password hash): the
   // controller must still take the dummy branch, never the real hash.
-  nextUser = { role: "customer", isActive: true, password: await bcrypt.hash("real-password-123", 4) };
+  nextUser = {
+    role: "customer",
+    isActive: true,
+    password: await bcrypt.hash("real-password-123", 4),
+  };
   compareCalls.length = 0;
   const res = await runAdminLogin("customer@example.com", "real-password-123");
-  assert.equal(res.code, 401, "non-admin must 401 even with the correct password");
+  assert.equal(
+    res.code,
+    401,
+    "non-admin must 401 even with the correct password",
+  );
   assert.equal(compareCalls.length, 1, "non-admin must still burn one compare");
   const dummy = await auth._getDummyPasswordHash();
-  assert.equal(compareCalls[0].hash, dummy, "non-admin compare must use the dummy, not the user's real hash");
+  assert.equal(
+    compareCalls[0].hash,
+    dummy,
+    "non-admin compare must use the dummy, not the user's real hash",
+  );
 });
 
 test("AR-34: the precomputed dummy is a cost-12 bcrypt hash (cost parameters unchanged)", async () => {
   const dummy = await auth._getDummyPasswordHash();
-  assert.match(dummy, /^\$2[aby]\$12\$/, `dummy must be a bcrypt hash at cost 12; got: ${dummy.slice(0, 7)}...`);
-  assert.equal(await bcrypt.compare("timing-equalization-dummy", dummy), true,
-    "dummy must be a hash of the same dummy plaintext as before");
+  assert.match(
+    dummy,
+    /^\$2[aby]\$12\$/,
+    `dummy must be a bcrypt hash at cost 12; got: ${dummy.slice(0, 7)}...`,
+  );
+  assert.equal(
+    await bcrypt.compare("timing-equalization-dummy", dummy),
+    true,
+    "dummy must be a hash of the same dummy plaintext as before",
+  );
 });

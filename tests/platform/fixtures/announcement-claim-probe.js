@@ -16,11 +16,15 @@ const fs = require("node:fs");
 const REPO = path.resolve(__dirname, "../../..");
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "announce-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri("aura_announce_claim_test");
 
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
@@ -29,7 +33,9 @@ async function main() {
   const service = require(path.join(REPO, "services/announcementService"));
 
   let notifyCount = 0;
-  service.notifyUsersAboutAnnouncement = async () => { notifyCount += 1; };
+  service.notifyUsersAboutAnnouncement = async () => {
+    notifyCount += 1;
+  };
 
   const ann = await Announcement.create({
     title: "Claim test",
@@ -44,7 +50,9 @@ async function main() {
   const realFind = Announcement.find.bind(Announcement);
   let arrived = 0;
   let release;
-  const gate = new Promise((r) => { release = r; });
+  const gate = new Promise((r) => {
+    release = r;
+  });
   Announcement.find = function (...args) {
     arrived += 1;
     if (arrived === 2) release();
@@ -65,13 +73,16 @@ async function main() {
   const realSave = proto.save;
   let saveArrived = 0;
   let releaseSave;
-  const saveGate = new Promise((r) => { releaseSave = r; });
+  const saveGate = new Promise((r) => {
+    releaseSave = r;
+  });
   proto.save = function (...args) {
     saveArrived += 1;
     if (saveArrived === 2) releaseSave();
-    const wait = saveArrived <= 2
-      ? Promise.race([saveGate, new Promise((r) => setTimeout(r, 750))])
-      : Promise.resolve();
+    const wait =
+      saveArrived <= 2
+        ? Promise.race([saveGate, new Promise((r) => setTimeout(r, 750))])
+        : Promise.resolve();
     return wait.then(() => realSave.apply(this, args));
   };
 
@@ -84,7 +95,9 @@ async function main() {
 
   const after = await Announcement.findById(ann._id).lean();
   const processedTotal = (r1?.processed || 0) + (r2?.processed || 0);
-  console.log(`RESULT status=${after.status} notifyCount=${notifyCount} processedTotal=${processedTotal}`);
+  console.log(
+    `RESULT status=${after.status} notifyCount=${notifyCount} processedTotal=${processedTotal}`,
+  );
 
   await mongoose.disconnect();
   await mongod.stop({ doCleanup: true, force: true });
@@ -92,5 +105,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

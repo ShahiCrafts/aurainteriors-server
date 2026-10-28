@@ -52,7 +52,10 @@ async function migrateCategoryAncestors({ dryRun = false } = {}) {
   const all = await Category.find({}, "_id slug parent ancestors depth").lean();
   const parentOf = new Map();
   for (const category of all) {
-    parentOf.set(String(category._id), category.parent ? String(category.parent) : null);
+    parentOf.set(
+      String(category._id),
+      category.parent ? String(category.parent) : null,
+    );
   }
   const entries = [];
   const ops = [];
@@ -83,7 +86,10 @@ async function migrateCategoryAncestors({ dryRun = false } = {}) {
       ancestorCount: expected.length,
       changed: isChanged,
       ...(isChanged
-        ? { before: { ancestors: stored, depth: category.depth || 0 }, after: { ancestors: expected, depth: expected.length } }
+        ? {
+            before: { ancestors: stored, depth: category.depth || 0 },
+            after: { ancestors: expected, depth: expected.length },
+          }
         : {}),
     });
   }
@@ -122,12 +128,15 @@ async function migrateProductTypeKeys({ dryRun = false } = {}) {
   const classify = (entry) => {
     if (known.has(entry)) return { verdict: "ok" };
     const candidates = byLowercase.get(String(entry).toLowerCase()) || [];
-    if (candidates.length === 1) return { verdict: "remap-candidate", candidate: candidates[0] };
+    if (candidates.length === 1)
+      return { verdict: "remap-candidate", candidate: candidates[0] };
     if (candidates.length === 0) return { verdict: "dangling" };
     return { verdict: "ambiguous", candidates };
   };
 
-  const types = await ProductType.find({}).select("key attributeKeys attributeAssignments").lean();
+  const types = await ProductType.find({})
+    .select("key attributeKeys attributeAssignments")
+    .lean();
   const entries = [];
   let changed = 0;
   let flagged = 0;
@@ -137,30 +146,56 @@ async function migrateProductTypeKeys({ dryRun = false } = {}) {
     const repairedKeys = (type.attributeKeys || []).map((entry) => {
       const result = classify(entry);
       if (result.verdict === "remap-candidate") {
-        changes.push({ field: "attributeKeys", from: entry, to: result.candidate });
+        changes.push({
+          field: "attributeKeys",
+          from: entry,
+          to: result.candidate,
+        });
         return result.candidate;
       }
       if (result.verdict === "dangling") {
-        flags.push({ field: "attributeKeys", entry, reason: "no attribute definition matches even case-insensitively — dangling, left as-is" });
+        flags.push({
+          field: "attributeKeys",
+          entry,
+          reason:
+            "no attribute definition matches even case-insensitively — dangling, left as-is",
+        });
       } else if (result.verdict === "ambiguous") {
-        flags.push({ field: "attributeKeys", entry, reason: `matches ${result.candidates.join(", ")} case-insensitively — ambiguous, left as-is` });
+        flags.push({
+          field: "attributeKeys",
+          entry,
+          reason: `matches ${result.candidates.join(", ")} case-insensitively — ambiguous, left as-is`,
+        });
       }
       return entry;
     });
     const assignmentFindings = [];
     for (const assignment of type.attributeAssignments || []) {
       const result = classify(assignment.attributeKey);
-      if (result.verdict !== "ok") assignmentFindings.push({ entry: assignment.attributeKey, ...result });
+      if (result.verdict !== "ok")
+        assignmentFindings.push({ entry: assignment.attributeKey, ...result });
     }
     if (changes.length > 0) {
       changed += 1;
       if (!dryRun) {
-        await ProductType.updateOne({ _id: type._id }, { $set: { attributeKeys: repairedKeys } });
+        await ProductType.updateOne(
+          { _id: type._id },
+          { $set: { attributeKeys: repairedKeys } },
+        );
       }
     }
     if (flags.length > 0 || assignmentFindings.length > 0) flagged += 1;
-    if (changes.length > 0 || flags.length > 0 || assignmentFindings.length > 0) {
-      entries.push({ key: type.key, changes, flagged: flags, assignmentFindings });
+    if (
+      changes.length > 0 ||
+      flags.length > 0 ||
+      assignmentFindings.length > 0
+    ) {
+      entries.push({
+        key: type.key,
+        changes,
+        flagged: flags,
+        assignmentFindings,
+      });
     }
   }
   return {
@@ -184,7 +219,10 @@ async function migrateProductTypeKeys({ dryRun = false } = {}) {
 // NEVER invented). Dry-run classifies with the same guards
 // ensureDefaultVariant enforces, without calling it.
 async function migrateDefaultVariants({ dryRun = false } = {}) {
-  const products = await Product.find({}, "_id sku catalogVariants variantOptionKeys").lean();
+  const products = await Product.find(
+    {},
+    "_id sku catalogVariants variantOptionKeys",
+  ).lean();
   const entries = [];
   let created = 0;
   let skipped = 0;
@@ -192,9 +230,13 @@ async function migrateDefaultVariants({ dryRun = false } = {}) {
     const productId = String(product._id);
     const sku = product.sku || null;
     let skipReason = null;
-    if ((product.catalogVariants || []).length > 0) skipReason = "already has variants";
-    else if ((product.variantOptionKeys || []).length > 0) skipReason = "declares variantOptionKeys — variants need explicit options";
-    else if (!product.sku) skipReason = "no SKU to carry over — a SKU is never invented";
+    if ((product.catalogVariants || []).length > 0)
+      skipReason = "already has variants";
+    else if ((product.variantOptionKeys || []).length > 0)
+      skipReason =
+        "declares variantOptionKeys — variants need explicit options";
+    else if (!product.sku)
+      skipReason = "no SKU to carry over — a SKU is never invented";
     if (skipReason) {
       skipped += 1;
       entries.push({ productId, sku, outcome: "skipped", reason: skipReason });
@@ -209,14 +251,30 @@ async function migrateDefaultVariants({ dryRun = false } = {}) {
       const result = await ensureDefaultVariant(product);
       if (result.created) {
         created += 1;
-        entries.push({ productId, sku, outcome: "created", variantId: String(result.variant._id || result.variant.id || ""), variantSku: result.variant.sku });
+        entries.push({
+          productId,
+          sku,
+          outcome: "created",
+          variantId: String(result.variant._id || result.variant.id || ""),
+          variantSku: result.variant.sku,
+        });
       } else {
         skipped += 1;
-        entries.push({ productId, sku, outcome: "skipped", reason: "already has variants" });
+        entries.push({
+          productId,
+          sku,
+          outcome: "skipped",
+          reason: "already has variants",
+        });
       }
     } catch (error) {
       skipped += 1;
-      entries.push({ productId, sku, outcome: "skipped", reason: `ensureDefaultVariant refused: ${error.message}` });
+      entries.push({
+        productId,
+        sku,
+        outcome: "skipped",
+        reason: `ensureDefaultVariant refused: ${error.message}`,
+      });
     }
   }
   return {
@@ -242,11 +300,17 @@ async function migrateDefaultVariants({ dryRun = false } = {}) {
 const sameSlugSet = (a, b) => {
   const left = [...(a || [])].sort();
   const right = [...(b || [])].sort();
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 };
 
 async function migrateCategoryWiring({ dryRun = false } = {}) {
-  const categories = await Category.find({}, "_id slug productType roomSlugs").lean();
+  const categories = await Category.find(
+    {},
+    "_id slug productType roomSlugs",
+  ).lean();
   const entries = [];
   let changed = 0;
   let flagged = 0;
@@ -266,17 +330,27 @@ async function migrateCategoryWiring({ dryRun = false } = {}) {
     const flags = [];
     if (wiring.type) {
       if ((category.productType || null) !== wiring.type) {
-        changes.push({ field: "productType", from: category.productType || null, to: wiring.type });
+        changes.push({
+          field: "productType",
+          from: category.productType || null,
+          to: wiring.type,
+        });
       }
     } else if (wiring.flag) {
       flags.push(wiring.flag);
     }
     if (wiring.roomsPinned) {
       if (!sameSlugSet(category.roomSlugs, wiring.rooms)) {
-        changes.push({ field: "roomSlugs", from: [...(category.roomSlugs || [])], to: [...wiring.rooms] });
+        changes.push({
+          field: "roomSlugs",
+          from: [...(category.roomSlugs || [])],
+          to: [...wiring.rooms],
+        });
       }
     } else {
-      flags.push("room assignment unpinned in VOCABULARY §3 ('all rooms') — roomSlugs left untouched");
+      flags.push(
+        "room assignment unpinned in VOCABULARY §3 ('all rooms') — roomSlugs left untouched",
+      );
     }
     if (changes.length > 0) {
       changed += 1;
@@ -288,7 +362,8 @@ async function migrateCategoryWiring({ dryRun = false } = {}) {
     }
     if (flags.length > 0) flagged += 1;
     if (changes.length === 0 && flags.length === 0) skipped += 1;
-    if (changes.length > 0 || flags.length > 0) entries.push({ slug: category.slug, changes, flags });
+    if (changes.length > 0 || flags.length > 0)
+      entries.push({ slug: category.slug, changes, flags });
   }
   return {
     name: "category-wiring",

@@ -19,8 +19,12 @@ function makeOrder(i) {
     paymentStatus: "paid",
     total: 1000 + i,
     shippingAddress: {
-      fullName: "Fixture User", phone: "9800000000", addressLine1: "1 Main St",
-      addressLine2: "", city: "Kathmandu", country: "Nepal",
+      fullName: "Fixture User",
+      phone: "9800000000",
+      addressLine1: "1 Main St",
+      addressLine2: "",
+      city: "Kathmandu",
+      country: "Nepal",
     },
     items: [{ name: `Item ${i}`, quantity: 1, price: 1000 + i }],
     createdAt: new Date(Date.UTC(2025, 5, 1) - i * 60000),
@@ -38,25 +42,51 @@ let lastFindOneRecord = null;
 
 function capturingQuery(getRows, record) {
   const q = {
-    sort() { record.sort = true; return q; },
-    limit(n) { record.limit = n; return q; },
-    select() { record.select = true; return q; },
-    lean() { record.lean = true; return q; },
-    populate() { return q; },
-    maxTimeMS(n) { record.maxTimeMS = n; return q; },
+    sort() {
+      record.sort = true;
+      return q;
+    },
+    limit(n) {
+      record.limit = n;
+      return q;
+    },
+    select() {
+      record.select = true;
+      return q;
+    },
+    lean() {
+      record.lean = true;
+      return q;
+    },
+    populate() {
+      return q;
+    },
+    maxTimeMS(n) {
+      record.maxTimeMS = n;
+      return q;
+    },
     then(onFulfilled, onRejected) {
       let rows = getRows();
-      if (Array.isArray(rows) && typeof record.limit === "number") rows = rows.slice(0, record.limit);
+      if (Array.isArray(rows) && typeof record.limit === "number")
+        rows = rows.slice(0, record.limit);
       return Promise.resolve(rows).then(onFulfilled, onRejected);
     },
-    catch(onRejected) { return Promise.resolve(getRows()).catch(onRejected); },
+    catch(onRejected) {
+      return Promise.resolve(getRows()).catch(onRejected);
+    },
   };
   return q;
 }
 
 stubModule("models/order.model", {
-  find: () => { lastFindRecord = {}; return capturingQuery(() => fixture, lastFindRecord); },
-  findOne: () => { lastFindOneRecord = {}; return capturingQuery(() => fixture[0], lastFindOneRecord); },
+  find: () => {
+    lastFindRecord = {};
+    return capturingQuery(() => fixture, lastFindRecord);
+  },
+  findOne: () => {
+    lastFindOneRecord = {};
+    return capturingQuery(() => fixture[0], lastFindOneRecord);
+  },
 });
 stubModule("models/product.model", {});
 stubModule("models/category.model", {});
@@ -92,10 +122,18 @@ test("AR-36: formatted output for a user with <=20 orders is byte-identical to t
       city: o.shippingAddress.city,
       country: o.shippingAddress.country,
     },
-    items: o.items.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
+    items: o.items.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+    })),
     createdAt: o.createdAt,
   }));
-  assert.equal(JSON.stringify(out), JSON.stringify(expected), "byte-identical formatted output for <=20 orders");
+  assert.equal(
+    JSON.stringify(out),
+    JSON.stringify(expected),
+    "byte-identical formatted output for <=20 orders",
+  );
   assert.equal(out.length, 3);
 });
 

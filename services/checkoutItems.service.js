@@ -39,7 +39,8 @@ const prepareOrderItems = async (items, session = null) => {
   // FIX: Batch fetch all products instead of one query per item (N+1 prevention)
   // Extract all product IDs first
   const productIds = items.map((item) => item.productId || item.product);
-  if (productIds.some(id => !id)) throw new AppError("An item is no longer available", 400);
+  if (productIds.some((id) => !id))
+    throw new AppError("An item is no longer available", 400);
 
   // Single batch query for all products
   // AR-47: project only the fields read below — status/deletedAt
@@ -55,13 +56,23 @@ const prepareOrderItems = async (items, session = null) => {
   // effective-stock rule per variant.
   const reservationsOn = stockReservation.isEnabled();
   const products = await Product.find({
-    _id: { $in: productIds }, deletedAt: null, status: "active",
-  }).select(reservationsOn ? "_id name price stock images reservedStock catalogVariants" : "_id name price stock images catalogVariants").session(session);
+    _id: { $in: productIds },
+    deletedAt: null,
+    status: "active",
+  })
+    .select(
+      reservationsOn
+        ? "_id name price stock images reservedStock catalogVariants"
+        : "_id name price stock images catalogVariants",
+    )
+    .session(session);
 
   // Create a map for O(1) lookup
   const productMap = new Map(products.map((p) => [p._id.toString(), p]));
   const effectiveStock = (product) =>
-    reservationsOn ? product.stock - (product.reservedStock || 0) : product.stock;
+    reservationsOn
+      ? product.stock - (product.reservedStock || 0)
+      : product.stock;
   const effectiveVariantStock = (variant) =>
     (variant.stock || 0) - (reservationsOn ? variant.reservedStock || 0 : 0);
 
@@ -70,7 +81,9 @@ const prepareOrderItems = async (items, session = null) => {
   let definitionsByKey = null;
   const definitions = async () => {
     if (!definitionsByKey) {
-      const { loadActiveDefinitions } = require("./attributeResolution.service");
+      const {
+        loadActiveDefinitions,
+      } = require("./attributeResolution.service");
       definitionsByKey = await loadActiveDefinitions();
     }
     return definitionsByKey;
@@ -90,28 +103,55 @@ const prepareOrderItems = async (items, session = null) => {
     // product resolves ONLY to the default variant (the empty
     // combination) — the legacy-cart rule — and is otherwise a
     // per-line rejection, never a silent parent-product sale.
-    const variants = Array.isArray(product.catalogVariants) ? product.catalogVariants : [];
+    const variants = Array.isArray(product.catalogVariants)
+      ? product.catalogVariants
+      : [];
     let variant = null;
     if (item.variantId) {
-      variant = variants.find((v) => String(v._id) === String(item.variantId)) || null;
+      variant =
+        variants.find((v) => String(v._id) === String(item.variantId)) || null;
       if (!variant) {
-        throw new AppError(`Variant not found for ${product.name}`, 400, "VARIANT_NOT_FOUND");
+        throw new AppError(
+          `Variant not found for ${product.name}`,
+          400,
+          "VARIANT_NOT_FOUND",
+        );
       }
-      if (item.sku && String(item.sku).toUpperCase() !== String(variant.sku || "").toUpperCase()) {
-        throw new AppError(`Variant SKU mismatch for ${product.name}`, 400, "SKU_MISMATCH");
+      if (
+        item.sku &&
+        String(item.sku).toUpperCase() !==
+          String(variant.sku || "").toUpperCase()
+      ) {
+        throw new AppError(
+          `Variant SKU mismatch for ${product.name}`,
+          400,
+          "SKU_MISMATCH",
+        );
       }
     } else if (variants.length > 0) {
       variant = variants.find((v) => (v.combinationKey || "") === "") || null;
       if (!variant) {
-        throw new AppError(`${product.name} requires a variant selection`, 400, "VARIANT_REQUIRED");
+        throw new AppError(
+          `${product.name} requires a variant selection`,
+          400,
+          "VARIANT_REQUIRED",
+        );
       }
     }
     if (variant) {
       if (variant.enabled === false) {
-        throw new AppError(`The selected variant of ${product.name} is unavailable`, 409, "VARIANT_UNAVAILABLE");
+        throw new AppError(
+          `The selected variant of ${product.name} is unavailable`,
+          409,
+          "VARIANT_UNAVAILABLE",
+        );
       }
       if (effectiveVariantStock(variant) < item.quantity) {
-        throw new AppError(`Insufficient stock for ${product.name}`, 400, "VARIANT_OUT_OF_STOCK");
+        throw new AppError(
+          `Insufficient stock for ${product.name}`,
+          400,
+          "VARIANT_OUT_OF_STOCK",
+        );
       }
     } else if (effectiveStock(product) < item.quantity) {
       throw new AppError(`Insufficient stock for ${product.name}`, 400);
@@ -133,11 +173,13 @@ const prepareOrderItems = async (items, session = null) => {
       variantSnapshot = {
         variantId: variant._id,
         sku: variant.sku,
-        variantOptions: Object.entries(variantOptionsObject(variant)).map(([key, value]) => ({
-          key,
-          label: (defs.get(key) && defs.get(key).label) || key,
-          value: String(value),
-        })),
+        variantOptions: Object.entries(variantOptionsObject(variant)).map(
+          ([key, value]) => ({
+            key,
+            label: (defs.get(key) && defs.get(key).label) || key,
+            value: String(value),
+          }),
+        ),
       };
     }
 
@@ -150,7 +192,7 @@ const prepareOrderItems = async (items, session = null) => {
       // The free-form triple belongs to legacy lines only: for a
       // variant line the combination lives in variantOptions, and
       // duplicating it into the triple would fork the identity.
-      variant: variant ? {} : (item.variant || {}),
+      variant: variant ? {} : item.variant || {},
       image: (variant && variant.images && variant.images[0]) || primaryImage,
       ...variantSnapshot,
     });
@@ -160,11 +202,14 @@ const prepareOrderItems = async (items, session = null) => {
   const quantities = new Map();
   for (let i = 0; i < orderItems.length; i++) {
     const item = orderItems[i];
-    if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) throw new AppError("Invalid item quantity", 400);
+    if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0)
+      throw new AppError("Invalid item quantity", 400);
     // Variant lines combine per VARIANT (two lines of one product
     // may buy different variants); legacy lines per product, as
     // before.
-    const key = resolved[i].variant ? `variant:${resolved[i].variant._id}` : `product:${item.product}`;
+    const key = resolved[i].variant
+      ? `variant:${resolved[i].variant._id}`
+      : `product:${item.product}`;
     const entry = quantities.get(key) || { ...resolved[i], quantity: 0 };
     entry.quantity += item.quantity;
     quantities.set(key, entry);
@@ -172,7 +217,11 @@ const prepareOrderItems = async (items, session = null) => {
   for (const entry of quantities.values()) {
     if (entry.variant) {
       if (effectiveVariantStock(entry.variant) < entry.quantity) {
-        throw new AppError("Insufficient combined variant stock", 400, "VARIANT_OUT_OF_STOCK");
+        throw new AppError(
+          "Insufficient combined variant stock",
+          400,
+          "VARIANT_OUT_OF_STOCK",
+        );
       }
     } else if (effectiveStock(entry.product) < entry.quantity) {
       throw new AppError("Insufficient combined product stock", 400);

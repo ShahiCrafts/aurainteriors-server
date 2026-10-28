@@ -12,7 +12,7 @@ const orderAddressSchema = new mongoose.Schema(
     postalCode: { type: String, required: true },
     country: { type: String, default: "Nepal" },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const orderItemSchema = new mongoose.Schema(
@@ -50,7 +50,7 @@ const orderItemSchema = new mongoose.Schema(
     ],
     image: String,
   },
-  { _id: true }
+  { _id: true },
 );
 
 const orderSchema = new mongoose.Schema(
@@ -98,7 +98,11 @@ const orderSchema = new mongoose.Schema(
     inventoryReviewRequired: { type: Boolean, default: false },
     discountUsageConsumed: { type: Boolean, default: false },
     refundRequest: {
-      status: { type: String, enum: ["none", "pending", "completed"], default: "none" },
+      status: {
+        type: String,
+        enum: ["none", "pending", "completed"],
+        default: "none",
+      },
       requestedAt: Date,
       reason: String,
       providerReference: String,
@@ -161,7 +165,7 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });
@@ -184,7 +188,8 @@ const ORDER_SUFFIX_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 orderSchema.statics.generateOrderSuffix = function () {
   let suffix = "";
   for (let i = 0; i < 4; i++) {
-    suffix += ORDER_SUFFIX_ALPHABET[crypto.randomInt(ORDER_SUFFIX_ALPHABET.length)];
+    suffix +=
+      ORDER_SUFFIX_ALPHABET[crypto.randomInt(ORDER_SUFFIX_ALPHABET.length)];
   }
   return suffix;
 };

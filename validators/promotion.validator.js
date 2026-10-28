@@ -64,9 +64,7 @@ exports.updatePromotionSchema = Joi.object({
   targetAudience: targetAudienceSchema.optional(),
   scheduledAt: Joi.date().iso().min("now").allow(null).optional(),
   discount: Joi.string().hex().length(24).allow(null).optional(),
-  actionUrl: joiSafeUrl(Joi, 500)
-    .allow(null)
-    .optional(),
+  actionUrl: joiSafeUrl(Joi, 500).allow(null).optional(),
   imageUrl: joiSafeUrl(Joi, 500).allow(null).optional(),
   priority: Joi.string().valid("low", "normal", "high").optional(),
   tags: Joi.array().items(Joi.string().max(50).trim()).max(10).optional(),

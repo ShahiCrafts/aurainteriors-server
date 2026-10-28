@@ -44,7 +44,7 @@ const roomSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 roomSchema.index({ active: 1, sortOrder: 1 });

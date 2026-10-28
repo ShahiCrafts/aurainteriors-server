@@ -17,16 +17,33 @@ const { policies, runRetention } = require("../services/retention.service");
     const pol = policies();
     const { results } = await runRetention({ dryRun: true });
     const lines = [
-      ["RETENTION_NOTIFICATION_DAYS", "notifications", pol.notifications, results.notifications],
-      ["RETENTION_CHAT_MESSAGE_DAYS", "chatMessages", pol.chatMessages, results.chatMessages],
-      ["RETENTION_BLOG_ENGAGEMENT_DAYS", "blogEngagements", pol.blogEngagements, results.blogEngagements],
+      [
+        "RETENTION_NOTIFICATION_DAYS",
+        "notifications",
+        pol.notifications,
+        results.notifications,
+      ],
+      [
+        "RETENTION_CHAT_MESSAGE_DAYS",
+        "chatMessages",
+        pol.chatMessages,
+        results.chatMessages,
+      ],
+      [
+        "RETENTION_BLOG_ENGAGEMENT_DAYS",
+        "blogEngagements",
+        pol.blogEngagements,
+        results.blogEngagements,
+      ],
       ["RETENTION_CONTACT_DAYS", "contacts", pol.contacts, results.contacts],
     ];
     for (const [envName, key, days, count] of lines) {
       if (days === null) {
         console.log(`${envName} unset - skipped (nothing would be deleted)`);
       } else {
-        console.log(`${key}: ${count} rows older than ${days} days WOULD be deleted`);
+        console.log(
+          `${key}: ${count} rows older than ${days} days WOULD be deleted`,
+        );
       }
     }
   } catch (error) {

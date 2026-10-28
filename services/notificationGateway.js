@@ -26,7 +26,10 @@ function buildSocketOrigins(env = process.env) {
 // keeps receiving non-privileged handling until the next revalidation,
 // at which point the socket is cut exactly as it is today.
 const getSocketRevalidateIntervalMs = (env = process.env) => {
-  const n = require("../config/appConfig").getInt("SOCKET_REVALIDATE_INTERVAL_MS", env);
+  const n = require("../config/appConfig").getInt(
+    "SOCKET_REVALIDATE_INTERVAL_MS",
+    env,
+  );
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
@@ -49,9 +52,14 @@ const getSocketRevalidateIntervalMs = (env = process.env) => {
 //                (JWT + user/guest row) re-check is.
 //   heartbeat   — pure liveness echo, no state at all.
 const PRIVILEGED_SOCKET_EVENTS = Object.freeze(["chat:join", "chat:leave"]);
-const NON_PRIVILEGED_SOCKET_EVENTS = Object.freeze(["chat:typing", "chat:read", "heartbeat"]);
+const NON_PRIVILEGED_SOCKET_EVENTS = Object.freeze([
+  "chat:typing",
+  "chat:read",
+  "heartbeat",
+]);
 const isPrivilegedSocketEvent = (eventName) =>
-  PRIVILEGED_SOCKET_EVENTS.includes(eventName) || !NON_PRIVILEGED_SOCKET_EVENTS.includes(eventName);
+  PRIVILEGED_SOCKET_EVENTS.includes(eventName) ||
+  !NON_PRIVILEGED_SOCKET_EVENTS.includes(eventName);
 
 class NotificationGateway {
   constructor(server) {
@@ -76,27 +84,39 @@ class NotificationGateway {
     // failure degrades to no-adapter with a loud log rather than
     // failing boot.
     this.adapterPromise = null;
-    if ((require("../config/appConfig").getString("SOCKET_ADAPTER") || "").trim().toLowerCase() === "mongo") {
+    if (
+      (require("../config/appConfig").getString("SOCKET_ADAPTER") || "")
+        .trim()
+        .toLowerCase() === "mongo"
+    ) {
       this.adapterPromise = this.attachMongoAdapter();
     }
 
     this.io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth.token || authToken.extract(socket.handshake);
+        const token =
+          socket.handshake.auth.token || authToken.extract(socket.handshake);
         socket.sessionToken = token;
         const guestSessionId = socket.handshake.auth.guestSessionId;
 
         if (token) {
           // Authenticated user
           const decoded = await authToken.verify(token);
-          const user = await User.findOne({ _id: decoded.id, isActive: true, deletedAt: null }).select("_id role").lean();
+          const user = await User.findOne({
+            _id: decoded.id,
+            isActive: true,
+            deletedAt: null,
+          })
+            .select("_id role")
+            .lean();
           if (!user) return next(new Error("Authentication error"));
           socket.userId = String(user._id);
           socket.role = user.role;
           socket.isGuest = false;
         } else if (guestSessionId) {
           // Guest sockets must present a real public GuestSession key.
-          const guestSession = await ChatService.resolveGuestSession(guestSessionId);
+          const guestSession =
+            await ChatService.resolveGuestSession(guestSessionId);
           if (!guestSession) return next(new Error("Authentication error"));
           socket.guestSessionId = guestSession.sessionId;
           socket.guestSessionObjectId = guestSession._id.toString();
@@ -138,7 +158,10 @@ class NotificationGateway {
           await this.refreshIdentity(socket);
           socket.identityRevalidatedAt = Date.now();
           next();
-        } catch (_error) { next(new Error("Authentication error")); socket.disconnect(true); }
+        } catch (_error) {
+          next(new Error("Authentication error"));
+          socket.disconnect(true);
+        }
       });
       // Join user to personal room
       if (socket.userId) {
@@ -155,12 +178,19 @@ class NotificationGateway {
         try {
           // FA-72: same chatId type/format validation the typing/read
           // events enforce - a malformed id never reaches authorization.
-          if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId)) return;
+          if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId))
+            return;
           const authorized = await ChatService.authorizeChat(
-            chatId, socket.userId, socket.role, socket.guestSessionId
+            chatId,
+            socket.userId,
+            socket.role,
+            socket.guestSessionId,
           );
           if (!authorized) {
-            socket.emit("chat:error", { chatId, message: "Not authorized to join this chat" });
+            socket.emit("chat:error", {
+              chatId,
+              message: "Not authorized to join this chat",
+            });
             return;
           }
           const room = `chat:${chatId}`;
@@ -172,37 +202,63 @@ class NotificationGateway {
       });
 
       socket.on("chat:leave", ({ chatId } = {}) => {
-        if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId)) return;
+        if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId))
+          return;
         const room = `chat:${chatId}`;
         socket.leave(room);
         socket.leave(`${room}:admins`);
-        console.log(`Socket ${socket.id} (${socket.isGuest ? 'Guest' : 'User'}: ${socket.userId || socket.guestSessionId}) left room ${room}`);
+        console.log(
+          `Socket ${socket.id} (${socket.isGuest ? "Guest" : "User"}: ${socket.userId || socket.guestSessionId}) left room ${room}`,
+        );
       });
 
       const authorizeEvent = async (chatId) => {
-        if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId)) return false;
-        return ChatService.authorizeChat(chatId, socket.userId, socket.role, socket.guestSessionId);
+        if (typeof chatId !== "string" || !/^[a-f0-9]{24}$/i.test(chatId))
+          return false;
+        return ChatService.authorizeChat(
+          chatId,
+          socket.userId,
+          socket.role,
+          socket.guestSessionId,
+        );
       };
       socket.on("chat:typing", async ({ chatId, isTyping } = {}) => {
         try {
-          if (typeof isTyping !== "boolean" || !await authorizeEvent(chatId)) return;
+          if (typeof isTyping !== "boolean" || !(await authorizeEvent(chatId)))
+            return;
           socket.to(`chat:${chatId}`).emit("chat:typing:status", {
-            chatId, isTyping, userId: socket.userId, userRole: socket.role,
+            chatId,
+            isTyping,
+            userId: socket.userId,
+            userRole: socket.role,
           });
-        } catch (_error) { socket.emit("chat:error", { message: "Unable to update typing status" }); }
+        } catch (_error) {
+          socket.emit("chat:error", {
+            message: "Unable to update typing status",
+          });
+        }
       });
       socket.on("chat:read", async ({ chatId } = {}) => {
         try {
-          if (!await authorizeEvent(chatId)) return;
-          await ChatService.markMessagesAsRead(chatId, socket.userId, socket.role, socket.guestSessionId);
-        } catch (_error) { socket.emit("chat:error", { message: "Unable to update read status" }); }
+          if (!(await authorizeEvent(chatId))) return;
+          await ChatService.markMessagesAsRead(
+            chatId,
+            socket.userId,
+            socket.role,
+            socket.guestSessionId,
+          );
+        } catch (_error) {
+          socket.emit("chat:error", {
+            message: "Unable to update read status",
+          });
+        }
       });
 
       socket.on("heartbeat", () => {
         socket.emit("heartbeat:ack", { timestamp: new Date() });
       });
 
-      socket.on("disconnect", () => { });
+      socket.on("disconnect", () => {});
     });
   }
 
@@ -216,18 +272,29 @@ class NotificationGateway {
     try {
       const mongoose = require("mongoose");
       if (!mongoose.connection || !mongoose.connection.db) {
-        console.error("[Socket] SOCKET_ADAPTER=mongo but no MongoDB handle is available; continuing WITHOUT the adapter (single-instance semantics)");
+        console.error(
+          "[Socket] SOCKET_ADAPTER=mongo but no MongoDB handle is available; continuing WITHOUT the adapter (single-instance semantics)",
+        );
         return false;
       }
       const db = mongoose.connection.db;
       const collectionName = "socketio_adapter";
-      const existing = await db.listCollections({ name: collectionName }).toArray();
+      const existing = await db
+        .listCollections({ name: collectionName })
+        .toArray();
       if (existing.length === 0) {
-        await db.createCollection(collectionName, { capped: true, size: 1000000 });
+        await db.createCollection(collectionName, {
+          capped: true,
+          size: 1000000,
+        });
       } else {
-        const stats = await db.command({ collStats: collectionName }).catch(() => null);
+        const stats = await db
+          .command({ collStats: collectionName })
+          .catch(() => null);
         if (stats && !stats.capped) {
-          console.error(`[Socket] WARNING: collection "${collectionName}" already exists and is NOT capped; the MongoDB adapter's default mode assumes a capped collection - drop or convert it (MIGRATIONS.md M-7). Continuing with the adapter attached.`);
+          console.error(
+            `[Socket] WARNING: collection "${collectionName}" already exists and is NOT capped; the MongoDB adapter's default mode assumes a capped collection - drop or convert it (MIGRATIONS.md M-7). Continuing with the adapter attached.`,
+          );
         }
       }
       const { createAdapter } = require("@socket.io/mongo-adapter");
@@ -235,7 +302,10 @@ class NotificationGateway {
       console.log("Socket.IO MongoDB adapter attached");
       return true;
     } catch (error) {
-      console.error("[Socket] Failed to attach the MongoDB adapter; continuing WITHOUT it (single-instance semantics):", error && error.message ? error.message : error);
+      console.error(
+        "[Socket] Failed to attach the MongoDB adapter; continuing WITHOUT it (single-instance semantics):",
+        error && error.message ? error.message : error,
+      );
       return false;
     }
   }
@@ -250,20 +320,31 @@ class NotificationGateway {
 
   async refreshIdentity(socket) {
     if (socket.isGuest) {
-      if (!await ChatService.resolveGuestSession(socket.guestSessionId)) throw new Error("Expired guest session");
+      if (!(await ChatService.resolveGuestSession(socket.guestSessionId)))
+        throw new Error("Expired guest session");
       return;
     }
     const decoded = await authToken.verify(socket.sessionToken);
-    const user = await User.findOne({ _id: decoded.id, isActive: true, deletedAt: null }).select("_id role").lean();
-    if (!user || String(user._id) !== socket.userId) throw new Error("Inactive account");
+    const user = await User.findOne({
+      _id: decoded.id,
+      isActive: true,
+      deletedAt: null,
+    })
+      .select("_id role")
+      .lean();
+    if (!user || String(user._id) !== socket.userId)
+      throw new Error("Inactive account");
     // A role change invalidates existing room memberships and connection.
     if (user.role !== socket.role) throw new Error("Account role changed");
   }
 
   async cleanupStaleConnections() {
     for (const socket of this.io.sockets.sockets.values()) {
-      try { await this.refreshIdentity(socket); }
-      catch (_error) { socket.disconnect(true); }
+      try {
+        await this.refreshIdentity(socket);
+      } catch (_error) {
+        socket.disconnect(true);
+      }
     }
   }
 

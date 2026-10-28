@@ -2,7 +2,11 @@ const mongoose = require("mongoose");
 
 const documentSchema = new mongoose.Schema(
   {
-    visibility: { type: String, enum: ["private", "public"], default: "private" },
+    visibility: {
+      type: String,
+      enum: ["private", "public"],
+      default: "private",
+    },
     fileName: {
       type: String,
       required: [true, "Document must have a file name"],
@@ -51,7 +55,7 @@ const documentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 documentSchema.index({ status: 1, createdAt: -1 });

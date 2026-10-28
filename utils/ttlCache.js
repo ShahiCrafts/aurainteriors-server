@@ -17,7 +17,10 @@ function getCached(key) {
   if (!ttl) return undefined;
   const entry = store.get(key);
   if (!entry) return undefined;
-  if (Date.now() - entry.at > ttl) { store.delete(key); return undefined; }
+  if (Date.now() - entry.at > ttl) {
+    store.delete(key);
+    return undefined;
+  }
   return JSON.parse(entry.json);
 }
 
@@ -26,6 +29,8 @@ function setCached(key, value) {
   store.set(key, { at: Date.now(), json: JSON.stringify(value) });
 }
 
-function clearCache() { store.clear(); }
+function clearCache() {
+  store.clear();
+}
 
 module.exports = { ttlMs, getCached, setCached, clearCache, _store: store };

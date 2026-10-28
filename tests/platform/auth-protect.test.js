@@ -47,7 +47,7 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
@@ -68,49 +68,128 @@ const field = (l, name) => {
   return m ? m[1] : null;
 };
 
-test("AR-10 (a): revoked token is still rejected by protect (revocation check intact)", { timeout: 190000 }, async () => {
-  const l = await line("revoked");
-  assert.match(l, /Session revoked/, `revoked token must be rejected by the revocation check; got: ${l}`);
-  assert.equal(field(l, "userSet"), "false", "no req.user may be attached for a revoked token");
-});
+test(
+  "AR-10 (a): revoked token is still rejected by protect (revocation check intact)",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("revoked");
+    assert.match(
+      l,
+      /Session revoked/,
+      `revoked token must be rejected by the revocation check; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "userSet"),
+      "false",
+      "no req.user may be attached for a revoked token",
+    );
+  },
+);
 
-test("AR-10 (b): deactivated account is still rejected 401 by protect", { timeout: 190000 }, async () => {
-  const l = await line("deactivated");
-  assert.match(l, /nextErr=401:/, `deactivated account must 401; got: ${l}`);
-  assert.equal(field(l, "userSet"), "false");
-});
+test(
+  "AR-10 (b): deactivated account is still rejected 401 by protect",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("deactivated");
+    assert.match(l, /nextErr=401:/, `deactivated account must 401; got: ${l}`);
+    assert.equal(field(l, "userSet"), "false");
+  },
+);
 
-test("AR-10: token for a deleted user is still rejected 401 by protect", { timeout: 190000 }, async () => {
-  const l = await line("ghost");
-  assert.match(l, /nextErr=401:/, `missing user must 401; got: ${l}`);
-  assert.equal(field(l, "userSet"), "false");
-});
+test(
+  "AR-10: token for a deleted user is still rejected 401 by protect",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("ghost");
+    assert.match(l, /nextErr=401:/, `missing user must 401; got: ${l}`);
+    assert.equal(field(l, "userSet"), "false");
+  },
+);
 
-test("AR-10 (d): valid token loads a lean req.user carrying every consumer field", { timeout: 190000 }, async () => {
-  const l = await line("happy");
-  assert.equal(field(l, "nextErr"), "none", `valid token must pass; got: ${l}`);
-  assert.equal(field(l, "isDoc"), "false", "req.user must be a lean plain object, not a Mongoose document");
-  assert.equal(field(l, "idMatches"), "true", "req.user.id (the virtual consumers read) must equal the user id");
-  assert.equal(field(l, "iatMatches"), "true", "req.user.iat must carry the token's iat (profile deleteAccount reads it)");
-  assert.equal(field(l, "phone"), "9800000000", "order checkout reads req.user.phone");
-  assert.equal(field(l, "role"), "customer");
-  const keys = (field(l, "keys") || "").split(",");
-  for (const needed of ["_id", "id", "email", "firstName", "lastName", "role", "isActive", "deletedAt", "iat"]) {
-    assert.ok(keys.includes(needed), `req.user must carry ${needed}; keys: ${keys}`);
-  }
-  const jsonBytes = Number(field(l, "jsonBytes"));
-  const fullBytes = Number(field(l, "fullDocBytes"));
-  assert.ok(jsonBytes < fullBytes, `lean user (${jsonBytes} B) must be smaller than the fully hydrated document (${fullBytes} B)`);
-});
+test(
+  "AR-10 (d): valid token loads a lean req.user carrying every consumer field",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("happy");
+    assert.equal(
+      field(l, "nextErr"),
+      "none",
+      `valid token must pass; got: ${l}`,
+    );
+    assert.equal(
+      field(l, "isDoc"),
+      "false",
+      "req.user must be a lean plain object, not a Mongoose document",
+    );
+    assert.equal(
+      field(l, "idMatches"),
+      "true",
+      "req.user.id (the virtual consumers read) must equal the user id",
+    );
+    assert.equal(
+      field(l, "iatMatches"),
+      "true",
+      "req.user.iat must carry the token's iat (profile deleteAccount reads it)",
+    );
+    assert.equal(
+      field(l, "phone"),
+      "9800000000",
+      "order checkout reads req.user.phone",
+    );
+    assert.equal(field(l, "role"), "customer");
+    const keys = (field(l, "keys") || "").split(",");
+    for (const needed of [
+      "_id",
+      "id",
+      "email",
+      "firstName",
+      "lastName",
+      "role",
+      "isActive",
+      "deletedAt",
+      "iat",
+    ]) {
+      assert.ok(
+        keys.includes(needed),
+        `req.user must carry ${needed}; keys: ${keys}`,
+      );
+    }
+    const jsonBytes = Number(field(l, "jsonBytes"));
+    const fullBytes = Number(field(l, "fullDocBytes"));
+    assert.ok(
+      jsonBytes < fullBytes,
+      `lean user (${jsonBytes} B) must be smaller than the fully hydrated document (${fullBytes} B)`,
+    );
+  },
+);
 
-test("AR-10: protect issues exactly 2 finds per call and the user find is projected", { timeout: 190000 }, async () => {
-  const l = await line("bench");
-  const n = Number(field(l, "n"));
-  assert.equal(Number(field(l, "usersFinds")), n, "exactly one users find per protect call");
-  assert.equal(Number(field(l, "revokedFinds")), n, "exactly one revocation find per protect call (check NOT removed)");
-  assert.equal(Number(field(l, "totalFinds")), 2 * n, "no extra round-trips");
-  const proj = field(l, "usersProjection");
-  assert.ok(proj && proj !== "none" && proj !== "null", `users find must carry a projection; got: ${l}`);
-  assert.ok(!proj.includes("preferences") && !proj.includes("googleId") && !proj.includes("password"),
-    `projection must exclude non-consumer fields; got: ${proj}`);
-});
+test(
+  "AR-10: protect issues exactly 2 finds per call and the user find is projected",
+  { timeout: 190000 },
+  async () => {
+    const l = await line("bench");
+    const n = Number(field(l, "n"));
+    assert.equal(
+      Number(field(l, "usersFinds")),
+      n,
+      "exactly one users find per protect call",
+    );
+    assert.equal(
+      Number(field(l, "revokedFinds")),
+      n,
+      "exactly one revocation find per protect call (check NOT removed)",
+    );
+    assert.equal(Number(field(l, "totalFinds")), 2 * n, "no extra round-trips");
+    const proj = field(l, "usersProjection");
+    assert.ok(
+      proj && proj !== "none" && proj !== "null",
+      `users find must carry a projection; got: ${l}`,
+    );
+    assert.ok(
+      !proj.includes("preferences") &&
+        !proj.includes("googleId") &&
+        !proj.includes("password"),
+      `projection must exclude non-consumer fields; got: ${proj}`,
+    );
+  },
+);

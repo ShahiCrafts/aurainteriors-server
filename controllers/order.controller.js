@@ -1538,11 +1538,9 @@ exports.reconcileRefund = catchAsync(async (req, res, next) => {
     },
     ip: req.ip,
   });
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Refund settlement recorded",
-      data: { order: settled },
-    });
+  res.status(200).json({
+    success: true,
+    message: "Refund settlement recorded",
+    data: { order: settled },
+  });
 });

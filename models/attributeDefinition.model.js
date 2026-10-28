@@ -153,13 +153,16 @@ const attributeDefinitionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 attributeDefinitionSchema.index({ active: 1, sortOrder: 1 });
 attributeDefinitionSchema.index({ storage: 1 });
 
-const AttributeDefinition = mongoose.model("AttributeDefinition", attributeDefinitionSchema);
+const AttributeDefinition = mongoose.model(
+  "AttributeDefinition",
+  attributeDefinitionSchema,
+);
 
 module.exports = AttributeDefinition;
 module.exports.ATTRIBUTE_TYPES = ATTRIBUTE_TYPES;

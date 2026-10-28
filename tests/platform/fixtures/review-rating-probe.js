@@ -29,7 +29,8 @@ const REPO = path.resolve(__dirname, "../../..");
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -37,11 +38,15 @@ function mulberry32(seed) {
 }
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "review-rating-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri("aura_review_rating_test");
 
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
@@ -52,7 +57,10 @@ async function main() {
 
   let aggregateCalls = 0;
   const realAggregate = Review.aggregate.bind(Review);
-  Review.aggregate = (...args) => { aggregateCalls += 1; return realAggregate(...args); };
+  Review.aggregate = (...args) => {
+    aggregateCalls += 1;
+    return realAggregate(...args);
+  };
 
   const category = new mongoose.Types.ObjectId();
   const product = await Product.create({
@@ -65,7 +73,9 @@ async function main() {
   });
   const users = [];
   for (let i = 0; i < 80; i++) {
-    users.push(await User.create({ email: `rater${i}@example.com`, firstName: `R${i}` }));
+    users.push(
+      await User.create({ email: `rater${i}@example.com`, firstName: `R${i}` }),
+    );
   }
 
   const rand = mulberry32(20261024);
@@ -100,7 +110,7 @@ async function main() {
     const roll = rand();
     if (roll < 0.35) {
       await doCreate();
-    } else if (roll < 0.60) {
+    } else if (roll < 0.6) {
       // edit rating (updateReview path: findOne + save)
       await withLive(async (_u, reviewId) => {
         const doc = await Review.findById(reviewId);
@@ -108,7 +118,7 @@ async function main() {
         doc.rating = 1 + Math.floor(rand() * 5);
         await doc.save();
       });
-    } else if (roll < 0.80) {
+    } else if (roll < 0.8) {
       // approval flip (admin toggleApproval path: findOne + save)
       await withLive(async (_u, reviewId) => {
         const doc = await Review.findById(reviewId);
@@ -127,7 +137,7 @@ async function main() {
       await withLive(async (_u, reviewId) => {
         await Review.findOneAndUpdate(
           { _id: reviewId },
-          { adminResponse: { comment: "thanks", respondedAt: new Date() } }
+          { adminResponse: { comment: "thanks", respondedAt: new Date() } },
         );
       });
     }
@@ -147,12 +157,14 @@ async function main() {
   };
 
   const expected = await expectedOf(product._id);
-  const stored = await Product.findById(product._id).select("+rating.sum").lean(); // +rating.sum: internal field is select:false (never in payloads); the probe reads it explicitly
+  const stored = await Product.findById(product._id)
+    .select("+rating.sum")
+    .lean(); // +rating.sum: internal field is select:false (never in payloads); the probe reads it explicitly
   const avgDiff = Math.abs((stored.rating?.average ?? -1) - expected.avg);
   console.log(
     `RESULT rating ops=${ops} aggregateCalls=${aggregateCalls}` +
-    ` storedAvg=${stored.rating?.average} storedCount=${stored.rating?.count} storedSum=${stored.rating?.sum ?? "absent"}` +
-    ` expectedAvg=${expected.avg} expectedCount=${expected.count} expectedSum=${expected.sum} avgDiff=${avgDiff}`
+      ` storedAvg=${stored.rating?.average} storedCount=${stored.rating?.count} storedSum=${stored.rating?.sum ?? "absent"}` +
+      ` expectedAvg=${expected.avg} expectedCount=${expected.count} expectedSum=${expected.sum} avgDiff=${avgDiff}`,
   );
 
   // Legacy leg: sum absent, bogus stored rating, reviews pre-inserted
@@ -180,7 +192,10 @@ async function main() {
   await Review.collection.insertMany(legacyDocs);
   await Product.collection.updateOne(
     { _id: legacy._id },
-    { $unset: { "rating.sum": "" }, $set: { "rating.average": 4.9, "rating.count": 999 } }
+    {
+      $unset: { "rating.sum": "" },
+      $set: { "rating.average": 4.9, "rating.count": 999 },
+    },
   );
   // One ordinary write through the app entry point must initialize.
   await Review.create({
@@ -191,11 +206,15 @@ async function main() {
     comment: "first tracked review",
   });
   const legacyExpected = await expectedOf(legacy._id);
-  const legacyStored = await Product.findById(legacy._id).select("+rating.sum").lean();
-  const legacyAvgDiff = Math.abs((legacyStored.rating?.average ?? -1) - legacyExpected.avg);
+  const legacyStored = await Product.findById(legacy._id)
+    .select("+rating.sum")
+    .lean();
+  const legacyAvgDiff = Math.abs(
+    (legacyStored.rating?.average ?? -1) - legacyExpected.avg,
+  );
   console.log(
     `RESULT legacy storedAvg=${legacyStored.rating?.average} storedCount=${legacyStored.rating?.count} storedSum=${legacyStored.rating?.sum ?? "absent"}` +
-    ` expectedAvg=${legacyExpected.avg} expectedCount=${legacyExpected.count} expectedSum=${legacyExpected.sum} avgDiff=${legacyAvgDiff}`
+      ` expectedAvg=${legacyExpected.avg} expectedCount=${legacyExpected.count} expectedSum=${legacyExpected.sum} avgDiff=${legacyAvgDiff}`,
   );
 
   await mongoose.disconnect();
@@ -204,5 +223,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

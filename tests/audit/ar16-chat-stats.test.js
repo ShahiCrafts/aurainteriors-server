@@ -13,7 +13,13 @@ const { stubModule } = require("./helpers");
 
 let chatAggregateCalls = [];
 let messageAggregateCalls = [];
-let countsByStatus = { ai_handling: 3, escalated: 2, agent_handling: 4, resolved: 5, closed: 6 };
+let countsByStatus = {
+  ai_handling: 3,
+  escalated: 2,
+  agent_handling: 4,
+  resolved: 5,
+  closed: 6,
+};
 // Total = sum of the five status counts plus any other deletedAt:null docs.
 const TOTAL = 20;
 
@@ -47,36 +53,76 @@ test("AR-16: getChatStats derives avgResponseTimeMinutes from a chatmessages agg
   chatAggregateCalls = [];
   messageAggregateCalls = [];
   const stats = await service.getChatStats();
-  assert.equal(stats.avgResponseTimeMinutes, 60, "average must come from the chatmessages aggregation (3600000 ms)");
-  assert.equal(messageAggregateCalls.length, 1, "exactly one aggregation over chatmessages");
-  assert.equal(chatAggregateCalls.length, 0, "Chat.aggregate (the $lookup pipeline) must no longer run");
+  assert.equal(
+    stats.avgResponseTimeMinutes,
+    60,
+    "average must come from the chatmessages aggregation (3600000 ms)",
+  );
+  assert.equal(
+    messageAggregateCalls.length,
+    1,
+    "exactly one aggregation over chatmessages",
+  );
+  assert.equal(
+    chatAggregateCalls.length,
+    0,
+    "Chat.aggregate (the $lookup pipeline) must no longer run",
+  );
 });
 
 test("AR-16: the chatmessages pipeline is index-shaped: $match admin first, $sort by chat/createdAt, $group $first, small $lookup on chats", async () => {
   if (messageAggregateCalls.length === 0) await service.getChatStats();
   const pipeline = messageAggregateCalls[messageAggregateCalls.length - 1];
   const serialized = JSON.stringify(pipeline);
-  assert.ok(!serialized.includes('"chatmessages"'), "pipeline must not $lookup the chatmessages collection");
-  assert.deepEqual(pipeline[0], { $match: { senderRole: "admin" } }, "first stage filters to admin messages");
+  assert.ok(
+    !serialized.includes('"chatmessages"'),
+    "pipeline must not $lookup the chatmessages collection",
+  );
+  assert.deepEqual(
+    pipeline[0],
+    { $match: { senderRole: "admin" } },
+    "first stage filters to admin messages",
+  );
   const sortStage = pipeline.find((s) => s.$sort);
-  assert.deepEqual(sortStage, { $sort: { chat: 1, createdAt: 1 } }, "sort supports first-per-chat grouping");
+  assert.deepEqual(
+    sortStage,
+    { $sort: { chat: 1, createdAt: 1 } },
+    "sort supports first-per-chat grouping",
+  );
   const groupStage = pipeline.find((s) => s.$group && s.$group.firstAdminAt);
-  assert.ok(groupStage, "pipeline groups per chat taking the first (earliest) admin message");
+  assert.ok(
+    groupStage,
+    "pipeline groups per chat taking the first (earliest) admin message",
+  );
   assert.deepEqual(groupStage.$group.firstAdminAt, { $first: "$createdAt" });
   const lookupStage = pipeline.find((s) => s.$lookup);
   assert.ok(lookupStage, "pipeline joins chat createdAt via a $lookup");
-  assert.equal(lookupStage.$lookup.from, "chats", "the only $lookup is against the small chats collection");
+  assert.equal(
+    lookupStage.$lookup.from,
+    "chats",
+    "the only $lookup is against the small chats collection",
+  );
 });
 
 test("AR-16: returned object shape and counts are unchanged", async () => {
   const stats = await service.getChatStats();
   assert.deepEqual(Object.keys(stats).sort(), [
-    "activeChats", "agentHandlingChats", "aiHandlingChats", "avgResponseTimeMinutes",
-    "closedChats", "resolvedChats", "totalChats", "waitingChats",
+    "activeChats",
+    "agentHandlingChats",
+    "aiHandlingChats",
+    "avgResponseTimeMinutes",
+    "closedChats",
+    "resolvedChats",
+    "totalChats",
+    "waitingChats",
   ]);
   assert.equal(stats.totalChats, TOTAL);
   assert.equal(stats.waitingChats, 2, "waitingChats mirrors escalatedChats");
-  assert.equal(stats.activeChats, 3 + 4, "activeChats = aiHandling + agentHandling");
+  assert.equal(
+    stats.activeChats,
+    3 + 4,
+    "activeChats = aiHandling + agentHandling",
+  );
   assert.equal(stats.aiHandlingChats, 3);
   assert.equal(stats.agentHandlingChats, 4);
   assert.equal(stats.resolvedChats, 5);

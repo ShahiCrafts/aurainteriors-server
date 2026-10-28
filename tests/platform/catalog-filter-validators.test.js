@@ -7,10 +7,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getProductsQuerySchema } = require("../../validators/product.validator");
+const {
+  getProductsQuerySchema,
+} = require("../../validators/product.validator");
 
 const validateQuery = (query) =>
-  getProductsQuerySchema.validate(query, { abortEarly: false, stripUnknown: true });
+  getProductsQuerySchema.validate(query, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
 
 test("filter validators: attr.* string keys survive query validation", () => {
   const { error, value } = validateQuery({
@@ -31,14 +36,19 @@ test("filter validators: attr.* string keys survive query validation", () => {
 test("filter validators: container values under attr.* keys are rejected", () => {
   const { error } = validateQuery({ "attr.color": { $ne: "red" } });
   assert.ok(error, "an object value under attr.color must fail validation");
-  const { error: arrayError } = validateQuery({ "attr.color": ["red", "blue"] });
+  const { error: arrayError } = validateQuery({
+    "attr.color": ["red", "blue"],
+  });
   assert.ok(arrayError, "an array value under attr.color must fail validation");
 });
 
 test("filter validators: facets accepts only the documented switches; unknown keys still strip", () => {
   const { error } = validateQuery({ facets: "yes" });
   assert.ok(error);
-  const { error: okError, value } = validateQuery({ facets: "0", bogusParam: "x" });
+  const { error: okError, value } = validateQuery({
+    facets: "0",
+    bogusParam: "x",
+  });
   assert.equal(okError, undefined);
   assert.equal(value.facets, "0");
   assert.equal(value.bogusParam, undefined);

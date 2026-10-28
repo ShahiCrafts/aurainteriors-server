@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
@@ -8,7 +11,9 @@ router.param("id", objectIdParam);
 const orderController = require("../controllers/order.controller");
 const { protect, restrictTo } = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
-const { publicEndpointRateLimit } = require("../middleware/rateLimit.middleware");
+const {
+  publicEndpointRateLimit,
+} = require("../middleware/rateLimit.middleware");
 const {
   guestCheckoutSchema,
   authenticatedCheckoutSchema,
@@ -19,19 +24,29 @@ const {
 
 router.post(
   "/guest-checkout",
-  publicEndpointRateLimit(20, "Too many checkout attempts. Please try again later."),
+  publicEndpointRateLimit(
+    20,
+    "Too many checkout attempts. Please try again later.",
+  ),
   validate(guestCheckoutSchema),
-  orderController.guestCheckout
+  orderController.guestCheckout,
 );
 
 router.post(
   "/track",
-  publicEndpointRateLimit(30, "Too many tracking requests. Please try again later."),
+  publicEndpointRateLimit(
+    30,
+    "Too many tracking requests. Please try again later.",
+  ),
   validate(orderTrackingSchema),
-  orderController.trackOrder
+  orderController.trackOrder,
 );
 
-router.get("/esewa/success", publicEndpointRateLimit(60), orderController.esewaSuccess);
+router.get(
+  "/esewa/success",
+  publicEndpointRateLimit(60),
+  orderController.esewaSuccess,
+);
 router.get("/esewa/failure", orderController.esewaFailure);
 
 router.get(
@@ -39,24 +54,29 @@ router.get(
   protect,
   restrictTo("admin"),
   validate(getOrdersQuerySchema, "query"),
-  orderController.getAllOrders
+  orderController.getAllOrders,
 );
 
 router.get(
   "/admin/:id",
   protect,
   restrictTo("admin"),
-  orderController.getOrderAdmin
+  orderController.getOrderAdmin,
 );
 
 router.post(
   "/checkout",
   protect,
   validate(authenticatedCheckoutSchema),
-  orderController.authenticatedCheckout
+  orderController.authenticatedCheckout,
 );
 
-router.post("/:id/refund/reconcile", protect, restrictTo("admin"), orderController.reconcileRefund);
+router.post(
+  "/:id/refund/reconcile",
+  protect,
+  restrictTo("admin"),
+  orderController.reconcileRefund,
+);
 
 router.get("/my-orders", protect, orderController.getMyOrders);
 router.get("/:id", protect, orderController.getOrder);
@@ -66,14 +86,14 @@ router.patch(
   "/:id/return",
   protect,
   restrictTo("admin"),
-  orderController.processReturnRequest
+  orderController.processReturnRequest,
 );
 router.patch(
   "/:id/status",
   protect,
   restrictTo("admin"),
   validate(updateOrderStatusSchema),
-  orderController.updateOrderStatus
+  orderController.updateOrderStatus,
 );
 
 module.exports = router;

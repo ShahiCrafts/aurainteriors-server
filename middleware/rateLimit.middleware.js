@@ -74,7 +74,7 @@ exports.chatRateLimit = rateLimit({
       const now = Date.now();
       const resetTime = req.rateLimit ? req.rateLimit.resetTime : now + 900000;
       const secondsRemaining = Math.max(0, Math.ceil((resetTime - now) / 1000));
-      
+
       return res.status(429).json({
         status: "error",
         code: "RATE_LIMIT_EXCEEDED",
@@ -122,7 +122,7 @@ exports.sendMessageRateLimit = rateLimit({
       const now = Date.now();
       const resetTime = req.rateLimit ? req.rateLimit.resetTime : now + 900000;
       const secondsRemaining = Math.max(0, Math.ceil((resetTime - now) / 1000));
-      
+
       return res.status(429).json({
         status: "error",
         code: "RATE_LIMIT_EXCEEDED",
@@ -170,7 +170,7 @@ exports.startChatRateLimit = rateLimit({
       const now = Date.now();
       const resetTime = req.rateLimit ? req.rateLimit.resetTime : now + 900000;
       const secondsRemaining = Math.max(0, Math.ceil((resetTime - now) / 1000));
-      
+
       return res.status(429).json({
         status: "error",
         code: "RATE_LIMIT_EXCEEDED",
@@ -193,17 +193,26 @@ exports.startChatRateLimit = rateLimit({
  * (ND-4) is made; budgets are set generously so a shared proxy bucket
  * cannot throttle ordinary traffic, while still capping floods.
  */
-exports.publicEndpointRateLimit = (max, message = "Too many requests. Please try again later.") =>
+exports.publicEndpointRateLimit = (
+  max,
+  message = "Too many requests. Please try again later.",
+) =>
   rateLimit({
     store: storeFor("public"),
     windowMs: 15 * 60 * 1000,
     limit: max,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => ipKeyGenerator(req.ip || req.socket?.remoteAddress || "unknown"),
+    keyGenerator: (req) =>
+      ipKeyGenerator(req.ip || req.socket?.remoteAddress || "unknown"),
     handler: (req, res) => {
-      const resetTime = req.rateLimit ? req.rateLimit.resetTime : Date.now() + 900000;
-      const secondsRemaining = Math.max(0, Math.ceil((resetTime - Date.now()) / 1000));
+      const resetTime = req.rateLimit
+        ? req.rateLimit.resetTime
+        : Date.now() + 900000;
+      const secondsRemaining = Math.max(
+        0,
+        Math.ceil((resetTime - Date.now()) / 1000),
+      );
       return res.status(429).json({
         status: "error",
         code: "RATE_LIMIT_EXCEEDED",
@@ -218,7 +227,10 @@ exports.publicEndpointRateLimit = (max, message = "Too many requests. Please try
  * anonymous requests). Used on POST /promotions/track (C-09) so one
  * account cannot inflate engagement metrics unboundedly.
  */
-exports.userRateLimit = (max, message = "Too many requests. Please try again later.") =>
+exports.userRateLimit = (
+  max,
+  message = "Too many requests. Please try again later.",
+) =>
   rateLimit({
     store: storeFor("user"),
     windowMs: 15 * 60 * 1000,
@@ -226,10 +238,17 @@ exports.userRateLimit = (max, message = "Too many requests. Please try again lat
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) =>
-      req.user?._id ? `user_${req.user._id}` : ipKeyGenerator(req.ip || req.socket?.remoteAddress || "unknown"),
+      req.user?._id
+        ? `user_${req.user._id}`
+        : ipKeyGenerator(req.ip || req.socket?.remoteAddress || "unknown"),
     handler: (req, res) => {
-      const resetTime = req.rateLimit ? req.rateLimit.resetTime : Date.now() + 900000;
-      const secondsRemaining = Math.max(0, Math.ceil((resetTime - Date.now()) / 1000));
+      const resetTime = req.rateLimit
+        ? req.rateLimit.resetTime
+        : Date.now() + 900000;
+      const secondsRemaining = Math.max(
+        0,
+        Math.ceil((resetTime - Date.now()) / 1000),
+      );
       return res.status(429).json({
         status: "error",
         code: "RATE_LIMIT_EXCEEDED",
@@ -251,24 +270,26 @@ exports.userRateLimit = (max, message = "Too many requests. Please try again lat
 // client IP (see ND-4: trust proxy is an owner decision; on Render
 // the counters are per-instance in memory - a Redis store is listed
 // as an option under ND-4 in AUDIT_STATE.md).
-const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS =
+  Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 const isReadMethod = (req) => ["GET", "HEAD", "OPTIONS"].includes(req.method);
 const isEsewaPath = (req) => req.path.startsWith("/esewa");
 
-const makeTierLimiter = (max, skip) => rateLimit({
-  store: storeFor("tier"),
-  windowMs: RATE_LIMIT_WINDOW_MS,
-  max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip,
-  handler: (req, res) => {
-    res.status(429).json({
-      status: "fail",
-      message: "Too many requests. Please try again later.",
-    });
-  },
-});
+const makeTierLimiter = (max, skip) =>
+  rateLimit({
+    store: storeFor("tier"),
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip,
+    handler: (req, res) => {
+      res.status(429).json({
+        status: "fail",
+        message: "Too many requests. Please try again later.",
+      });
+    },
+  });
 
 exports.standardReadLimiter = makeTierLimiter(
   Number(process.env.RATE_LIMIT_READ_MAX) || 900,

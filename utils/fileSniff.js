@@ -13,13 +13,22 @@ exports.detectImageType = (buffer) => {
   // SVG has no magic bytes (it is XML text). Detect an <svg> root in the
   // first chunk. Whether SVG is *accepted* is a per-path policy decision
   // (see ND-3 in AUDIT_STATE.md); detection only reports the truth.
-  const head = buffer.subarray(0, 1024).toString("utf8").trimStart().toLowerCase();
-  if (head.startsWith("<svg") || (head.startsWith("<?xml") && head.includes("<svg"))) return "svg";
+  const head = buffer
+    .subarray(0, 1024)
+    .toString("utf8")
+    .trimStart()
+    .toLowerCase();
+  if (
+    head.startsWith("<svg") ||
+    (head.startsWith("<?xml") && head.includes("<svg"))
+  )
+    return "svg";
   return null;
 };
 
 const isTextBuffer = (buffer) => {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0 || buffer.includes(0)) return false;
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0 || buffer.includes(0))
+    return false;
   try {
     new TextDecoder("utf-8", { fatal: true }).decode(buffer);
     return true;
@@ -33,7 +42,11 @@ const isTextBuffer = (buffer) => {
 exports.detectDocumentType = (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) return null;
   if (matchesFileType(buffer, "application/pdf")) return "pdf";
-  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return "docx";
+  if (
+    buffer.length >= 4 &&
+    buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))
+  )
+    return "docx";
   if (isTextBuffer(buffer)) return "text";
   return null;
 };
@@ -41,12 +54,19 @@ exports.detectDocumentType = (buffer) => {
 // 3D model content checks per extension.
 exports.matchesModelFile = (buffer, ext) => {
   if (!Buffer.isBuffer(buffer)) return false;
-  if (ext === "glb") return buffer.length >= 4 && buffer.subarray(0, 4).toString() === "glTF";
-  if (ext === "usdz") return buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  if (ext === "glb")
+    return buffer.length >= 4 && buffer.subarray(0, 4).toString() === "glTF";
+  if (ext === "usdz")
+    return (
+      buffer.length >= 4 &&
+      buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))
+    );
   if (ext === "gltf") {
     try {
       const parsed = JSON.parse(buffer.toString("utf8"));
-      return Boolean(parsed && parsed.asset && typeof parsed.asset.version === "string");
+      return Boolean(
+        parsed && parsed.asset && typeof parsed.asset.version === "string",
+      );
     } catch {
       return false;
     }

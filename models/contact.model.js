@@ -62,7 +62,11 @@ const contactSchema = new mongoose.Schema(
       maxlength: [2000, "Notes cannot exceed 2000 characters"],
     },
     response: {
-      deliveryStatus: { type: String, enum: ["pending", "accepted", "failed"], default: "pending" },
+      deliveryStatus: {
+        type: String,
+        enum: ["pending", "accepted", "failed"],
+        default: "pending",
+      },
       acceptedAt: Date,
       providerMessageId: String,
       message: {
@@ -89,7 +93,7 @@ const contactSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Indexes
@@ -133,12 +137,8 @@ contactSchema.statics.getStats = async function () {
   const [total, unread, statusCounts, categoryCounts] = await Promise.all([
     this.countDocuments(),
     this.countDocuments({ isRead: false }),
-    this.aggregate([
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
-    this.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } },
-    ]),
+    this.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }]),
   ]);
 
   return {

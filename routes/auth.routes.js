@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
@@ -10,12 +13,28 @@ const { protect } = require("../middleware/auth.middleware");
 const { issueOauthState, verifyOauthState } = require("../utils/oauthState");
 
 // Magic Link Authentication
-router.post("/send-magic-link", createAuthLimiter("sendMagicLink", 3, 20), authController.sendMagicLink);
-router.post("/verify-magic-link", createAuthLimiter("verifyMagicLink", 20, 60), authController.verifyMagicLink);
+router.post(
+  "/send-magic-link",
+  createAuthLimiter("sendMagicLink", 3, 20),
+  authController.sendMagicLink,
+);
+router.post(
+  "/verify-magic-link",
+  createAuthLimiter("verifyMagicLink", 20, 60),
+  authController.verifyMagicLink,
+);
 
 // Admin Email + Password + OTP Authentication
-router.post("/admin/login", createAuthLimiter("adminLogin", 10, 50), authController.adminLogin);
-router.post("/admin/verify-otp", createAuthLimiter("adminVerifyOtp", 25, 100), authController.adminVerifyOtp);
+router.post(
+  "/admin/login",
+  createAuthLimiter("adminLogin", 10, 50),
+  authController.adminLogin,
+);
+router.post(
+  "/admin/verify-otp",
+  createAuthLimiter("adminVerifyOtp", 25, 100),
+  authController.adminVerifyOtp,
+);
 
 router.get("/me", protect, authController.getMe);
 router.post("/logout", authController.logout);
@@ -25,7 +44,11 @@ router.get("/google", (req, res, next) => {
   // (A-01); verifyOauthState checks it on the callback before passport
   // exchanges the code.
   const state = issueOauthState(res);
-  passport.authenticate("google", { scope: ["profile", "email"], state })(req, res, next);
+  passport.authenticate("google", { scope: ["profile", "email"], state })(
+    req,
+    res,
+    next,
+  );
 });
 
 router.get(

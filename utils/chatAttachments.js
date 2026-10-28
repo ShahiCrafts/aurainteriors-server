@@ -14,10 +14,22 @@ function validateChatAttachments(attachments) {
   for (const att of attachments) {
     if (!att || typeof att !== "object") return null;
     const { fileName, fileUrl, fileType, fileSize } = att;
-    if (typeof fileName !== "string" || !fileName || fileName.length > 255) return null;
-    if (typeof fileUrl !== "string" || !/^https:\/\//.test(fileUrl) || fileUrl.length > 2048) return null;
-    if (typeof fileType !== "string" || !fileType || fileType.length > 50) return null;
-    if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MAX_FILE_SIZE) return null;
+    if (typeof fileName !== "string" || !fileName || fileName.length > 255)
+      return null;
+    if (
+      typeof fileUrl !== "string" ||
+      !/^https:\/\//.test(fileUrl) ||
+      fileUrl.length > 2048
+    )
+      return null;
+    if (typeof fileType !== "string" || !fileType || fileType.length > 50)
+      return null;
+    if (
+      !Number.isSafeInteger(fileSize) ||
+      fileSize <= 0 ||
+      fileSize > MAX_FILE_SIZE
+    )
+      return null;
     clean.push({ fileName, fileUrl, fileType, fileSize });
   }
   return clean;

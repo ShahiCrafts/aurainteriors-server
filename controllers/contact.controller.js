@@ -11,10 +11,6 @@ const { stripHtmlTags } = require("../utils/escapeHtml");
 // PUBLIC: Submit a contact form
 exports.submitContact = catchAsync(async (req, res, next) => {
   const { email, phone, category } = req.body;
-  // FA-11: the public form is stored as PLAIN TEXT - markup is stripped at
-  // ingestion so stored fields cannot become script in admin views,
-  // notifications, or email. (The response email already escapes; this
-  // closes the stored-content path itself.)
   const name = stripHtmlTags(req.body.name);
   const subject = stripHtmlTags(req.body.subject);
   const message = stripHtmlTags(req.body.message);
@@ -43,7 +39,8 @@ exports.submitContact = catchAsync(async (req, res, next) => {
 
   res.status(201).json({
     status: "success",
-    message: "Your message has been sent successfully. We'll get back to you soon!",
+    message:
+      "Your message has been sent successfully. We'll get back to you soon!",
     data: {
       contact: {
         id: contact._id,
@@ -72,11 +69,17 @@ exports.getAllContacts = catchAsync(async (req, res, next) => {
   const limitNum = boundedLimit(limit);
   const skip = (pageNum - 1) * limitNum;
 
-  // Build filter (FA-56: values coerced against the model enums at the sink)
   const filter = {};
 
   const statusC = asEnum(status, ["new", "in-progress", "resolved", "closed"]);
-  const categoryC = asEnum(category, ["general", "support", "sales", "partnership", "feedback", "other"]);
+  const categoryC = asEnum(category, [
+    "general",
+    "support",
+    "sales",
+    "partnership",
+    "feedback",
+    "other",
+  ]);
   const priorityC = asEnum(priority, ["low", "medium", "high"]);
   const isReadC = asBoolean(isRead);
   if (statusC !== undefined) filter.status = statusC;
@@ -196,7 +199,11 @@ exports.respondToContact = catchAsync(async (req, res, next) => {
   await contact.save({ validateBeforeSave: false });
 
   try {
-    const delivery = await sendContactResponseEmail(contact.email, contact.name, message);
+    const delivery = await sendContactResponseEmail(
+      contact.email,
+      contact.name,
+      message,
+    );
     contact.response.deliveryStatus = "accepted";
     contact.response.acceptedAt = new Date();
     contact.response.providerMessageId = delivery?.messageId;
@@ -206,7 +213,12 @@ exports.respondToContact = catchAsync(async (req, res, next) => {
     contact.response.deliveryStatus = "failed";
     if (contact.status === "resolved") contact.status = "in-progress";
     await contact.save({ validateBeforeSave: false });
-    return next(new AppError("Response saved, but email delivery failed. Please retry.", 502));
+    return next(
+      new AppError(
+        "Response saved, but email delivery failed. Please retry.",
+        502,
+      ),
+    );
   }
 
   const updatedContact = await Contact.findById(contact._id)
@@ -245,10 +257,16 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
     return next(new AppError("Please provide contact IDs", 400));
   }
 
-  if (ids.length > 100 || ids.some(id => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))) {
+  if (
+    ids.length > 100 ||
+    ids.some((id) => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))
+  ) {
     return next(new AppError("Provide at most 100 valid contact IDs", 400));
   }
-  if (status !== undefined && !["new", "in-progress", "resolved", "closed"].includes(status)) {
+  if (
+    status !== undefined &&
+    !["new", "in-progress", "resolved", "closed"].includes(status)
+  ) {
     return next(new AppError("Invalid contact status", 400));
   }
   if (isRead !== undefined && typeof isRead !== "boolean") {
@@ -257,11 +275,21 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
   if (priority !== undefined && !["low", "medium", "high"].includes(priority)) {
     return next(new AppError("Invalid contact priority", 400));
   }
-  if (assignedTo !== undefined && assignedTo !== null && (typeof assignedTo !== "string" || !/^[a-f0-9]{24}$/i.test(assignedTo))) {
+  if (
+    assignedTo !== undefined &&
+    assignedTo !== null &&
+    (typeof assignedTo !== "string" || !/^[a-f0-9]{24}$/i.test(assignedTo))
+  ) {
     return next(new AppError("Invalid assignee", 400));
   }
-  if (status === undefined && isRead === undefined && priority === undefined && assignedTo === undefined) return next(new AppError("Provide an update", 400));
-  const uniqueIds = [...new Set(ids.map(id => id.toLowerCase()))];
+  if (
+    status === undefined &&
+    isRead === undefined &&
+    priority === undefined &&
+    assignedTo === undefined
+  )
+    return next(new AppError("Provide an update", 400));
+  const uniqueIds = [...new Set(ids.map((id) => id.toLowerCase()))];
   const updateData = {};
   if (status) updateData.status = status;
   if (priority) updateData.priority = priority;
@@ -273,8 +301,11 @@ exports.bulkUpdateContacts = catchAsync(async (req, res, next) => {
 
   const result = await Contact.updateMany(
     { _id: { $in: uniqueIds } },
-    { $set: updateData, ...(isRead === false ? { $unset: { readAt: 1 } } : {}) },
-    { runValidators: true }
+    {
+      $set: updateData,
+      ...(isRead === false ? { $unset: { readAt: 1 } } : {}),
+    },
+    { runValidators: true },
   );
 
   res.status(200).json({

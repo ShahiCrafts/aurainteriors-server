@@ -24,12 +24,12 @@ const wishlistSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 wishlistSchema.methods.addProduct = async function (productId) {
   const exists = this.products.some(
-    (item) => item.product.toString() === productId.toString()
+    (item) => item.product.toString() === productId.toString(),
   );
 
   if (!exists) {
@@ -42,14 +42,14 @@ wishlistSchema.methods.addProduct = async function (productId) {
 
 wishlistSchema.methods.removeProduct = async function (productId) {
   this.products = this.products.filter(
-    (item) => item.product.toString() !== productId.toString()
+    (item) => item.product.toString() !== productId.toString(),
   );
   return this.save();
 };
 
 wishlistSchema.methods.hasProduct = function (productId) {
   return this.products.some(
-    (item) => item.product.toString() === productId.toString()
+    (item) => item.product.toString() === productId.toString(),
   );
 };
 

@@ -34,7 +34,9 @@ module.exports = {
   // (null until the gateway is registered, e.g. pre-boot / in tests
   // that never construct one).
   getIo() {
-    return registry.notificationGateway ? registry.notificationGateway.io : null;
+    return registry.notificationGateway
+      ? registry.notificationGateway.io
+      : null;
   },
   setKeepAliveService(service) {
     registry.keepAliveService = service || null;

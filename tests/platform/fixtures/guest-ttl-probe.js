@@ -14,12 +14,18 @@ const REPO = path.resolve(__dirname, "../../..");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "guestttl-"));
   const mongod = await MongoMemoryServer.create({
-    instance: { dbPath, storageEngine: "wiredTiger", args: ["--setParameter", "ttlMonitorSleepSecs=2"] },
+    instance: {
+      dbPath,
+      storageEngine: "wiredTiger",
+      args: ["--setParameter", "ttlMonitorSleepSecs=2"],
+    },
   });
   const uri = mongod.getUri("aura_guest_ttl_test");
 
@@ -39,18 +45,31 @@ async function main() {
 
   const now = Date.now();
   await Scratch.create([
-    { sessionId: "idle", createdAt: new Date(now - 60_000), lastActivityAt: new Date(now - 60_000) },
-    { sessionId: "active", createdAt: new Date(now - 60_000), lastActivityAt: new Date(now - 1_000) },
+    {
+      sessionId: "idle",
+      createdAt: new Date(now - 60_000),
+      lastActivityAt: new Date(now - 60_000),
+    },
+    {
+      sessionId: "active",
+      createdAt: new Date(now - 60_000),
+      lastActivityAt: new Date(now - 1_000),
+    },
   ]);
 
   // Keep "active" active for ~9 seconds (three TTL windows), touching
   // it the way resolveGuestSession does (conditional $set).
   for (let i = 0; i < 4; i++) {
     await sleep(2200);
-    await Scratch.updateOne({ sessionId: "active" }, { $set: { lastActivityAt: new Date() } });
+    await Scratch.updateOne(
+      { sessionId: "active" },
+      { $set: { lastActivityAt: new Date() } },
+    );
   }
 
-  const remaining = (await Scratch.find({}).select("sessionId").lean()).map((d) => d.sessionId).sort();
+  const remaining = (await Scratch.find({}).select("sessionId").lean())
+    .map((d) => d.sessionId)
+    .sort();
   console.log(`RESULT remaining=${remaining.join(",")}`);
 
   await mongoose.disconnect();
@@ -59,5 +78,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

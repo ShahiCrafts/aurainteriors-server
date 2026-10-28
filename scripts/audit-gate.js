@@ -12,18 +12,31 @@ let parsed;
 try {
   parsed = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 } catch {
-  console.error("AUDIT COULD NOT RUN: npm audit produced no parseable report (registry unreachable or blocked?).");
+  console.error(
+    "AUDIT COULD NOT RUN: npm audit produced no parseable report (registry unreachable or blocked?).",
+  );
   process.exit(2);
 }
-if (!parsed || parsed.error || !parsed.metadata || !parsed.metadata.vulnerabilities) {
-  console.error("AUDIT COULD NOT RUN:", (parsed && parsed.error && parsed.error.message) || "unexpected npm audit output shape.");
+if (
+  !parsed ||
+  parsed.error ||
+  !parsed.metadata ||
+  !parsed.metadata.vulnerabilities
+) {
+  console.error(
+    "AUDIT COULD NOT RUN:",
+    (parsed && parsed.error && parsed.error.message) ||
+      "unexpected npm audit output shape.",
+  );
   process.exit(2);
 }
 const v = parsed.metadata.vulnerabilities;
 const critical = v.critical || 0;
 const high = v.high || 0;
 if (critical + high > 0) {
-  console.error(`AUDIT FOUND ISSUES: ${critical} critical, ${high} high vulnerabilities.`);
+  console.error(
+    `AUDIT FOUND ISSUES: ${critical} critical, ${high} high vulnerabilities.`,
+  );
   process.exit(1);
 }
 console.log("npm audit: no high or critical vulnerabilities.");

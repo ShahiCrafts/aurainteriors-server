@@ -113,7 +113,7 @@ const promotionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 promotionSchema.index({ status: 1 });
@@ -133,14 +133,14 @@ promotionSchema.virtual("canEdit").get(function () {
 promotionSchema.virtual("deliveryRate").get(function () {
   if (this.metrics.sentCount === 0) return 0;
   return Math.round(
-    (this.metrics.deliveredCount / this.metrics.sentCount) * 100
+    (this.metrics.deliveredCount / this.metrics.sentCount) * 100,
   );
 });
 
 promotionSchema.virtual("engagementRate").get(function () {
   if (this.metrics.deliveredCount === 0) return 0;
   return Math.round(
-    (this.metrics.readCount / this.metrics.deliveredCount) * 100
+    (this.metrics.readCount / this.metrics.deliveredCount) * 100,
   );
 });
 
@@ -167,7 +167,7 @@ promotionSchema.methods.updateMetrics = async function (field, increment = 1) {
   // dirtying the document.
   await this.constructor.updateOne(
     { _id: this._id },
-    { $inc: { [`metrics.${field}`]: increment } }
+    { $inc: { [`metrics.${field}`]: increment } },
   );
   if (this._doc.metrics) {
     this._doc.metrics[field] = (this._doc.metrics[field] || 0) + increment;
@@ -183,7 +183,7 @@ promotionSchema.statics.getScheduledCampaignsToSend = function () {
 
 promotionSchema.statics.getActivePromotionsForUser = function (
   userId,
-  categoryPreferences = []
+  categoryPreferences = [],
 ) {
   const query = {
     status: "sent",

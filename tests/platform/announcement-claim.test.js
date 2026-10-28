@@ -18,16 +18,32 @@ function runProbe() {
       (err, stdout) => {
         if (err && !stdout) return reject(err);
         resolve(String(stdout));
-      }
+      },
     );
   });
 }
 
-test("AR-08: two concurrent scheduled-announcement ticks publish + fan out exactly once", { timeout: 150000 }, async () => {
-  const out = await runProbe();
-  const line = out.split("\n").find((l) => l.startsWith("RESULT"));
-  assert.ok(line, `probe must print a RESULT line; got: ${out}`);
-  assert.match(line, /status=published/, `the announcement must end published; got: ${line}`);
-  assert.match(line, /notifyCount=1/, `fan-out must happen exactly once across both ticks; got: ${line}`);
-  assert.match(line, /processedTotal=1/, `exactly one tick may report the publish; got: ${line}`);
-});
+test(
+  "AR-08: two concurrent scheduled-announcement ticks publish + fan out exactly once",
+  { timeout: 150000 },
+  async () => {
+    const out = await runProbe();
+    const line = out.split("\n").find((l) => l.startsWith("RESULT"));
+    assert.ok(line, `probe must print a RESULT line; got: ${out}`);
+    assert.match(
+      line,
+      /status=published/,
+      `the announcement must end published; got: ${line}`,
+    );
+    assert.match(
+      line,
+      /notifyCount=1/,
+      `fan-out must happen exactly once across both ticks; got: ${line}`,
+    );
+    assert.match(
+      line,
+      /processedTotal=1/,
+      `exactly one tick may report the publish; got: ${line}`,
+    );
+  },
+);

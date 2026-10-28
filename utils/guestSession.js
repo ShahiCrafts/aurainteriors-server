@@ -13,13 +13,23 @@
 // provably needs it). Header/cookie/body are always accepted and take
 // precedence. See OWNER_DECISIONS.md (D-3, decided).
 const getGuestSessionId = (req) => {
-  const fromQuery = require("../config/appConfig").getString("GUEST_SESSION_ALLOW_QUERY") === "1" ? req.query?.guestSessionId : undefined;
-  return req.headers?.['x-guest-session-id'] || req.cookies?.guestSessionId || req.body?.guestSessionId || fromQuery;
+  const fromQuery =
+    require("../config/appConfig").getString("GUEST_SESSION_ALLOW_QUERY") ===
+    "1"
+      ? req.query?.guestSessionId
+      : undefined;
+  return (
+    req.headers?.["x-guest-session-id"] ||
+    req.cookies?.guestSessionId ||
+    req.body?.guestSessionId ||
+    fromQuery
+  );
 };
 
 // Production check, normalised exactly like auth.controller's
 // isProduction() ("Production" / " production " still mean production).
-const isProduction = () => (process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+const isProduction = () =>
+  (process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 
 // VULN-009: the server — not page script — sets the guest-session
 // cookie, so the credential is httpOnly (unreadable by any script on
@@ -29,7 +39,13 @@ const isProduction = () => (process.env.NODE_ENV || "").trim().toLowerCase() ===
 // startChat response body for header use during the page session.
 const GUEST_SESSION_COOKIE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const setGuestSessionCookie = (res, sessionId) => {
-  if (!res || typeof res.cookie !== "function" || typeof sessionId !== "string" || !sessionId) return;
+  if (
+    !res ||
+    typeof res.cookie !== "function" ||
+    typeof sessionId !== "string" ||
+    !sessionId
+  )
+    return;
   res.cookie("guestSessionId", sessionId, {
     httpOnly: true,
     secure: isProduction(),

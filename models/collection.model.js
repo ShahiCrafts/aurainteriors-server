@@ -54,7 +54,13 @@ const collectionSchema = new mongoose.Schema(
     rule: {
       type: {
         type: String,
-        enum: ["new-arrivals", "best-sellers", "featured", "on-sale", "attribute-match"],
+        enum: [
+          "new-arrivals",
+          "best-sellers",
+          "featured",
+          "on-sale",
+          "attribute-match",
+        ],
       },
       params: {
         type: mongoose.Schema.Types.Mixed,
@@ -74,7 +80,7 @@ const collectionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 collectionSchema.index({ active: 1, sortOrder: 1 });

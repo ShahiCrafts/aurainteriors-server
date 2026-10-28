@@ -1,24 +1,37 @@
 const Address = require("../models/address.model");
 
-// FA-20: clients get a generic 500 (the real error is logged here);
-// 400s surface only field-level validation messages, mirroring the
-// global error handler, never raw internal error text.
 const sendServerError = (res, error, where) => {
   console.error(`[address:${where}]`, error);
-  return res.status(500).json({ status: "error", message: "Something went wrong. Please try again." });
+  return res
+    .status(500)
+    .json({
+      status: "error",
+      message: "Something went wrong. Please try again.",
+    });
 };
 const sendClientError = (res, error, where) => {
   if (error?.name === "ValidationError") {
     const details = Object.values(error.errors || {}).map((e) => e.message);
-    return res.status(400).json({ status: "fail", message: `Invalid input data. ${details.join(". ")}` });
+    return res
+      .status(400)
+      .json({
+        status: "fail",
+        message: `Invalid input data. ${details.join(". ")}`,
+      });
   }
   if (error?.name === "CastError") {
-    return res.status(400).json({ status: "fail", message: `Invalid ${error.path}: ${error.value}` });
+    return res
+      .status(400)
+      .json({
+        status: "fail",
+        message: `Invalid ${error.path}: ${error.value}`,
+      });
   }
   console.error(`[address:${where}]`, error);
-  return res.status(400).json({ status: "fail", message: "Invalid request data." });
+  return res
+    .status(400)
+    .json({ status: "fail", message: "Invalid request data." });
 };
-
 
 exports.getAllAddresses = async (req, res) => {
   try {
@@ -103,9 +116,6 @@ exports.createAddress = async (req, res) => {
       isDefault: shouldBeDefault,
     });
 
-    // AR-42: enforce default exclusivity atomically (the removed
-    // pre-save hook did this non-atomically). Runs after create so
-    // the switch is the last writer.
     if (shouldBeDefault) {
       await Address.switchDefault(req.user.id, address._id);
     }
@@ -164,9 +174,6 @@ exports.updateAddress = async (req, res) => {
     if (isDefault !== undefined) address.isDefault = isDefault;
 
     await address.save();
-
-    // AR-42: if this update made the address the default, enforce
-    // exclusivity atomically after the save (switch is last writer).
     if (isDefault === true) {
       await Address.switchDefault(req.user.id, address._id);
     }
@@ -204,8 +211,6 @@ exports.deleteAddress = async (req, res) => {
         createdAt: -1,
       });
       if (nextAddress) {
-        // AR-42: promote atomically (was: set flag + save via the
-        // non-atomic hook).
         await Address.switchDefault(req.user.id, nextAddress._id);
       }
     }
@@ -233,8 +238,6 @@ exports.setDefaultAddress = async (req, res) => {
       });
     }
 
-    // AR-42: ONE atomic switch (was: set flag + save, with exclusivity
-    // left to the non-atomic pre-save hook).
     await Address.switchDefault(req.user.id, address._id);
     address.isDefault = true; // response payload reflects the switch
 

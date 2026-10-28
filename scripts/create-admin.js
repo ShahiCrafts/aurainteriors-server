@@ -16,12 +16,22 @@ const { connectDatabase } = require("../config/database");
     // actually uses when MONGO_DB_NAME/the URI path disagreed).
     await connectDatabase();
     if (await User.exists({ email })) {
-      throw new Error("Account already exists; no role or password was changed");
+      throw new Error(
+        "Account already exists; no role or password was changed",
+      );
     }
-    await User.create({ email, password, role: "admin", isActive: true, isEmailVerified: true });
+    await User.create({
+      email,
+      password,
+      role: "admin",
+      isActive: true,
+      isEmailVerified: true,
+    });
     console.log("Administrator created successfully");
   } catch (_error) {
-    console.error("Administrator provisioning failed; check credentials, database connection and whether the account already exists");
+    console.error(
+      "Administrator provisioning failed; check credentials, database connection and whether the account already exists",
+    );
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();

@@ -15,7 +15,10 @@ const ONE_DAY = 24 * 60 * 60 * 1000;
 async function runLeased(name, ttlMs, fn) {
   try {
     const ran = await withLease(name, ttlMs, fn);
-    if (!ran) console.log(`[background] ${name}: lease held by another instance, skipping this period`);
+    if (!ran)
+      console.log(
+        `[background] ${name}: lease held by another instance, skipping this period`,
+      );
     return ran;
   } catch (error) {
     console.error(`[background] ${name}: lease/run failed:`, error.message);
@@ -70,7 +73,8 @@ async function expireStockReservationsTick() {
 // drainer - but ONLY when EMAIL_MODE=outbox. The env check is inside
 // the tick so direct mode never writes lease documents for this task.
 async function drainEmailOutboxTick() {
-  if (require("../config/appConfig").getString("EMAIL_MODE") !== "outbox") return;
+  if (require("../config/appConfig").getString("EMAIL_MODE") !== "outbox")
+    return;
   await runLeased("email-outbox-drain", 55 * 1000, async () => {
     await require("./emailOutbox.service").drainEmailOutbox();
   });
@@ -79,9 +83,13 @@ async function cleanupAttachments() {
   await runLeased("attachment-cleanup", 10 * ONE_MINUTE, async () => {
     if (cleaningAttachments) return;
     cleaningAttachments = true;
-    try { await require("./chatUpload.service").cleanupExpiredUploads(); }
-    catch (error) { console.error("[background] Attachment cleanup failed:", error.message); }
-    finally { cleaningAttachments = false; }
+    try {
+      await require("./chatUpload.service").cleanupExpiredUploads();
+    } catch (error) {
+      console.error("[background] Attachment cleanup failed:", error.message);
+    } finally {
+      cleaningAttachments = false;
+    }
   });
 }
 
@@ -99,7 +107,10 @@ async function processScheduledPromotions() {
     const PromotionService = require("./promotionService");
     await PromotionService.processScheduledPromotions();
   } catch (error) {
-    console.error("[background] Scheduled promotion processing failed:", error.message);
+    console.error(
+      "[background] Scheduled promotion processing failed:",
+      error.message,
+    );
   } finally {
     isProcessingPromotions = false;
   }
@@ -109,9 +120,16 @@ let isProcessingAnnouncements = false;
 async function processScheduledAnnouncements() {
   if (isProcessingAnnouncements) return;
   isProcessingAnnouncements = true;
-  try { await require("./announcementService").processScheduledAnnouncements(); }
-  catch (error) { console.error("[background] Scheduled announcement processing failed:", error.message); }
-  finally { isProcessingAnnouncements = false; }
+  try {
+    await require("./announcementService").processScheduledAnnouncements();
+  } catch (error) {
+    console.error(
+      "[background] Scheduled announcement processing failed:",
+      error.message,
+    );
+  } finally {
+    isProcessingAnnouncements = false;
+  }
 }
 function processScheduledContent() {
   // Each processor isolates errors so either task can proceed independently.
@@ -170,7 +188,10 @@ function startBackgroundTasks() {
   emailOutboxInterval = setInterval(drainEmailOutboxTick, ONE_MINUTE);
   emailOutboxInterval.unref?.();
 
-  stockReservationInterval = setInterval(expireStockReservationsTick, 10 * ONE_MINUTE);
+  stockReservationInterval = setInterval(
+    expireStockReservationsTick,
+    10 * ONE_MINUTE,
+  );
   stockReservationInterval.unref?.();
 
   retentionTimeout = setTimeout(() => {
@@ -180,7 +201,10 @@ function startBackgroundTasks() {
   }, millisecondsUntilNextUtcHour(3));
   retentionTimeout.unref?.();
 
-  ingestionSweepInterval = setInterval(runIngestionRecoverySweepTick, 5 * ONE_MINUTE);
+  ingestionSweepInterval = setInterval(
+    runIngestionRecoverySweepTick,
+    5 * ONE_MINUTE,
+  );
   ingestionSweepInterval.unref?.();
   // Boot recovery: documents stranded in "processing" by a restart
   // are swept once at startup, not only at the first 5-minute tick.
@@ -216,7 +240,6 @@ function stopBackgroundTasks() {
   guestHoldInterval = null;
 }
 
-
 let isReleasingGuestHolds = false;
 // FA-09: stale PENDING guest COD reservations are auto-released when
 // GUEST_COD_HOLD_RELEASE_HOURS is set (>0): the order is cancelled
@@ -231,7 +254,11 @@ async function releaseExpiredGuestCodHolds() {
   if (!Number.isFinite(hours) || hours <= 0) return;
   // Lease only once the feature is enabled, so a disabled release
   // never writes lease documents.
-  await runLeased("guest-hold-release", 10 * ONE_MINUTE, releaseExpiredGuestCodHoldsLeased);
+  await runLeased(
+    "guest-hold-release",
+    10 * ONE_MINUTE,
+    releaseExpiredGuestCodHoldsLeased,
+  );
 }
 
 async function releaseExpiredGuestCodHoldsLeased() {
@@ -244,18 +271,32 @@ async function releaseExpiredGuestCodHoldsLeased() {
     const { transitionOrder } = require("./orderTransition.service");
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const stale = await Order.find({
-      isGuestOrder: true, paymentMethod: "cod",
-      orderStatus: "pending", paymentStatus: { $ne: "paid" },
+      isGuestOrder: true,
+      paymentMethod: "cod",
+      orderStatus: "pending",
+      paymentStatus: { $ne: "paid" },
       createdAt: { $lt: cutoff },
-    }).select("_id").lean();
+    })
+      .select("_id")
+      .lean();
     for (const { _id } of stale) {
       try {
-        await transitionOrder({ _id }, "cancelled", "Guest COD hold expired without confirmation (auto-release)");
+        await transitionOrder(
+          { _id },
+          "cancelled",
+          "Guest COD hold expired without confirmation (auto-release)",
+        );
       } catch (error) {
-        console.error(`[background] Guest COD hold release failed for ${_id}:`, error.message);
+        console.error(
+          `[background] Guest COD hold release failed for ${_id}:`,
+          error.message,
+        );
       }
     }
-    if (stale.length) console.log(`[background] Released ${stale.length} expired guest COD hold(s)`);
+    if (stale.length)
+      console.log(
+        `[background] Released ${stale.length} expired guest COD hold(s)`,
+      );
   } catch (error) {
     console.error("[background] Guest COD hold release failed:", error.message);
   } finally {
@@ -271,14 +312,22 @@ function runDocumentIngestion(documentId) {
   // test stubs depend on them), enqueue errors are caught and logged
   // here, and nothing here ever throws or rejects unhandled.
   try {
-    const result = require("./ingestionJobs.service").enqueueIngestion(documentId);
+    const result = require("./ingestionJobs.service").enqueueIngestion(
+      documentId,
+    );
     if (result && typeof result.catch === "function") {
       result.catch((error) => {
-        console.error(`[INGESTION] Failed to enqueue ingestion for document ${documentId}:`, error.message);
+        console.error(
+          `[INGESTION] Failed to enqueue ingestion for document ${documentId}:`,
+          error.message,
+        );
       });
     }
   } catch (error) {
-    console.error(`[INGESTION] Failed to enqueue ingestion for document ${documentId}:`, error.message);
+    console.error(
+      `[INGESTION] Failed to enqueue ingestion for document ${documentId}:`,
+      error.message,
+    );
   }
 }
 

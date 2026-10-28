@@ -14,24 +14,109 @@ const {
   buildVariantAwareClause,
   parseEffectiveSort,
 } = require("../../services/catalogFilter.service");
-const { VARIANT_OPTION_TYPES } = require("../../services/productVariant.service");
+const {
+  VARIANT_OPTION_TYPES,
+} = require("../../services/productVariant.service");
 
 const DEFS = new Map(
   [
-    { key: "color", type: "color", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "seatingCapacity", type: "integer", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "extendable", type: "boolean", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "cushionFirmness", type: "enum", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "features", type: "multi-enum", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "probeDepth", type: "measurement", unit: "cm", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "dims", type: "dimensions", storage: "catalogAttributes", filterable: true, active: true },
-    { key: "shelfCount", type: "integer", storage: "catalogAttributes", filterable: false, active: true },
-    { key: "ghost", type: "enum", storage: "catalogAttributes", filterable: true, active: false },
-    { key: "weight", type: "measurement", storage: "field", fieldPath: "weight", filterable: true, active: true },
-    { key: "style", type: "enum", storage: "field", fieldPath: "style", filterable: true, active: true },
-    { key: "colors", type: "multi-enum", storage: "field", fieldPath: "colors", filterable: true, active: true },
-    { key: "price", type: "money", storage: "field", fieldPath: "price", filterable: true, active: true },
-  ].map((def) => [def.key, def])
+    {
+      key: "color",
+      type: "color",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "seatingCapacity",
+      type: "integer",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "extendable",
+      type: "boolean",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "cushionFirmness",
+      type: "enum",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "features",
+      type: "multi-enum",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "probeDepth",
+      type: "measurement",
+      unit: "cm",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "dims",
+      type: "dimensions",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "shelfCount",
+      type: "integer",
+      storage: "catalogAttributes",
+      filterable: false,
+      active: true,
+    },
+    {
+      key: "ghost",
+      type: "enum",
+      storage: "catalogAttributes",
+      filterable: true,
+      active: false,
+    },
+    {
+      key: "weight",
+      type: "measurement",
+      storage: "field",
+      fieldPath: "weight",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "style",
+      type: "enum",
+      storage: "field",
+      fieldPath: "style",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "colors",
+      type: "multi-enum",
+      storage: "field",
+      fieldPath: "colors",
+      filterable: true,
+      active: true,
+    },
+    {
+      key: "price",
+      type: "money",
+      storage: "field",
+      fieldPath: "price",
+      filterable: true,
+      active: true,
+    },
+  ].map((def) => [def.key, def]),
 );
 
 const parse = (query) => parseAttributeFilters(query, DEFS);
@@ -39,7 +124,7 @@ const throws400 = (query, pattern) =>
   assert.throws(
     () => parse(query),
     (err) => err.statusCode === 400 && pattern.test(err.message),
-    `expected a 400 matching ${pattern} for ${JSON.stringify(query)}`
+    `expected a 400 matching ${pattern} for ${JSON.stringify(query)}`,
   );
 
 test("filter parser: enum values are literal OR lists (regex metachars stay data)", () => {
@@ -78,18 +163,27 @@ test("filter parser: color hex normalizes like the write path; names stay litera
 });
 
 test("filter parser: ranges only on numeric types, bounds parsed and ordered", () => {
-  const [cond] = parse({ "attr.seatingCapacity.min": "2", "attr.seatingCapacity.max": "6" });
+  const [cond] = parse({
+    "attr.seatingCapacity.min": "2",
+    "attr.seatingCapacity.max": "6",
+  });
   assert.equal(cond.min, 2);
   assert.equal(cond.max, 6);
   assert.equal(cond.exactValues, null);
-  throws400({ "attr.seatingCapacity.min": "6", "attr.seatingCapacity.max": "2" }, /min greater than max/);
+  throws400(
+    { "attr.seatingCapacity.min": "6", "attr.seatingCapacity.max": "2" },
+    /min greater than max/,
+  );
   throws400({ "attr.seatingCapacity.min": "abc" }, /numeric/);
   throws400({ "attr.cushionFirmness.min": "1" }, /does not accept range/);
   throws400({ "attr.extendable.max": "1" }, /does not accept range/);
 });
 
 test("filter parser: exact + range combine on one key", () => {
-  const [cond] = parse({ "attr.seatingCapacity": "4", "attr.seatingCapacity.min": "2" });
+  const [cond] = parse({
+    "attr.seatingCapacity": "4",
+    "attr.seatingCapacity.min": "2",
+  });
   assert.deepEqual(cond.exactValues, [4]);
   assert.equal(cond.min, 2);
 });
@@ -120,15 +214,24 @@ test("filter parser: measurement matches the stored .value on both storages", ()
     "catalogAttributes.probeDepth.value": { $in: [120] },
   });
   const [fieldCond] = parse({ "attr.weight.min": "5" });
-  assert.deepEqual(conditionProductFragment(fieldCond), { "weight.value": { $gte: 5 } });
+  assert.deepEqual(conditionProductFragment(fieldCond), {
+    "weight.value": { $gte: 5 },
+  });
 });
 
 test("filter parser: field-storage fragments read the field path", () => {
   const [style] = parse({ "attr.style": "modern,classic" });
-  assert.deepEqual(conditionProductFragment(style), { style: { $in: ["modern", "classic"] } });
+  assert.deepEqual(conditionProductFragment(style), {
+    style: { $in: ["modern", "classic"] },
+  });
   const [colors] = parse({ "attr.colors": "Red" });
-  assert.deepEqual(conditionProductFragment(colors), { colors: { $in: ["Red"] } });
-  const [capacity] = parse({ "attr.seatingCapacity.min": "2", "attr.seatingCapacity.max": "6" });
+  assert.deepEqual(conditionProductFragment(colors), {
+    colors: { $in: ["Red"] },
+  });
+  const [capacity] = parse({
+    "attr.seatingCapacity.min": "2",
+    "attr.seatingCapacity.max": "6",
+  });
   assert.deepEqual(conditionProductFragment(capacity), {
     "catalogAttributes.seatingCapacity": { $gte: 2, $lte: 6 },
   });
@@ -156,14 +259,26 @@ test("filter clauses: pure legacy when nothing variant-aware is requested", () =
 });
 
 test("filter clauses: price-only becomes the effective-price $or", () => {
-  const clauses = buildVariantAwareClause({ priceRange: { min: 100, max: 500 } });
+  const clauses = buildVariantAwareClause({
+    priceRange: { min: 100, max: 500 },
+  });
   assert.equal(clauses.length, 1);
   const [branch, variantBranch] = clauses[0].$or;
-  assert.deepEqual(branch, { hasVariants: { $ne: true }, price: { $gte: 100, $lte: 500 } });
-  assert.ok(variantBranch.$expr, "variant branch is the purchasable-unit expression");
+  assert.deepEqual(branch, {
+    hasVariants: { $ne: true },
+    price: { $gte: 100, $lte: 500 },
+  });
+  assert.ok(
+    variantBranch.$expr,
+    "variant branch is the purchasable-unit expression",
+  );
   const conds = variantBranch.$expr.$gt[0].$size.$filter.cond.$and;
-  assert.ok(conds.some((c) => c.$gte && c.$gte[0] === "$$v.price" && c.$gte[1] === 100));
-  assert.ok(conds.some((c) => c.$lte && c.$lte[0] === "$$v.price" && c.$lte[1] === 500));
+  assert.ok(
+    conds.some((c) => c.$gte && c.$gte[0] === "$$v.price" && c.$gte[1] === 100),
+  );
+  assert.ok(
+    conds.some((c) => c.$lte && c.$lte[0] === "$$v.price" && c.$lte[1] === 500),
+  );
 });
 
 test("filter clauses: an axis condition builds the two-branch same-variant clause", () => {
@@ -174,16 +289,31 @@ test("filter clauses: an axis condition builds the two-branch same-variant claus
   // Product branch: value at product level + the product must not
   // route the filtered key to variants.
   const parts = productBranch.$and;
-  assert.ok(parts.some((p) => p["catalogAttributes.color"] && p["catalogAttributes.color"].$in[0] === "#ff0000"));
-  assert.ok(parts.some((p) => Array.isArray(p.variantOptionKeys?.$nin) && p.variantOptionKeys.$nin.includes("color")));
+  assert.ok(
+    parts.some(
+      (p) =>
+        p["catalogAttributes.color"] &&
+        p["catalogAttributes.color"].$in[0] === "#ff0000",
+    ),
+  );
+  assert.ok(
+    parts.some(
+      (p) =>
+        Array.isArray(p.variantOptionKeys?.$nin) &&
+        p.variantOptionKeys.$nin.includes("color"),
+    ),
+  );
   // Variant branch: the option read targets the same element the
   // enabled check reads ($filter over catalogVariants).
   const conds = variantBranch.$expr.$gt[0].$size.$filter.cond.$and;
   assert.ok(conds.some((c) => c.$eq && c.$eq[0] === "$$v.enabled"));
   assert.ok(
     conds.some(
-      (c) => c.$in && c.$in[0] === "$$v.options.color" && c.$in[1].includes("#ff0000")
-    )
+      (c) =>
+        c.$in &&
+        c.$in[0] === "$$v.options.color" &&
+        c.$in[1].includes("#ff0000"),
+    ),
   );
 });
 
@@ -195,8 +325,12 @@ test("filter clauses: availability binds into the variant expression", () => {
 });
 
 test("effective sort parser: tokens, mixing, and fallback behavior", () => {
-  assert.deepEqual(parseEffectiveSort("effectivePriceAsc"), { effectivePrice: 1 });
-  assert.deepEqual(parseEffectiveSort("effectivePriceDesc"), { effectivePrice: -1 });
+  assert.deepEqual(parseEffectiveSort("effectivePriceAsc"), {
+    effectivePrice: 1,
+  });
+  assert.deepEqual(parseEffectiveSort("effectivePriceDesc"), {
+    effectivePrice: -1,
+  });
   assert.deepEqual(parseEffectiveSort("-createdAt,effectivePriceAsc"), {
     createdAt: -1,
     effectivePrice: 1,
@@ -206,5 +340,7 @@ test("effective sort parser: tokens, mixing, and fallback behavior", () => {
   assert.equal(parseEffectiveSort("secretField"), null);
   assert.equal(parseEffectiveSort(undefined), null);
   // Unknown fields are dropped, the effective token still applies.
-  assert.deepEqual(parseEffectiveSort("secretField,effectivePriceAsc"), { effectivePrice: 1 });
+  assert.deepEqual(parseEffectiveSort("secretField,effectivePriceAsc"), {
+    effectivePrice: 1,
+  });
 });

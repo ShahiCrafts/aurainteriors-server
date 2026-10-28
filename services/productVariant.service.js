@@ -81,18 +81,25 @@ function normalizeSku(raw) {
 }
 
 function assertValidSku(raw) {
-  if (raw === undefined || raw === null || (typeof raw === "string" && !raw.trim())) {
+  if (
+    raw === undefined ||
+    raw === null ||
+    (typeof raw === "string" && !raw.trim())
+  ) {
     throw new AppError("Variant SKU is required", 400);
   }
   const sku = normalizeSku(raw);
   if (!sku) throw new AppError("Variant SKU is required", 400);
   if (sku.length > MAX_SKU_LENGTH) {
-    throw new AppError(`Variant SKU cannot exceed ${MAX_SKU_LENGTH} characters`, 400);
+    throw new AppError(
+      `Variant SKU cannot exceed ${MAX_SKU_LENGTH} characters`,
+      400,
+    );
   }
   if (!SKU_PATTERN.test(sku)) {
     throw new AppError(
       "Variant SKU must start with a letter or digit and contain only letters, digits, '.', '_' or '-'",
-      400
+      400,
     );
   }
   return sku;
@@ -105,7 +112,10 @@ function computeCombinationKey(normalizedOptions) {
   const options = normalizedOptions || {};
   return Object.keys(options)
     .sort()
-    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(options[key]))}`)
+    .map(
+      (key) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(String(options[key]))}`,
+    )
     .join("&");
 }
 
@@ -178,13 +188,13 @@ function variantOptionDefinition(definitionsByKey, key) {
   if ((definition.storage || "catalogAttributes") !== "catalogAttributes") {
     throw new AppError(
       `Attribute "${key}" is a product field, not a catalog attribute, and cannot define variants`,
-      400
+      400,
     );
   }
   if (!VARIANT_OPTION_TYPES.includes(definition.type)) {
     throw new AppError(
       `Attribute "${key}" of type "${definition.type}" cannot define variants (variant options must be scalar: ${VARIANT_OPTION_TYPES.join(", ")})`,
-      400
+      400,
     );
   }
   return definition;
@@ -196,14 +206,20 @@ function variantOptionDefinition(definitionsByKey, key) {
 async function validateVariantOptionKeys(raw) {
   const parsed = parseJsonField(raw);
   if (!Array.isArray(parsed)) {
-    throw new AppError("variantOptionKeys must be an array of attribute keys", 400);
+    throw new AppError(
+      "variantOptionKeys must be an array of attribute keys",
+      400,
+    );
   }
   const definitionsByKey = await loadActiveDefinitions();
   const keys = [];
   const seen = new Set();
   for (const item of parsed) {
     if (typeof item !== "string" || !item.trim()) {
-      throw new AppError("variantOptionKeys must contain attribute key strings", 400);
+      throw new AppError(
+        "variantOptionKeys must contain attribute key strings",
+        400,
+      );
     }
     const key = item.trim();
     variantOptionDefinition(definitionsByKey, key);
@@ -227,11 +243,12 @@ async function applyVariantOptionKeys(product, raw) {
   const variants = product.catalogVariants || [];
   if (variants.length > 0) {
     const sameSet =
-      keys.length === current.length && keys.every((key) => current.includes(key));
+      keys.length === current.length &&
+      keys.every((key) => current.includes(key));
     if (!sameSet) {
       throw new AppError(
         "variantOptionKeys cannot change while the product has variants; delete the variants first",
-        400
+        400,
       );
     }
   }
@@ -247,23 +264,32 @@ function validateVariantOptions(product, rawOptions, definitionsByKey) {
   const parsed = parseJsonField(rawOptions);
   const options = parsed === undefined || parsed === null ? {} : parsed;
   if (!isPlainObject(options)) {
-    throw new AppError("Variant options must be an object of attribute key/value pairs", 400);
+    throw new AppError(
+      "Variant options must be an object of attribute key/value pairs",
+      400,
+    );
   }
   const pollution = findPollutionKey(options);
   if (pollution) {
-    throw new AppError(`Variant options contain a forbidden key: "${pollution}"`, 400);
+    throw new AppError(
+      `Variant options contain a forbidden key: "${pollution}"`,
+      400,
+    );
   }
   const expected = product.variantOptionKeys || [];
   const provided = Object.keys(options);
   const missing = expected.filter((key) => !provided.includes(key));
   const extra = provided.filter((key) => !expected.includes(key));
   if (missing.length > 0) {
-    throw new AppError(`Variant is missing option(s): ${missing.join(", ")}`, 400);
+    throw new AppError(
+      `Variant is missing option(s): ${missing.join(", ")}`,
+      400,
+    );
   }
   if (extra.length > 0) {
     throw new AppError(
       `Variant has option(s) not declared in variantOptionKeys: ${extra.join(", ")}`,
-      400
+      400,
     );
   }
   const normalized = {};
@@ -285,7 +311,10 @@ function validateVariantOptions(product, rawOptions, definitionsByKey) {
 async function assertSkuAvailable(product, sku) {
   for (const sibling of product.catalogVariants || []) {
     if (normalizeSku(sibling.sku) === sku) {
-      throw new AppError(`SKU "${sku}" is already used by a variant of this product`, 409);
+      throw new AppError(
+        `SKU "${sku}" is already used by a variant of this product`,
+        409,
+      );
     }
   }
   const otherVariant = await Product.findOne({
@@ -295,13 +324,19 @@ async function assertSkuAvailable(product, sku) {
     .select("_id")
     .lean();
   if (otherVariant) {
-    throw new AppError(`SKU "${sku}" is already used by a variant of another product`, 409);
+    throw new AppError(
+      `SKU "${sku}" is already used by a variant of another product`,
+      409,
+    );
   }
   const otherProduct = await Product.findOne({ _id: { $ne: product._id }, sku })
     .select("_id")
     .lean();
   if (otherProduct) {
-    throw new AppError(`SKU "${sku}" is already used as another product's SKU`, 409);
+    throw new AppError(
+      `SKU "${sku}" is already used as another product's SKU`,
+      409,
+    );
   }
 }
 
@@ -313,9 +348,13 @@ function assertNonNegativeNumber(value, label) {
 }
 
 function validateVariantImages(raw) {
-  if (!Array.isArray(raw)) throw new AppError("Variant images must be an array of URLs", 400);
+  if (!Array.isArray(raw))
+    throw new AppError("Variant images must be an array of URLs", 400);
   if (raw.length > MAX_VARIANT_IMAGES) {
-    throw new AppError(`Variant cannot have more than ${MAX_VARIANT_IMAGES} images`, 400);
+    throw new AppError(
+      `Variant cannot have more than ${MAX_VARIANT_IMAGES} images`,
+      400,
+    );
   }
   return raw.map((item) => {
     if (typeof item !== "string" || !item.trim()) {
@@ -326,7 +365,8 @@ function validateVariantImages(raw) {
 }
 
 function validateVariantWeight(raw) {
-  if (!isPlainObject(raw)) throw new AppError("Variant weight must be an object { value, unit }", 400);
+  if (!isPlainObject(raw))
+    throw new AppError("Variant weight must be an object { value, unit }", 400);
   assertNonNegativeNumber(raw.value, "Variant weight value");
   const unit = raw.unit === undefined ? "kg" : raw.unit;
   if (!["kg", "lb", "g"].includes(unit)) {
@@ -336,16 +376,23 @@ function validateVariantWeight(raw) {
 }
 
 function validateVariantDimensions(raw) {
-  if (!isPlainObject(raw)) throw new AppError("Variant dimensions must be an object", 400);
+  if (!isPlainObject(raw))
+    throw new AppError("Variant dimensions must be an object", 400);
   const out = {};
   for (const part of ["width", "height", "depth"]) {
     if (raw[part] !== undefined) {
-      out[part] = assertNonNegativeNumber(raw[part], `Variant dimensions ${part}`);
+      out[part] = assertNonNegativeNumber(
+        raw[part],
+        `Variant dimensions ${part}`,
+      );
     }
   }
   const unit = raw.unit === undefined ? "cm" : raw.unit;
   if (!["cm", "m", "in"].includes(unit)) {
-    throw new AppError("Variant dimensions unit must be one of: cm, m, in", 400);
+    throw new AppError(
+      "Variant dimensions unit must be one of: cm, m, in",
+      400,
+    );
   }
   out.unit = unit;
   return out;
@@ -354,14 +401,22 @@ function validateVariantDimensions(raw) {
 // Builds the validated, storage-ready variant fields from a
 // create payload. Throws AppError(400) on any problem.
 async function buildNewVariant(product, payload) {
-  if (!isPlainObject(payload)) throw new AppError("Variant payload must be an object", 400);
+  if (!isPlainObject(payload))
+    throw new AppError("Variant payload must be an object", 400);
   const pollution = findPollutionKey(payload);
   if (pollution) {
-    throw new AppError(`Variant payload contains a forbidden key: "${pollution}"`, 400);
+    throw new AppError(
+      `Variant payload contains a forbidden key: "${pollution}"`,
+      400,
+    );
   }
   const definitionsByKey = await loadActiveDefinitions();
   const sku = assertValidSku(payload.sku);
-  const options = validateVariantOptions(product, payload.options, definitionsByKey);
+  const options = validateVariantOptions(
+    product,
+    payload.options,
+    definitionsByKey,
+  );
   if (payload.price === undefined || payload.price === null) {
     throw new AppError("Variant price is required", 400);
   }
@@ -379,7 +434,10 @@ async function buildNewVariant(product, payload) {
     updatedAt: new Date(),
   };
   if (payload.compareAtPrice !== undefined && payload.compareAtPrice !== null) {
-    variant.compareAtPrice = assertNonNegativeNumber(payload.compareAtPrice, "Variant compareAtPrice");
+    variant.compareAtPrice = assertNonNegativeNumber(
+      payload.compareAtPrice,
+      "Variant compareAtPrice",
+    );
   }
   if (payload.stock !== undefined) {
     if (!Number.isInteger(payload.stock) || payload.stock < 0) {
@@ -393,14 +451,19 @@ async function buildNewVariant(product, payload) {
     }
     variant.enabled = payload.enabled;
   }
-  if (payload.images !== undefined) variant.images = validateVariantImages(payload.images);
+  if (payload.images !== undefined)
+    variant.images = validateVariantImages(payload.images);
   if (payload.weight !== undefined && payload.weight !== null) {
     variant.weight = validateVariantWeight(payload.weight);
   }
   if (payload.dimensions !== undefined && payload.dimensions !== null) {
     variant.dimensions = validateVariantDimensions(payload.dimensions);
   }
-  if (payload.modelUrl !== undefined && payload.modelUrl !== null && payload.modelUrl !== "") {
+  if (
+    payload.modelUrl !== undefined &&
+    payload.modelUrl !== null &&
+    payload.modelUrl !== ""
+  ) {
     if (typeof payload.modelUrl !== "string") {
       throw new AppError("Variant modelUrl must be a string", 400);
     }
@@ -428,10 +491,18 @@ async function syncDerived(productId) {
   if (!fresh) return null;
   const variants = fresh.catalogVariants || [];
   const derived = computeDerived(variants);
-  if (fresh.hasVariants !== derived.hasVariants || fresh.priceFrom !== derived.priceFrom) {
+  if (
+    fresh.hasVariants !== derived.hasVariants ||
+    fresh.priceFrom !== derived.priceFrom
+  ) {
     await Product.updateOne(
       { _id: productId },
-      { $set: { hasVariants: derived.hasVariants, priceFrom: derived.priceFrom } }
+      {
+        $set: {
+          hasVariants: derived.hasVariants,
+          priceFrom: derived.priceFrom,
+        },
+      },
     );
   }
   // Phase 4: an admin variant write is an inventory mutation too
@@ -465,10 +536,14 @@ async function refreshStockMirror(productId, { session } = {}) {
   const variants = fresh.catalogVariants || [];
   if (!variants.length) return null; // variant-less: the product counters are authoritative
   const stock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
-  const reservedStock = variants.reduce((sum, v) => sum + (v.reservedStock || 0), 0);
+  const reservedStock = variants.reduce(
+    (sum, v) => sum + (v.reservedStock || 0),
+    0,
+  );
   const set = {};
   if (fresh.stock !== stock) set.stock = stock;
-  if ((fresh.reservedStock || 0) !== reservedStock) set.reservedStock = reservedStock;
+  if ((fresh.reservedStock || 0) !== reservedStock)
+    set.reservedStock = reservedStock;
   // A variant product is born with the not-yet-meaningful scalar
   // stock 0, which the model's save hook reads as out_of_stock.
   // Once variants carry real stock the product is sellable again,
@@ -478,7 +553,11 @@ async function refreshStockMirror(productId, { session } = {}) {
   // checks read the counters, not the status, at that point.
   if (stock > 0 && fresh.status === "out_of_stock") set.status = "active";
   if (Object.keys(set).length > 0) {
-    await Product.updateOne({ _id: productId }, { $set: set }, session ? { session } : {});
+    await Product.updateOne(
+      { _id: productId },
+      { $set: set },
+      session ? { session } : {},
+    );
   }
   return { stock, reservedStock };
 }
@@ -490,7 +569,12 @@ const NO_MATCH = { matchedCount: 0, modifiedCount: 0 };
 // stock, so matchedCount !== 1 IS the insufficient-stock signal.
 // sellableOnly adds the product-level conditions the capture
 // path has always required (not deleted, active).
-async function deductVariantStock(productId, variantId, quantity, { session, sellableOnly = false } = {}) {
+async function deductVariantStock(
+  productId,
+  variantId,
+  quantity,
+  { session, sellableOnly = false } = {},
+) {
   if (!OBJECT_ID_PATTERN.test(String(variantId || ""))) return { ...NO_MATCH };
   const vid = new mongoose.Types.ObjectId(String(variantId));
   const filter = {
@@ -504,7 +588,7 @@ async function deductVariantStock(productId, variantId, quantity, { session, sel
   return Product.updateOne(
     filter,
     { $inc: { "catalogVariants.$[v].stock": -quantity } },
-    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) }
+    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) },
   );
 }
 
@@ -513,13 +597,18 @@ async function deductVariantStock(productId, variantId, quantity, { session, sel
 // — the caller decides how to reconcile (orderTransition flags
 // the order inventoryReviewRequired rather than failing the
 // cancellation).
-async function restoreVariantStock(productId, variantId, quantity, { session } = {}) {
+async function restoreVariantStock(
+  productId,
+  variantId,
+  quantity,
+  { session } = {},
+) {
   if (!OBJECT_ID_PATTERN.test(String(variantId || ""))) return { ...NO_MATCH };
   const vid = new mongoose.Types.ObjectId(String(variantId));
   return Product.updateOne(
     { _id: productId, "catalogVariants._id": vid },
     { $inc: { "catalogVariants.$[v].stock": quantity } },
-    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) }
+    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) },
   );
 }
 
@@ -527,7 +616,12 @@ async function restoreVariantStock(productId, variantId, quantity, { session } =
 // evaluated against the matched variant element via $filter —
 // requires stock >= reservedStock + quantity, mirroring the
 // product-level gate in stockReservation.service.
-async function reserveVariantStock(productId, variantId, quantity, { session } = {}) {
+async function reserveVariantStock(
+  productId,
+  variantId,
+  quantity,
+  { session } = {},
+) {
   if (!OBJECT_ID_PATTERN.test(String(variantId || ""))) return { ...NO_MATCH };
   const vid = new mongoose.Types.ObjectId(String(variantId));
   return Product.updateOne(
@@ -558,7 +652,7 @@ async function reserveVariantStock(productId, variantId, quantity, { session } =
       },
     },
     { $inc: { "catalogVariants.$[v].reservedStock": quantity } },
-    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) }
+    { arrayFilters: [{ "v._id": vid }], ...(session ? { session } : {}) },
   );
 }
 
@@ -567,7 +661,12 @@ async function reserveVariantStock(productId, variantId, quantity, { session } =
 // guard miss (counter already lower, or variant deleted) leaves
 // the counter untouched and the caller logs drift, exactly the
 // conservative direction of the legacy path.
-async function releaseVariantReserved(productId, variantId, quantity, { session } = {}) {
+async function releaseVariantReserved(
+  productId,
+  variantId,
+  quantity,
+  { session } = {},
+) {
   if (!OBJECT_ID_PATTERN.test(String(variantId || ""))) return { ...NO_MATCH };
   const vid = new mongoose.Types.ObjectId(String(variantId));
   return Product.updateOne(
@@ -576,14 +675,18 @@ async function releaseVariantReserved(productId, variantId, quantity, { session 
     {
       arrayFilters: [{ "v._id": vid, "v.reservedStock": { $gte: quantity } }],
       ...(session ? { session } : {}),
-    }
+    },
   );
 }
 
 function plainVariant(variant) {
   if (!variant) return variant;
-  const plain = typeof variant.toObject === "function" ? variant.toObject() : { ...variant };
-  if (plain.options instanceof Map) plain.options = Object.fromEntries(plain.options);
+  const plain =
+    typeof variant.toObject === "function"
+      ? variant.toObject()
+      : { ...variant };
+  if (plain.options instanceof Map)
+    plain.options = Object.fromEntries(plain.options);
   return plain;
 }
 
@@ -595,14 +698,17 @@ async function createVariant(product, payload) {
     if (sibling.combinationKey === variant.combinationKey) {
       throw new AppError(
         "A variant with this option combination already exists for this product",
-        409
+        409,
       );
     }
   }
   await assertSkuAvailable(product, variant.sku);
   // Optimistic derived values from the loaded product; syncDerived
   // re-converges them from a fresh read immediately after.
-  const optimistic = computeDerived([...(product.catalogVariants || []), variant]);
+  const optimistic = computeDerived([
+    ...(product.catalogVariants || []),
+    variant,
+  ]);
   let result;
   try {
     result = await Product.updateOne(
@@ -615,7 +721,7 @@ async function createVariant(product, payload) {
       {
         $push: { catalogVariants: variant },
         $set: { hasVariants: true, priceFrom: optimistic.priceFrom },
-      }
+      },
     );
   } catch (err) {
     if (isDuplicateKeyError(err)) {
@@ -626,11 +732,13 @@ async function createVariant(product, payload) {
   if (!result.matchedCount) {
     throw new AppError(
       "A variant with this SKU or option combination already exists for this product",
-      409
+      409,
     );
   }
   const synced = await syncDerived(product._id);
-  const stored = (synced.variants || []).find((v) => String(v._id) === String(variant._id));
+  const stored = (synced.variants || []).find(
+    (v) => String(v._id) === String(variant._id),
+  );
   return {
     variant: plainVariant(stored || variant),
     hasVariants: synced.hasVariants,
@@ -643,18 +751,25 @@ async function updateVariant(product, variantId, payload) {
     throw new AppError("Variant not found", 404);
   }
   const existing = (product.catalogVariants || []).find(
-    (variant) => String(variant._id) === String(variantId)
+    (variant) => String(variant._id) === String(variantId),
   );
   if (!existing) throw new AppError("Variant not found", 404);
-  if (!isPlainObject(payload)) throw new AppError("Variant payload must be an object", 400);
+  if (!isPlainObject(payload))
+    throw new AppError("Variant payload must be an object", 400);
   const pollution = findPollutionKey(payload);
   if (pollution) {
-    throw new AppError(`Variant payload contains a forbidden key: "${pollution}"`, 400);
+    throw new AppError(
+      `Variant payload contains a forbidden key: "${pollution}"`,
+      400,
+    );
   }
 
   // Invariant 5: the SKU never changes. Naming the same SKU
   // (any case) is a no-op; a different one is a 400.
-  if (payload.sku !== undefined && normalizeSku(payload.sku) !== normalizeSku(existing.sku)) {
+  if (
+    payload.sku !== undefined &&
+    normalizeSku(payload.sku) !== normalizeSku(existing.sku)
+  ) {
     throw new AppError("Variant SKU is immutable and cannot be changed", 400);
   }
 
@@ -664,21 +779,30 @@ async function updateVariant(product, variantId, payload) {
   // MongoDB path conflict). null clears an optional field ($unset).
   const sets = {};
   const unsets = {};
-  const setField = (field, value) => { sets[`catalogVariants.$.${field}`] = value; };
-  const unsetField = (field) => { unsets[`catalogVariants.$.${field}`] = ""; };
+  const setField = (field, value) => {
+    sets[`catalogVariants.$.${field}`] = value;
+  };
+  const unsetField = (field) => {
+    unsets[`catalogVariants.$.${field}`] = "";
+  };
 
   if (payload.options !== undefined) {
     const definitionsByKey = await loadActiveDefinitions();
-    const options = validateVariantOptions(product, payload.options, definitionsByKey);
+    const options = validateVariantOptions(
+      product,
+      payload.options,
+      definitionsByKey,
+    );
     const combinationKey = computeCombinationKey(options);
     const clash = (product.catalogVariants || []).find(
       (variant) =>
-        String(variant._id) !== String(variantId) && variant.combinationKey === combinationKey
+        String(variant._id) !== String(variantId) &&
+        variant.combinationKey === combinationKey,
     );
     if (clash) {
       throw new AppError(
         "A variant with this option combination already exists for this product",
-        409
+        409,
       );
     }
     setField("options", options);
@@ -689,7 +813,14 @@ async function updateVariant(product, variantId, payload) {
   }
   if (payload.compareAtPrice !== undefined) {
     if (payload.compareAtPrice === null) unsetField("compareAtPrice");
-    else setField("compareAtPrice", assertNonNegativeNumber(payload.compareAtPrice, "Variant compareAtPrice"));
+    else
+      setField(
+        "compareAtPrice",
+        assertNonNegativeNumber(
+          payload.compareAtPrice,
+          "Variant compareAtPrice",
+        ),
+      );
   }
   if (payload.stock !== undefined) {
     if (!Number.isInteger(payload.stock) || payload.stock < 0) {
@@ -703,7 +834,8 @@ async function updateVariant(product, variantId, payload) {
     }
     setField("enabled", payload.enabled);
   }
-  if (payload.images !== undefined) setField("images", validateVariantImages(payload.images));
+  if (payload.images !== undefined)
+    setField("images", validateVariantImages(payload.images));
   if (payload.weight !== undefined) {
     if (payload.weight === null) unsetField("weight");
     else setField("weight", validateVariantWeight(payload.weight));
@@ -729,12 +861,14 @@ async function updateVariant(product, variantId, payload) {
   if (Object.keys(update).length > 0) {
     const result = await Product.updateOne(
       { _id: product._id, "catalogVariants._id": existing._id },
-      update
+      update,
     );
     if (!result.matchedCount) throw new AppError("Variant not found", 404);
   }
   const synced = await syncDerived(product._id);
-  const stored = (synced.variants || []).find((v) => String(v._id) === String(variantId));
+  const stored = (synced.variants || []).find(
+    (v) => String(v._id) === String(variantId),
+  );
   return {
     variant: plainVariant(stored || existing),
     hasVariants: synced.hasVariants,
@@ -747,12 +881,12 @@ async function deleteVariant(product, variantId) {
     throw new AppError("Variant not found", 404);
   }
   const existing = (product.catalogVariants || []).find(
-    (variant) => String(variant._id) === String(variantId)
+    (variant) => String(variant._id) === String(variantId),
   );
   if (!existing) throw new AppError("Variant not found", 404);
   const result = await Product.updateOne(
     { _id: product._id },
-    { $pull: { catalogVariants: { _id: existing._id } } }
+    { $pull: { catalogVariants: { _id: existing._id } } },
   );
   if (!result.modifiedCount) throw new AppError("Variant not found", 404);
   const synced = await syncDerived(product._id);
@@ -776,13 +910,13 @@ async function ensureDefaultVariant(product) {
   if ((fresh.variantOptionKeys || []).length > 0) {
     throw new AppError(
       "Cannot create a default variant: the product declares variantOptionKeys, so its variants need explicit options",
-      400
+      400,
     );
   }
   if (!fresh.sku) {
     throw new AppError(
       "Cannot create a default variant: the product has no SKU to carry over",
-      400
+      400,
     );
   }
   const images = (fresh.images || [])

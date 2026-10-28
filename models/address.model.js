@@ -67,7 +67,7 @@ const addressSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 addressSchema.index({ user: 1 });
@@ -87,7 +87,7 @@ addressSchema.statics.switchDefault = function (userId, addressId) {
   return this.updateMany(
     { user: userId },
     [{ $set: { isDefault: { $eq: ["$_id", target] } } }],
-    { updatePipeline: true }
+    { updatePipeline: true },
   );
 };
 

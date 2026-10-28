@@ -21,7 +21,14 @@ const announcementSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["general", "maintenance", "update", "promotion", "policy", "event"],
+      enum: [
+        "general",
+        "maintenance",
+        "update",
+        "promotion",
+        "policy",
+        "event",
+      ],
       default: "general",
     },
     priority: {
@@ -96,7 +103,7 @@ const announcementSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for efficient queries
@@ -110,20 +117,25 @@ announcementSchema.index({ scheduledAt: 1 });
 announcementSchema.virtual("isActive").get(function () {
   const now = new Date();
   return (
-    this.status === "published" &&
-    (!this.expiresAt || this.expiresAt > now)
+    this.status === "published" && (!this.expiresAt || this.expiresAt > now)
   );
 });
 
 // Pre-save middleware to auto-set publishedAt when status changes to published
 announcementSchema.pre("save", function () {
-  if (this.isModified("status") && this.status === "published" && !this.publishedAt) {
+  if (
+    this.isModified("status") &&
+    this.status === "published" &&
+    !this.publishedAt
+  ) {
     this.publishedAt = new Date();
   }
 });
 
 // Static method to get active announcements for users
-announcementSchema.statics.getActiveAnnouncements = async function (options = {}) {
+announcementSchema.statics.getActiveAnnouncements = async function (
+  options = {},
+) {
   const { limit = 10, page = 1, type, targetAudience = "all" } = options;
   const skip = (page - 1) * limit;
   const now = new Date();

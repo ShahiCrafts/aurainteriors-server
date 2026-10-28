@@ -17,11 +17,15 @@ const REPO = path.resolve(__dirname, "../../..");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-audit/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "dbretry-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const mongoPort = Number(new URL(mongod.getUri()).port);
 
   const blackholeUntil = Date.now() + 14000;
@@ -49,7 +53,9 @@ async function main() {
   const { connectDatabase } = require(path.join(REPO, "config/database"));
   await connectDatabase(); // parent code process.exit(1)s on first failure
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
-  console.log(`RESULT connected readyState=${mongoose.connection.readyState} elapsedMs=${Date.now() - startedAt}`);
+  console.log(
+    `RESULT connected readyState=${mongoose.connection.readyState} elapsedMs=${Date.now() - startedAt}`,
+  );
 
   await mongoose.disconnect();
   for (const s of held) s.destroy();
@@ -60,5 +66,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

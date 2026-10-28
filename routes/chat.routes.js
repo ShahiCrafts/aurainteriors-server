@@ -1,14 +1,28 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
-const { authorizeUpload, receiveAttachment } = require("../middleware/chatUpload.middleware");
+const {
+  authorizeUpload,
+  receiveAttachment,
+} = require("../middleware/chatUpload.middleware");
 const express = require("express");
 const router = express.Router();
 router.use(standardReadLimiter);
 router.use(standardWriteLimiter);
 router.param("id", objectIdParam);
 const chatController = require("../controllers/chat.controller");
-const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
-const { chatRateLimit, sendMessageRateLimit, startChatRateLimit } = require("../middleware/rateLimit.middleware");
+const {
+  protect,
+  protectOptional,
+  restrictTo,
+} = require("../middleware/auth.middleware");
+const {
+  chatRateLimit,
+  sendMessageRateLimit,
+  startChatRateLimit,
+} = require("../middleware/rateLimit.middleware");
 const validate = require("../middleware/validate.middleware");
 const {
   startChatSchema,
@@ -23,17 +37,24 @@ router.post(
   protectOptional,
   startChatRateLimit,
   validate(startChatSchema),
-  chatController.startChat
+  chatController.startChat,
 );
 
 // Get upload signature for direct Cloudinary uploads (before other routes)
 router.get(
   "/signature/upload",
   protectOptional,
-  chatController.getUploadSignature
+  chatController.getUploadSignature,
 );
 
-router.post("/:id/attachments", protectOptional, chatRateLimit, authorizeUpload, receiveAttachment, chatController.uploadAttachment);
+router.post(
+  "/:id/attachments",
+  protectOptional,
+  chatRateLimit,
+  authorizeUpload,
+  receiveAttachment,
+  chatController.uploadAttachment,
+);
 
 // Customer chat list - authenticated only (guests don't have persistent lists)
 router.get(
@@ -41,7 +62,7 @@ router.get(
   protect,
   restrictTo("customer"),
   validate(getChatsQuerySchema, "query"),
-  chatController.getMyChats
+  chatController.getMyChats,
 );
 
 // Guest-eligible routes
@@ -51,7 +72,7 @@ router.get(
   "/:id/messages",
   protectOptional,
   validate(getMessagesQuerySchema, "query"),
-  chatController.getChatMessages
+  chatController.getChatMessages,
 );
 
 router.post(
@@ -59,19 +80,29 @@ router.post(
   protectOptional,
   sendMessageRateLimit,
   validate(sendMessageSchema),
-  chatController.sendMessage
+  chatController.sendMessage,
 );
 
 router.patch("/:id/read", protectOptional, chatController.markMessagesRead);
 
-router.patch("/:id/close", protectOptional, chatRateLimit, chatController.closeChat);
-router.patch("/:id/toggle-bot", protectOptional, chatRateLimit, chatController.toggleBot);
+router.patch(
+  "/:id/close",
+  protectOptional,
+  chatRateLimit,
+  chatController.closeChat,
+);
+router.patch(
+  "/:id/toggle-bot",
+  protectOptional,
+  chatRateLimit,
+  chatController.toggleBot,
+);
 
 // Update message attachments with real URLs after upload (sync blob URLs to real Cloudinary URLs)
 router.patch(
   "/:id/messages/:messageId/attachments",
   protectOptional,
-  chatController.updateMessageAttachments
+  chatController.updateMessageAttachments,
 );
 
 // Admin routes - keep strict auth
@@ -79,7 +110,7 @@ router.get(
   "/admin/stats",
   protect,
   restrictTo("admin"),
-  chatController.getChatStats
+  chatController.getChatStats,
 );
 
 router.get(
@@ -87,21 +118,21 @@ router.get(
   protect,
   restrictTo("admin"),
   validate(getChatsQuerySchema, "query"),
-  chatController.getAllChats
+  chatController.getAllChats,
 );
 
 router.get(
   "/admin/queue",
   protect,
   restrictTo("admin"),
-  chatController.getWaitingQueue
+  chatController.getWaitingQueue,
 );
 
 router.patch(
   "/:id/resolve",
   protect,
   restrictTo("admin"),
-  chatController.resolveChat
+  chatController.resolveChat,
 );
 
 module.exports = router;

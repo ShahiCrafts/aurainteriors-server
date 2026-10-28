@@ -18,22 +18,29 @@ const fs = require("node:fs");
 const REPO = path.resolve(__dirname, "../../..");
 
 async function main() {
-  const { MongoMemoryServer } = require(path.join(REPO, "node_modules/mongodb-memory-server"));
+  const { MongoMemoryServer } = require(
+    path.join(REPO, "node_modules/mongodb-memory-server"),
+  );
   const base = path.join(process.env.HOME, "workspace/aura-catalog/mms-data");
   fs.mkdirSync(base, { recursive: true });
   const dbPath = fs.mkdtempSync(path.join(base, "cat8assign-"));
-  const mongod = await MongoMemoryServer.create({ instance: { dbPath, storageEngine: "wiredTiger" } });
+  const mongod = await MongoMemoryServer.create({
+    instance: { dbPath, storageEngine: "wiredTiger" },
+  });
   const uri = mongod.getUri("aura_catalog_phase8_assign_test");
 
   const mongoose = require(path.join(REPO, "node_modules/mongoose"));
   await mongoose.connect(uri);
   const ProductType = require(path.join(REPO, "models/productType.model"));
-  const bootstrap = require(path.join(REPO, "services/catalogBootstrap.service"));
-  const catalogCtrl = require(path.join(REPO, "controllers/catalog.controller"));
-  const {
-    createProductTypeSchema,
-    updateProductTypeSchema,
-  } = require(path.join(REPO, "validators/catalog.validator"));
+  const bootstrap = require(
+    path.join(REPO, "services/catalogBootstrap.service"),
+  );
+  const catalogCtrl = require(
+    path.join(REPO, "controllers/catalog.controller"),
+  );
+  const { createProductTypeSchema, updateProductTypeSchema } = require(
+    path.join(REPO, "validators/catalog.validator"),
+  );
 
   const say = (line) => console.log(`RESULT ${line}`);
 
@@ -41,12 +48,31 @@ async function main() {
     const res = {
       statusCode: undefined,
       body: undefined,
-      status(code) { this.statusCode = code; return this; },
-      json(payload) { this.body = payload; return this; },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return this;
+      },
     };
     let error;
-    const next = (err) => { error = err; };
-    handler({ file: undefined, files: undefined, params: {}, body: {}, query: {}, ...req }, res, next);
+    const next = (err) => {
+      error = err;
+    };
+    handler(
+      {
+        file: undefined,
+        files: undefined,
+        params: {},
+        body: {},
+        query: {},
+        ...req,
+      },
+      res,
+      next,
+    );
     const start = Date.now();
     while (res.body === undefined && error === undefined) {
       if (Date.now() - start > 15000) throw new Error("handler did not settle");
@@ -54,12 +80,18 @@ async function main() {
     }
     return { res, error };
   }
-  const statusOf = ({ res, error }) => (error ? error.statusCode : res.statusCode);
-  const messageOf = ({ res, error }) => (error ? error.message : (res.body && res.body.message) || "");
+  const statusOf = ({ res, error }) =>
+    error ? error.statusCode : res.statusCode;
+  const messageOf = ({ res, error }) =>
+    error ? error.message : (res.body && res.body.message) || "";
 
   const validated = (schema, body) => {
-    const { error, value } = schema.validate(body, { abortEarly: false, stripUnknown: true });
-    if (error) throw new Error(`schema rejected fixture body: ${error.message}`);
+    const { error, value } = schema.validate(body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error)
+      throw new Error(`schema rejected fixture body: ${error.message}`);
     return value;
   };
 
@@ -73,8 +105,12 @@ async function main() {
       attributeAssignments: [{ attributeKey: "noSuchAttribute" }],
     }),
   });
-  say(`create-unknown status=${statusOf(badCreate)} named=${messageOf(badCreate).includes("noSuchAttribute")}`);
-  say(`create-unknown persisted=${Boolean(await ProductType.findOne({ key: "p8-bad-create" }))}`);
+  say(
+    `create-unknown status=${statusOf(badCreate)} named=${messageOf(badCreate).includes("noSuchAttribute")}`,
+  );
+  say(
+    `create-unknown persisted=${Boolean(await ProductType.findOne({ key: "p8-bad-create" }))}`,
+  );
 
   // ---- create: unknown keys in BOTH lists are named together ----
   const badBoth = await call(catalogCtrl.createProductType, {
@@ -86,8 +122,12 @@ async function main() {
     }),
   });
   const bothMsg = messageOf(badBoth);
-  say(`create-both status=${statusOf(badBoth)} names=${bothMsg.includes("missingKeyOne") && bothMsg.includes("missingKeyTwo")}`);
-  say(`create-both persisted=${Boolean(await ProductType.findOne({ key: "p8-bad-both" }))}`);
+  say(
+    `create-both status=${statusOf(badBoth)} names=${bothMsg.includes("missingKeyOne") && bothMsg.includes("missingKeyTwo")}`,
+  );
+  say(
+    `create-both persisted=${Boolean(await ProductType.findOne({ key: "p8-bad-both" }))}`,
+  );
 
   // ---- create: known assignment key passes and is stored ----
   const goodCreate = await call(catalogCtrl.createProductType, {
@@ -99,7 +139,9 @@ async function main() {
   });
   say(`create-known status=${statusOf(goodCreate)}`);
   const goodStored = await ProductType.findOne({ key: "p8-good" }).lean();
-  say(`create-known stored=${goodStored.attributeAssignments.map((a) => a.attributeKey).join(",")}`);
+  say(
+    `create-known stored=${goodStored.attributeAssignments.map((a) => a.attributeKey).join(",")}`,
+  );
 
   // ---- update: unknown assignment key rejected, stored doc unchanged ----
   const badUpdate = await call(catalogCtrl.updateProductType, {
@@ -108,9 +150,13 @@ async function main() {
       attributeAssignments: [{ attributeKey: "anotherMissing" }],
     }),
   });
-  say(`update-unknown status=${statusOf(badUpdate)} named=${messageOf(badUpdate).includes("anotherMissing")}`);
+  say(
+    `update-unknown status=${statusOf(badUpdate)} named=${messageOf(badUpdate).includes("anotherMissing")}`,
+  );
   const afterBadUpdate = await ProductType.findOne({ key: "p8-good" }).lean();
-  say(`update-unknown stored=${afterBadUpdate.attributeAssignments.map((a) => a.attributeKey).join(",")}`);
+  say(
+    `update-unknown stored=${afterBadUpdate.attributeAssignments.map((a) => a.attributeKey).join(",")}`,
+  );
 
   // ---- update: known assignment key passes ----
   const goodUpdate = await call(catalogCtrl.updateProductType, {
@@ -121,7 +167,9 @@ async function main() {
   });
   say(`update-known status=${statusOf(goodUpdate)}`);
   const afterGoodUpdate = await ProductType.findOne({ key: "p8-good" }).lean();
-  say(`update-known stored=${afterGoodUpdate.attributeAssignments.map((a) => a.attributeKey).join(",")}`);
+  say(
+    `update-known stored=${afterGoodUpdate.attributeAssignments.map((a) => a.attributeKey).join(",")}`,
+  );
 
   await mongoose.disconnect();
   await mongod.stop({ doCleanup: true, force: true });
@@ -129,5 +177,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.log(`RESULT probe-error ${err && err.message}`); process.exit(2); }
+  (err) => {
+    console.log(`RESULT probe-error ${err && err.message}`);
+    process.exit(2);
+  },
 );

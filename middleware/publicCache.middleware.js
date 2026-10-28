@@ -18,7 +18,7 @@ module.exports = function publicCache(req, res, next) {
   if (!hasAuthorization && !hasJwtCookie) {
     res.setHeader(
       "Cache-Control",
-      "public, max-age=60, stale-while-revalidate=300"
+      "public, max-age=60, stale-while-revalidate=300",
     );
   }
   return next();

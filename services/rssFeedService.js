@@ -86,12 +86,13 @@ function extractImageUrl(item) {
   // FA-67: only http/https URLs may be stored as the featured image -
   // feed-controlled fields must not smuggle javascript:/data:/file: URLs
   // into records the storefront renders.
-  const httpUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : null);
+  const httpUrl = (u) =>
+    typeof u === "string" && /^https?:\/\//i.test(u) ? u : null;
   // Try various image sources
-  if (item.mediaContent?.$ ?.url) {
+  if (item.mediaContent?.$?.url) {
     return httpUrl(item.mediaContent.$.url);
   }
-  if (item.mediaThumbnail?.$ ?.url) {
+  if (item.mediaThumbnail?.$?.url) {
     return httpUrl(item.mediaThumbnail.$.url);
   }
   if (item.enclosure?.url && item.enclosure.type?.startsWith("image")) {
@@ -99,7 +100,8 @@ function extractImageUrl(item) {
   }
 
   // Try to extract from content
-  const content = item.contentEncoded || item.content || item.contentSnippet || "";
+  const content =
+    item.contentEncoded || item.content || item.contentSnippet || "";
   const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
   if (imgMatch) {
     return httpUrl(imgMatch[1]);
@@ -133,13 +135,20 @@ function extractExcerpt(item, maxLength = 300) {
   text = stripTagsToPlainText(text);
 
   // Decode common encoded entities before generating a readable excerpt.
-  text = text.replace(/&(?:nbsp|#160);/gi, " ")
-    .replace(/&amp;/gi, "&").replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
+  text = text
+    .replace(/&(?:nbsp|#160);/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
   // Entities decoded above can re-form tag text ("&lt;script&gt;");
   // strip once more so the stored excerpt never carries tag structure.
   text = stripTagsToPlainText(text);
-  text = text.replace(/\s+/g, " ").replace(/\bREAD MORE(?:\.{2,}|…)?\s*$/i, "").trim();
+  text = text
+    .replace(/\s+/g, " ")
+    .replace(/\bREAD MORE(?:\.{2,}|…)?\s*$/i, "")
+    .trim();
 
   // Truncate to max length
   if (text.length > maxLength) {
@@ -153,7 +162,8 @@ function extractExcerpt(item, maxLength = 300) {
  * Determine category based on content keywords
  */
 function determineCategory(item, defaultCategory) {
-  const text = `${item.title} ${item.contentSnippet || ""} ${item.categories?.join(" ") || ""}`.toLowerCase();
+  const text =
+    `${item.title} ${item.contentSnippet || ""} ${item.categories?.join(" ") || ""}`.toLowerCase();
 
   if (text.match(/small\s*space|apartment|compact|studio/)) {
     return "small-spaces";
@@ -195,7 +205,11 @@ function extractTags(item) {
   const titleWords = item.title
     .toLowerCase()
     .split(/\s+/)
-    .filter((word) => word.length > 4 && !["about", "these", "their", "would", "could", "should"].includes(word))
+    .filter(
+      (word) =>
+        word.length > 4 &&
+        !["about", "these", "their", "would", "could", "should"].includes(word),
+    )
     .slice(0, 3);
 
   tags.push(...titleWords);
@@ -216,17 +230,30 @@ function cleanArticleHtml(html) {
   // <meta refresh>, <object> and srcset through (B-22).
   // FA-68: the editorial pre-pass uses a backreference regex - cap the
   // input before it runs (feed-controlled HTML is otherwise unbounded).
-  const editorial = String(html || "").slice(0, 1000000)
-    .replace(/<([a-z][\w:-]*)\b[^>]*\b(?:class|id)=["'][^"']*(?:newsletter|subscribe|advert|promo|social|related|recommend|signup|paywall)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, "");
+  const editorial = String(html || "")
+    .slice(0, 1000000)
+    .replace(
+      /<([a-z][\w:-]*)\b[^>]*\b(?:class|id)=["'][^"']*(?:newsletter|subscribe|advert|promo|social|related|recommend|signup|paywall)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,
+      "",
+    );
   return sanitizeArticleHtml(editorial);
 }
 function readableLength(html) {
-  return String(html || "").replace(/<[^>]*>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim().length;
+  return String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&[a-z#0-9]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
 }
 async function fetchArticleBody(url, publisherUrl) {
   const target = new URL(url);
   const publisher = new URL(publisherUrl);
-  if (target.protocol !== "https:" || target.hostname !== publisher.hostname && !target.hostname.endsWith(`.${publisher.hostname}`)) return "";
+  if (
+    target.protocol !== "https:" ||
+    (target.hostname !== publisher.hostname &&
+      !target.hostname.endsWith(`.${publisher.hostname}`))
+  )
+    return "";
   // FA-15/FA-16: fetch through the shared guarded helper - the host is
   // resolved and validated ONCE and the request pinned to that address
   // (no validate-then-fetch rebinding window), redirects are re-validated
@@ -234,14 +261,19 @@ async function fetchArticleBody(url, publisherUrl) {
   let response;
   try {
     response = await guardedFetch(target.href, {
-      timeoutMs: 8000, maxBytes: 2 * 1024 * 1024,
-      headers: { "User-Agent": "AuraInteriorsRSSReader/1.0", Accept: "text/html" },
+      timeoutMs: 8000,
+      maxBytes: 2 * 1024 * 1024,
+      headers: {
+        "User-Agent": "AuraInteriorsRSSReader/1.0",
+        Accept: "text/html",
+      },
     });
   } catch {
     return "";
   }
   if (response.status !== 200) return "";
-  if (!String(response.headers.get("content-type") || "").includes("text/html")) return "";
+  if (!String(response.headers.get("content-type") || "").includes("text/html"))
+    return "";
   const page = await response.text();
   // Only extract an explicitly identified article body; avoid publishing full page chrome.
   const candidates = [
@@ -268,7 +300,8 @@ async function fetchFeed(feedConfig) {
     // which fetched with no SSRF guard at all. Fetch via the guarded
     // helper, then parse the string with the same parser configuration.
     const feedResponse = await guardedFetch(feedConfig.feedUrl, {
-      timeoutMs: 10000, maxBytes: 5 * 1024 * 1024,
+      timeoutMs: 10000,
+      maxBytes: 5 * 1024 * 1024,
       headers: { "User-Agent": "Mozilla/5.0 (compatible; AuraInteriors/1.0)" },
     });
     if (!feedResponse.ok) throw new Error(`Feed HTTP ${feedResponse.status}`);
@@ -278,17 +311,27 @@ async function fetchFeed(feedConfig) {
 
     for (const item of feed.items.slice(0, 10)) {
       // Skip if no title or link (FA-67: the stored originalUrl must be http/https)
-      if (!item.title || !item.link || !/^https?:\/\//i.test(item.link)) continue;
+      if (!item.title || !item.link || !/^https?:\/\//i.test(item.link))
+        continue;
 
-      const rssContent = cleanArticleHtml(item.contentEncoded || item["content:encoded"] || item.content || item.description || "");
+      const rssContent = cleanArticleHtml(
+        item.contentEncoded ||
+          item["content:encoded"] ||
+          item.content ||
+          item.description ||
+          "",
+      );
       let content = rssContent;
       // Feed descriptions are often teasers. Prefer a verified longer publisher body.
       if (readableLength(rssContent) < 1200) {
         try {
           const fullBody = await fetchArticleBody(item.link, feedConfig.url);
-          if (readableLength(fullBody) > readableLength(content) * 1.5) content = fullBody;
+          if (readableLength(fullBody) > readableLength(content) * 1.5)
+            content = fullBody;
         } catch (error) {
-          console.warn(`Article extraction skipped (${feedConfig.name}): ${error.message}`);
+          console.warn(
+            `Article extraction skipped (${feedConfig.name}): ${error.message}`,
+          );
         }
       }
       const article = {
@@ -334,7 +377,9 @@ let rssFetchInFlight = false;
  */
 async function fetchAllFeeds() {
   if (rssFetchInFlight) {
-    console.log("RSS feed fetch already in progress; skipping overlapping invocation");
+    console.log(
+      "RSS feed fetch already in progress; skipping overlapping invocation",
+    );
     return { newArticles: 0, errors: 0, skipped: true };
   }
   rssFetchInFlight = true;
@@ -356,24 +401,37 @@ async function fetchAllFeedsCycle() {
       const articles = await fetchFeed(feedConfig);
 
       if (articles.length) {
-        const result = await Blog.bulkWrite(articles.map(article => ({
-          updateOne: {
-            filter: { originalUrl: article.originalUrl },
-            update: {
-              $setOnInsert: article,
-              // Refresh content on ingestion, including previously imported summary-only rows.
-              // Never replace a longer existing article with a shorter teaser.
+        const result = await Blog.bulkWrite(
+          articles.map((article) => ({
+            updateOne: {
+              filter: { originalUrl: article.originalUrl },
+              update: {
+                $setOnInsert: article,
+                // Refresh content on ingestion, including previously imported summary-only rows.
+                // Never replace a longer existing article with a shorter teaser.
+              },
+              upsert: true,
             },
-            upsert: true,
-          },
-        })), { ordered: false });
+          })),
+          { ordered: false },
+        );
         totalNew += result.upsertedCount || 0;
         // Conditional upgrades avoid clobbering complete existing content.
         for (const article of articles) {
           if (readableLength(article.content) < 500) continue;
-          const current = await Blog.findOne({ originalUrl: article.originalUrl }, { content: 1 }).lean();
-          if (current && readableLength(article.content) > readableLength(current.content) * 1.5) {
-            await Blog.updateOne({ _id: current._id, content: current.content }, { $set: { content: article.content, excerpt: article.excerpt } });
+          const current = await Blog.findOne(
+            { originalUrl: article.originalUrl },
+            { content: 1 },
+          ).lean();
+          if (
+            current &&
+            readableLength(article.content) >
+              readableLength(current.content) * 1.5
+          ) {
+            await Blog.updateOne(
+              { _id: current._id, content: current.content },
+              { $set: { content: article.content, excerpt: article.excerpt } },
+            );
           }
         }
       }
@@ -386,7 +444,9 @@ async function fetchAllFeedsCycle() {
     }
   }
 
-  console.log(`RSS feed fetch complete. New articles: ${totalNew}, Errors: ${totalErrors}`);
+  console.log(
+    `RSS feed fetch complete. New articles: ${totalNew}, Errors: ${totalErrors}`,
+  );
 
   return { newArticles: totalNew, errors: totalErrors };
 }

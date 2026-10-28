@@ -27,7 +27,10 @@ const cookieOptions = () => ({
 
 exports.issueOauthState = (res) => {
   const state = crypto.randomBytes(32).toString("hex");
-  res.cookie(OAUTH_STATE_COOKIE, state, { ...cookieOptions(), maxAge: MAX_AGE_MS });
+  res.cookie(OAUTH_STATE_COOKIE, state, {
+    ...cookieOptions(),
+    maxAge: MAX_AGE_MS,
+  });
   return state;
 };
 

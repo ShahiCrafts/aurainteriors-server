@@ -47,7 +47,7 @@ class MongoRateLimitStore {
     const live = await RateLimitCounter.findOneAndUpdate(
       { _id, resetAt: { $gt: now } },
       { $inc: { hits: 1 } },
-      { new: true }
+      { new: true },
     );
     if (live) return { totalHits: live.hits, resetTime: live.resetAt };
     // (2) No counter / expired window: upsert a fresh window.
@@ -55,7 +55,7 @@ class MongoRateLimitStore {
       const fresh = await RateLimitCounter.findOneAndUpdate(
         { _id },
         { $set: { hits: 1, resetAt: new Date(now.getTime() + this.windowMs) } },
-        { upsert: true, new: true }
+        { upsert: true, new: true },
       );
       return { totalHits: fresh.hits, resetTime: fresh.resetAt };
     } catch (error) {
@@ -65,9 +65,10 @@ class MongoRateLimitStore {
         const retried = await RateLimitCounter.findOneAndUpdate(
           { _id, resetAt: { $gt: new Date() } },
           { $inc: { hits: 1 } },
-          { new: true }
+          { new: true },
         );
-        if (retried) return { totalHits: retried.hits, resetTime: retried.resetAt };
+        if (retried)
+          return { totalHits: retried.hits, resetTime: retried.resetAt };
       }
       throw error;
     }
@@ -77,7 +78,7 @@ class MongoRateLimitStore {
     await RateLimitCounter.findOneAndUpdate(
       { _id: this.fullKey(key), hits: { $gt: 0 } },
       { $inc: { hits: -1 } },
-      { new: true }
+      { new: true },
     );
   }
 

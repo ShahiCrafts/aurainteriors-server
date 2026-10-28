@@ -32,7 +32,11 @@ exports.validateNotificationCreation = (req, res, next) => {
 exports.validateMarkAsRead = (req, res, next) => {
   const schema = Joi.object({
     notificationIds: Joi.array()
-      .items(Joi.string().pattern(/^[a-f0-9]{24}$/i).required())
+      .items(
+        Joi.string()
+          .pattern(/^[a-f0-9]{24}$/i)
+          .required(),
+      )
       .min(1)
       .max(100)
       .unique()
@@ -54,7 +58,11 @@ exports.validateMarkAsRead = (req, res, next) => {
 exports.validateArchive = (req, res, next) => {
   const schema = Joi.object({
     notificationIds: Joi.array()
-      .items(Joi.string().pattern(/^[a-f0-9]{24}$/i).required())
+      .items(
+        Joi.string()
+          .pattern(/^[a-f0-9]{24}$/i)
+          .required(),
+      )
       .min(1)
       .max(100)
       .unique()

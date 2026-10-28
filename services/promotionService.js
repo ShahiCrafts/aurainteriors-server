@@ -50,7 +50,7 @@ class PromotionService {
     if (!promotion.canEdit) {
       throw new AppError(
         "Cannot edit a promotion that has already been sent",
-        400
+        400,
       );
     }
 
@@ -122,7 +122,11 @@ class PromotionService {
     const broadcastJobs = require("./broadcastJobs.service");
     if (broadcastJobs.isQueueMode()) {
       const job = await broadcastJobs.enqueuePromotion(promotionId);
-      return { queued: true, jobId: job._id, message: "Promotion queued for sending" };
+      return {
+        queued: true,
+        jobId: job._id,
+        message: "Promotion queued for sending",
+      };
     }
     return this.performPromotionSend(promotionId);
   }
@@ -132,15 +136,18 @@ class PromotionService {
     // can no longer both pass the status check and double-broadcast.
     const prior = await Promotion.findById(promotionId).select("status").lean();
     if (!prior) throw new AppError("Promotion not found", 404);
-    if (prior.status === "sent") throw new AppError("This promotion has already been sent", 400);
-    if (prior.status === "cancelled") throw new AppError("Cannot send a cancelled promotion", 400);
+    if (prior.status === "sent")
+      throw new AppError("This promotion has already been sent", 400);
+    if (prior.status === "cancelled")
+      throw new AppError("Cannot send a cancelled promotion", 400);
 
     const promotion = await Promotion.findOneAndUpdate(
       { _id: promotionId, status: { $in: ["draft", "scheduled"] } },
       { $set: { status: "sending" } },
-      { new: true }
+      { new: true },
     );
-    if (!promotion) throw new AppError("This promotion is already being sent", 409);
+    if (!promotion)
+      throw new AppError("This promotion is already being sent", 409);
     await promotion.populate("discount", "code discountPercentage");
     await promotion.populate("createdBy", "firstName lastName");
 
@@ -166,7 +173,9 @@ class PromotionService {
         // any markup an author pasted so it cannot render as HTML in
         // notification UIs or email digests.
         title: stripHtmlTags(promotion.title),
-        message: stripHtmlTags(promotion.shortDescription || promotion.description),
+        message: stripHtmlTags(
+          promotion.shortDescription || promotion.description,
+        ),
         expiresAt: promotion.expiresAt,
         type: "promotional",
         category: "promotion",
@@ -190,12 +199,16 @@ class PromotionService {
       const result = await this.broadcastPromotionToUsers(
         notificationData,
         targetUserIds,
-        promotion._id
+        promotion._id,
       );
 
       promotion.metrics.sentCount = result.sentCount;
       promotion.metrics.failedCount = result.failedCount;
-      if (result.failedCount) throw new AppError("Some promotion notifications could not be persisted; retry required", 503);
+      if (result.failedCount)
+        throw new AppError(
+          "Some promotion notifications could not be persisted; retry required",
+          503,
+        );
       promotion.status = "sent";
       promotion.sentAt = new Date();
       promotion.notification = result.notificationId;
@@ -227,7 +240,7 @@ class PromotionService {
     if (!promotion.canEdit) {
       throw new AppError(
         "Cannot schedule a promotion that has already been sent",
-        400
+        400,
       );
     }
 
@@ -252,7 +265,7 @@ class PromotionService {
     if (promotion.status === "sent") {
       throw new AppError(
         "Cannot cancel a promotion that has already been sent",
-        400
+        400,
       );
     }
 
@@ -273,7 +286,13 @@ class PromotionService {
     const query = {};
     // FA-56: coerce at the sink.
     const { asEnum } = require("../utils/params");
-    const statusC = asEnum(status, ["draft", "scheduled", "sending", "sent", "cancelled"]);
+    const statusC = asEnum(status, [
+      "draft",
+      "scheduled",
+      "sending",
+      "sent",
+      "cancelled",
+    ]);
     if (statusC !== undefined) {
       query.status = statusC;
     }
@@ -321,7 +340,7 @@ class PromotionService {
     if (promotion.status === "sending") {
       throw new AppError(
         "Cannot delete a promotion that is currently sending",
-        400
+        400,
       );
     }
 
@@ -345,7 +364,7 @@ class PromotionService {
       } catch (error) {
         console.error(
           `Failed to send scheduled promotion ${promotion._id}:`,
-          error.message
+          error.message,
         );
         results.failed++;
       }
@@ -371,7 +390,10 @@ class PromotionService {
     // Unbound calls used to let any account inflate any campaign's metrics.
     if (userId) {
       const Notification = require("../models/notification.model");
-      const delivered = await Notification.exists({ recipient: userId, "data.promotionId": promotionId });
+      const delivered = await Notification.exists({
+        recipient: userId,
+        "data.promotionId": promotionId,
+      });
       if (!delivered) return;
     }
 
@@ -386,7 +408,7 @@ class PromotionService {
   async getPromotionAnalytics(promotionId) {
     const promotion = await Promotion.findById(promotionId).populate(
       "discount",
-      "code currentUsageCount"
+      "code currentUsageCount",
     );
 
     if (!promotion) {
@@ -415,7 +437,7 @@ class PromotionService {
             ? Math.round(
                 (promotion.metrics.clickCount /
                   promotion.metrics.deliveredCount) *
-                  100
+                  100,
               )
             : 0,
       },

@@ -14,7 +14,8 @@ router.use(standardReadLimiter);
 // not this endpoint, so gating it breaks nothing.
 router.get("/keep-alive-status", protect, restrictTo("admin"), (req, res) => {
   try {
-    if (!runtimeContext.getKeepAliveService()) { // AR-33: registry, not global.keepAliveService
+    if (!runtimeContext.getKeepAliveService()) {
+      // AR-33: registry, not global.keepAliveService
       return res.status(503).json({
         success: false,
         error: "Keep-Alive service not initialized",

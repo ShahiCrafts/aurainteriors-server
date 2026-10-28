@@ -78,7 +78,7 @@ const productTypeSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 productTypeSchema.index({ active: 1, sortOrder: 1 });

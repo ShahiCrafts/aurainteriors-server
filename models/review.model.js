@@ -69,7 +69,7 @@ const reviewSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Compound index to ensure one review per user per product
@@ -84,9 +84,7 @@ reviewSchema.index({ rating: 1 });
 // APPROVED reviews count, each contributing 1 to the count and its
 // rating to the sum.
 const ratingContribution = (doc) =>
-  doc && doc.isApproved
-    ? { count: 1, sum: doc.rating }
-    : { count: 0, sum: 0 };
+  doc && doc.isApproved ? { count: 1, sum: doc.rating } : { count: 0, sum: 0 };
 
 // Static method to calculate average rating for a product FROM
 // SCRATCH (full aggregation over all its approved reviews). AR-24:
@@ -96,7 +94,10 @@ const ratingContribution = (doc) =>
 reviewSchema.statics.calcAverageRating = async function (productId) {
   const stats = await this.aggregate([
     {
-      $match: { product: new mongoose.Types.ObjectId(productId), isApproved: true },
+      $match: {
+        product: new mongoose.Types.ObjectId(productId),
+        isApproved: true,
+      },
     },
     {
       $group: {
@@ -135,7 +136,11 @@ reviewSchema.statics.calcAverageRating = async function (productId) {
 // match the filter: their sum cannot be derived from the rounded
 // average, so the first tracked write initializes it exactly via
 // the from-scratch recompute instead. No migration is needed.
-reviewSchema.statics.applyRatingDelta = async function (productId, dCount, dSum) {
+reviewSchema.statics.applyRatingDelta = async function (
+  productId,
+  dCount,
+  dSum,
+) {
   if (!productId || (dCount === 0 && dSum === 0)) return;
   const Product = mongoose.model("Product");
   const updated = await Product.findOneAndUpdate(
@@ -143,8 +148,12 @@ reviewSchema.statics.applyRatingDelta = async function (productId, dCount, dSum)
     [
       {
         $set: {
-          "rating.count": { $max: [0, { $add: [{ $ifNull: ["$rating.count", 0] }, dCount] }] },
-          "rating.sum": { $max: [0, { $add: [{ $ifNull: ["$rating.sum", 0] }, dSum] }] },
+          "rating.count": {
+            $max: [0, { $add: [{ $ifNull: ["$rating.count", 0] }, dCount] }],
+          },
+          "rating.sum": {
+            $max: [0, { $add: [{ $ifNull: ["$rating.sum", 0] }, dSum] }],
+          },
         },
       },
       {
@@ -158,7 +167,12 @@ reviewSchema.statics.applyRatingDelta = async function (productId, dCount, dSum)
                   {
                     $floor: {
                       $add: [
-                        { $multiply: [{ $divide: ["$rating.sum", "$rating.count"] }, 10] },
+                        {
+                          $multiply: [
+                            { $divide: ["$rating.sum", "$rating.count"] },
+                            10,
+                          ],
+                        },
                         0.5,
                       ],
                     },
@@ -171,7 +185,7 @@ reviewSchema.statics.applyRatingDelta = async function (productId, dCount, dSum)
         },
       },
     ],
-    { updatePipeline: true }
+    { updatePipeline: true },
   );
   if (!updated) {
     // Either the product is gone (nothing to maintain) or it is a
@@ -186,9 +200,9 @@ reviewSchema.statics.applyRatingDelta = async function (productId, dCount, dSum)
 reviewSchema.statics.getRatingBreakdown = async function (productId) {
   const breakdown = await this.aggregate([
     {
-      $match: { 
-        product: new mongoose.Types.ObjectId(productId), 
-        isApproved: true 
+      $match: {
+        product: new mongoose.Types.ObjectId(productId),
+        isApproved: true,
       },
     },
     {
@@ -256,7 +270,7 @@ reviewSchema.post("save", async function () {
     await this.constructor.applyRatingDelta(
       this.product,
       afterContribution.count,
-      afterContribution.sum
+      afterContribution.sum,
     );
     return;
   }
@@ -267,19 +281,19 @@ reviewSchema.post("save", async function () {
     await this.constructor.applyRatingDelta(
       before.product,
       -beforeContribution.count,
-      -beforeContribution.sum
+      -beforeContribution.sum,
     );
     await this.constructor.applyRatingDelta(
       this.product,
       afterContribution.count,
-      afterContribution.sum
+      afterContribution.sum,
     );
     return;
   }
   await this.constructor.applyRatingDelta(
     this.product,
     afterContribution.count - beforeContribution.count,
-    afterContribution.sum - beforeContribution.sum
+    afterContribution.sum - beforeContribution.sum,
   );
 });
 
@@ -290,7 +304,7 @@ reviewSchema.post("findOneAndDelete", async function (doc) {
     await doc.constructor.applyRatingDelta(
       doc.product,
       -contribution.count,
-      -contribution.sum
+      -contribution.sum,
     );
   }
 });

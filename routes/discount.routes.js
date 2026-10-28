@@ -1,4 +1,7 @@
-const { standardReadLimiter, standardWriteLimiter } = require("../middleware/rateLimit.middleware");
+const {
+  standardReadLimiter,
+  standardWriteLimiter,
+} = require("../middleware/rateLimit.middleware");
 const objectIdParam = require("../middleware/objectIdParam.middleware");
 const express = require("express");
 const router = express.Router();
@@ -6,7 +9,11 @@ router.use(standardReadLimiter);
 router.use(standardWriteLimiter);
 router.param("id", objectIdParam);
 const discountController = require("../controllers/discount.controller");
-const { protect, protectOptional, restrictTo } = require("../middleware/auth.middleware");
+const {
+  protect,
+  protectOptional,
+  restrictTo,
+} = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
 const {
   createDiscountSchema,
@@ -16,32 +23,37 @@ const {
   previewDiscountSchema,
 } = require("../validators/discount.validator");
 
-router.post("/preview", protectOptional, validate(previewDiscountSchema), discountController.previewDiscount);
+router.post(
+  "/preview",
+  protectOptional,
+  validate(previewDiscountSchema),
+  discountController.previewDiscount,
+);
 
 router.use(protect);
 
 router.post(
   "/apply",
   validate(applyDiscountSchema),
-  discountController.applyDiscount
+  discountController.applyDiscount,
 );
 router.get("/validate/:code", discountController.validateDiscount);
 router.use(restrictTo("admin"));
 router.get(
   "/",
   validate(getDiscountsQuerySchema, "query"),
-  discountController.getAllDiscounts
+  discountController.getAllDiscounts,
 );
 router.get("/:id", discountController.getDiscount);
 router.post(
   "/",
   validate(createDiscountSchema),
-  discountController.createDiscount
+  discountController.createDiscount,
 );
 router.patch(
   "/:id",
   validate(updateDiscountSchema),
-  discountController.updateDiscount
+  discountController.updateDiscount,
 );
 router.delete("/:id", discountController.deleteDiscount);
 

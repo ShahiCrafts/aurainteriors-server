@@ -11,7 +11,13 @@
 // them because they settle by writing the response (or calling next).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("../audit/helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("../audit/helpers");
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -45,13 +51,24 @@ const retryDoc = {
   fileName: "guide.pdf",
   status: "failed",
   error: "previous failure",
-  save: async function () { return this; },
+  save: async function () {
+    return this;
+  },
 };
-const storedDoc = { _id: DOC_ID, fileName: "guide.pdf", filePublicId: "doc-public-1", status: "ready" };
+const storedDoc = {
+  _id: DOC_ID,
+  fileName: "guide.pdf",
+  filePublicId: "doc-public-1",
+  status: "ready",
+};
 
 stubModule("models/document.model", {
   findById: async (id) => (id === DOC_ID ? storedDoc : retryDoc),
-  findByIdAndUpdate: async (id, update) => ({ _id: id, fileName: "guide.pdf", ...update }),
+  findByIdAndUpdate: async (id, update) => ({
+    _id: id,
+    fileName: "guide.pdf",
+    ...update,
+  }),
   findByIdAndDelete: async () => storedDoc,
   create: async (doc) => ({ _id: DOC_ID, ...doc }),
   find: () => makeQuery([storedDoc]),
@@ -59,7 +76,9 @@ stubModule("models/document.model", {
 });
 
 stubModule("services/backgroundTasks", {
-  runDocumentIngestion: (id) => { ingestionCalls.push(id); },
+  runDocumentIngestion: (id) => {
+    ingestionCalls.push(id);
+  },
   startBackgroundTasks: () => {},
   stopBackgroundTasks: () => {},
   releaseExpiredGuestCodHolds: async () => {},
@@ -67,7 +86,9 @@ stubModule("services/backgroundTasks", {
 
 stubModule("@qdrant/js-client-rest", {
   QdrantClient: class {
-    async delete() { return {}; }
+    async delete() {
+      return {};
+    }
   },
 });
 
@@ -76,7 +97,12 @@ stubModule("@qdrant/js-client-rest", {
 // ---------------------------------------------------------------------------
 const categoryList = [
   { _id: CAT_ID, name: "Chairs", slug: "chairs", status: "active" },
-  { _id: "64b64c2f4f5a6b7c8d9e0f22", name: "Tables", slug: "tables", status: "active" },
+  {
+    _id: "64b64c2f4f5a6b7c8d9e0f22",
+    name: "Tables",
+    slug: "tables",
+    status: "active",
+  },
 ];
 const currentCategory = {
   _id: CAT_ID,
@@ -87,7 +113,9 @@ const currentCategory = {
   status: "active",
   sortOrder: 1,
   imagePublicId: null,
-  save: async function () { return this; },
+  save: async function () {
+    return this;
+  },
 };
 
 stubModule("models/category.model", {
@@ -112,13 +140,31 @@ function freshProduct() {
     status: "active",
     deletedAt: null,
     images: [
-      { _id: { toString: () => "img-1" }, url: "https://img/1", publicId: "p1", isPrimary: true },
-      { _id: { toString: () => "img-2" }, url: "https://img/2", publicId: "p2", isPrimary: false },
+      {
+        _id: { toString: () => "img-1" },
+        url: "https://img/1",
+        publicId: "p1",
+        isPrimary: true,
+      },
+      {
+        _id: { toString: () => "img-2" },
+        url: "https://img/2",
+        publicId: "p2",
+        isPrimary: false,
+      },
     ],
-    modelFiles: [{ url: "https://model/1", publicId: "mp1", isExternal: false }],
-    save: async function () { return this; },
-    populate: async function () { return this; },
-    softDelete: async function () { this.deletedAt = new Date(); },
+    modelFiles: [
+      { url: "https://model/1", publicId: "mp1", isExternal: false },
+    ],
+    save: async function () {
+      return this;
+    },
+    populate: async function () {
+      return this;
+    },
+    softDelete: async function () {
+      this.deletedAt = new Date();
+    },
   };
 }
 let currentProduct = freshProduct();
@@ -215,7 +261,11 @@ stubModule("models/newsletter.model", {
 });
 
 stubModule("services/newsletterToken.service", {
-  verifyNewsletterToken: () => ({ email: "reader@example.com", nonce: "nonce-0", purpose: "subscribe" }),
+  verifyNewsletterToken: () => ({
+    email: "reader@example.com",
+    nonce: "nonce-0",
+    purpose: "subscribe",
+  }),
   issueNewsletterToken: () => "issued-token",
 });
 
@@ -233,25 +283,51 @@ stubModule("services/email.service", {
 // ---------------------------------------------------------------------------
 const announcementFixture = { _id: ANN_ID, title: "Sale", status: "published" };
 stubModule("services/announcementService", {
-  getAllAnnouncements: async () => ({ announcements: [announcementFixture], pagination: paginationFixture }),
+  getAllAnnouncements: async () => ({
+    announcements: [announcementFixture],
+    pagination: paginationFixture,
+  }),
   getAnnouncementById: async () => announcementFixture,
-  getPublicAnnouncements: async () => ({ announcements: [announcementFixture], pagination: paginationFixture }),
+  getPublicAnnouncements: async () => ({
+    announcements: [announcementFixture],
+    pagination: paginationFixture,
+  }),
   getPublicAnnouncementById: async () => announcementFixture,
-  getAnnouncementStats: async () => ({ total: 3, byStatus: { published: 2, draft: 1 }, totalViews: 42 }),
+  getAnnouncementStats: async () => ({
+    total: 3,
+    byStatus: { published: 2, draft: 1 },
+    totalViews: 42,
+  }),
   createAnnouncement: async (data) => ({ _id: ANN_ID, ...data }),
   updateAnnouncement: async () => announcementFixture,
   deleteAnnouncement: async () => {},
-  publishAnnouncement: async () => ({ ...announcementFixture, status: "published" }),
-  scheduleAnnouncement: async () => ({ ...announcementFixture, status: "scheduled" }),
-  archiveAnnouncement: async () => ({ ...announcementFixture, status: "archived" }),
+  publishAnnouncement: async () => ({
+    ...announcementFixture,
+    status: "published",
+  }),
+  scheduleAnnouncement: async () => ({
+    ...announcementFixture,
+    status: "scheduled",
+  }),
+  archiveAnnouncement: async () => ({
+    ...announcementFixture,
+    status: "archived",
+  }),
 });
 
 // ---------------------------------------------------------------------------
 // Stubs — promotion cluster (controller delegates to the service)
 // ---------------------------------------------------------------------------
-const promotionFixture = { _id: PROMO_ID, title: "Winter Sale", status: "draft" };
+const promotionFixture = {
+  _id: PROMO_ID,
+  title: "Winter Sale",
+  status: "draft",
+};
 stubModule("services/promotionService", {
-  getAllPromotions: async () => ({ promotions: [promotionFixture], pagination: paginationFixture }),
+  getAllPromotions: async () => ({
+    promotions: [promotionFixture],
+    pagination: paginationFixture,
+  }),
   getPromotionById: async () => promotionFixture,
   createPromotion: async (data) => ({ _id: PROMO_ID, ...data }),
   updatePromotion: async () => promotionFixture,
@@ -282,11 +358,16 @@ function freshContact() {
     priority: "medium",
     isRead: true,
     response: null,
-    save: async function () { return this; },
+    save: async function () {
+      return this;
+    },
   };
 }
 let currentContact = freshContact();
-const contactList = [freshContact(), { ...freshContact(), _id: CONTACT_ID_2, name: "John Roe" }];
+const contactList = [
+  freshContact(),
+  { ...freshContact(), _id: CONTACT_ID_2, name: "John Roe" },
+];
 
 stubModule("models/contact.model", {
   find: () => makeQuery(contactList),
@@ -295,7 +376,12 @@ stubModule("models/contact.model", {
   countDocuments: async () => 2,
   updateMany: async () => ({ matchedCount: 2, modifiedCount: 2 }),
   create: async (data) => ({ _id: CONTACT_ID, ...data }),
-  getStats: async () => ({ total: 10, unread: 3, statusCounts: { new: 4 }, categoryCounts: { general: 5 } }),
+  getStats: async () => ({
+    total: 10,
+    unread: 3,
+    statusCounts: { new: 4 },
+    categoryCounts: { general: 5 },
+  }),
 });
 
 stubModule("services/notificationEventEmitter", {
@@ -342,7 +428,11 @@ async function invoke(handler, req) {
 }
 
 function assertSuccess(res, next, statusCode) {
-  assert.equal(next.error, undefined, `handler must not error, got: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `handler must not error, got: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, statusCode);
   assert.equal(res.body.status, "success");
 }
@@ -353,11 +443,18 @@ function assertSuccess(res, next, statusCode) {
 
 test("PATCH /documents/:id/visibility — updateVisibility returns 200 with the updated document", async () => {
   ingestionCalls = [];
-  const req = baseReq({ params: { id: DOC_ID }, body: { visibility: "public" } });
+  const req = baseReq({
+    params: { id: DOC_ID },
+    body: { visibility: "public" },
+  });
   const { res, next } = await invoke(documentCtrl.updateVisibility, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.document.visibility, "public");
-  assert.deepEqual(ingestionCalls, [DOC_ID], "visibility change re-schedules ingestion");
+  assert.deepEqual(
+    ingestionCalls,
+    [DOC_ID],
+    "visibility change re-schedules ingestion",
+  );
 });
 
 test("DELETE /documents/:id — deleteDocument returns 200 with the deletion message", async () => {
@@ -385,14 +482,24 @@ test("POST /documents/:id/retry — retryDocumentIngestion returns 200 with the 
 // ===========================================================================
 
 test("GET /categories — getAllCategories returns 200 with the category list", async () => {
-  const { res, next } = await invoke(categoryCtrl.getAllCategories, baseReq({ query: {} }));
+  const { res, next } = await invoke(
+    categoryCtrl.getAllCategories,
+    baseReq({ query: {} }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, categoryList.length);
   assert.deepEqual(res.body.data.categories, categoryList);
 });
 
 test("POST /categories — createCategory returns 201 with the created category", async () => {
-  const req = baseReq({ body: { name: "Lighting", description: "Lamps and fixtures", status: "active", sortOrder: 3 } });
+  const req = baseReq({
+    body: {
+      name: "Lighting",
+      description: "Lamps and fixtures",
+      status: "active",
+      sortOrder: 3,
+    },
+  });
   const { res, next } = await invoke(categoryCtrl.createCategory, req);
   assertSuccess(res, next, 201);
   assert.equal(res.body.data.category.name, "Lighting");
@@ -400,7 +507,10 @@ test("POST /categories — createCategory returns 201 with the created category"
 });
 
 test("PATCH /categories/:id — updateCategory returns 200 with the updated category", async () => {
-  const req = baseReq({ params: { id: CAT_ID }, body: { name: "Designer Chairs", sortOrder: 2 } });
+  const req = baseReq({
+    params: { id: CAT_ID },
+    body: { name: "Designer Chairs", sortOrder: 2 },
+  });
   const { res, next } = await invoke(categoryCtrl.updateCategory, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.category.name, "Designer Chairs");
@@ -419,14 +529,20 @@ test("DELETE /categories/:id — deleteCategory returns 200 with the deletion me
 // ===========================================================================
 
 test("GET /products/featured — getFeaturedProducts returns 200 with the featured products", async () => {
-  const { res, next } = await invoke(productCtrl.getFeaturedProducts, baseReq({ query: { limit: "8" } }));
+  const { res, next } = await invoke(
+    productCtrl.getFeaturedProducts,
+    baseReq({ query: { limit: "8" } }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, productList.length);
   assert.deepEqual(res.body.data.products, productList);
 });
 
 test("GET /products/new-arrivals — getNewArrivals returns 200 with the new arrivals", async () => {
-  const { res, next } = await invoke(productCtrl.getNewArrivals, baseReq({ query: { limit: "8" } }));
+  const { res, next } = await invoke(
+    productCtrl.getNewArrivals,
+    baseReq({ query: { limit: "8" } }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, productList.length);
   assert.deepEqual(res.body.data.products, productList);
@@ -437,7 +553,10 @@ test("GET /products/:id/related — getRelatedProducts returns 200 with related 
   // SR-8 (Phase 0.5): the route binds the related product as
   // :productId (strict ObjectId guard), so the handler reads
   // req.params.productId; the direct invocation follows the route.
-  const req = baseReq({ params: { productId: PROD_ID }, query: { limit: "2" } });
+  const req = baseReq({
+    params: { productId: PROD_ID },
+    query: { limit: "2" },
+  });
   const { res, next } = await invoke(productCtrl.getRelatedProducts, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, productList.length);
@@ -463,7 +582,10 @@ test("DELETE /products/:id — deleteProduct returns 200 with the soft-delete me
   const { res, next } = await invoke(productCtrl.deleteProduct, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.message, "Product deleted successfully");
-  assert.ok(currentProduct.deletedAt instanceof Date, "softDelete stamped deletedAt");
+  assert.ok(
+    currentProduct.deletedAt instanceof Date,
+    "softDelete stamped deletedAt",
+  );
 });
 
 test("DELETE /products/:id/permanent — hardDeleteProduct returns 200 with the permanent-delete message", async () => {
@@ -503,18 +625,28 @@ test("GET /blogs/categories — getBlogCategories returns 200 with formatted cat
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.categories[0].slug, "all");
   assert.equal(res.body.data.categories[0].count, 5);
-  assert.deepEqual(res.body.data.categories[1], { slug: "trends", name: "Trends", count: 3 });
+  assert.deepEqual(res.body.data.categories[1], {
+    slug: "trends",
+    name: "Trends",
+    count: 3,
+  });
 });
 
 test("GET /blogs/popular — getPopularBlogs returns 200 with the popular blogs", async () => {
-  const { res, next } = await invoke(blogCtrl.getPopularBlogs, baseReq({ query: { limit: "5" } }));
+  const { res, next } = await invoke(
+    blogCtrl.getPopularBlogs,
+    baseReq({ query: { limit: "5" } }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, 1);
   assert.deepEqual(res.body.data.blogs, [blogDoc]);
 });
 
 test("GET /blogs/featured — getFeaturedBlogs returns 200 with the featured blogs", async () => {
-  const { res, next } = await invoke(blogCtrl.getFeaturedBlogs, baseReq({ query: { limit: "3" } }));
+  const { res, next } = await invoke(
+    blogCtrl.getFeaturedBlogs,
+    baseReq({ query: { limit: "3" } }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, 1);
   assert.deepEqual(res.body.data.blogs, [blogDoc]);
@@ -530,7 +662,10 @@ test("GET /blogs/stats — getBlogStats returns 200 with totals and counts", asy
 });
 
 test("GET /blogs/:id — getBlog returns 200 with the blog post", async () => {
-  const req = baseReq({ params: { id: "design-guide" }, user: { _id: ADMIN_ID, role: "customer" } });
+  const req = baseReq({
+    params: { id: "design-guide" },
+    user: { _id: ADMIN_ID, role: "customer" },
+  });
   const { res, next } = await invoke(blogCtrl.getBlog, req);
   assertSuccess(res, next, 200);
   assert.deepEqual(res.body.data.blog, blogDoc);
@@ -558,7 +693,10 @@ test("POST /blogs/refresh — refreshFeeds returns 200 reporting the new article
 // ===========================================================================
 
 test("POST /newsletter/confirm — confirmSubscription returns 200 confirming the subscription", async () => {
-  const req = baseReq({ body: { token: "payload.signature" }, user: undefined });
+  const req = baseReq({
+    body: { token: "payload.signature" },
+    user: undefined,
+  });
   const { res, next } = await invoke(newsletterCtrl.confirmSubscription, req);
   assert.equal(next.error, undefined);
   assert.equal(res.statusCode, 200);
@@ -583,24 +721,43 @@ test("GET /newsletter/stats — getStats returns 200 with subscriber statistics"
 // ===========================================================================
 
 test("GET /announcements/public — getPublicAnnouncements returns 200 with announcements and pagination", async () => {
-  const req = baseReq({ query: { page: "1", limit: "10" }, user: { _id: ADMIN_ID, role: "customer" } });
-  const { res, next } = await invoke(announcementCtrl.getPublicAnnouncements, req);
+  const req = baseReq({
+    query: { page: "1", limit: "10" },
+    user: { _id: ADMIN_ID, role: "customer" },
+  });
+  const { res, next } = await invoke(
+    announcementCtrl.getPublicAnnouncements,
+    req,
+  );
   assertSuccess(res, next, 200);
   assert.deepEqual(res.body.data.announcements, [announcementFixture]);
   assert.deepEqual(res.body.data.pagination, paginationFixture);
 });
 
 test("GET /announcements/public/:id — getPublicAnnouncement returns 200 with the announcement", async () => {
-  const req = baseReq({ params: { id: ANN_ID }, user: { _id: ADMIN_ID, role: "customer" } });
-  const { res, next } = await invoke(announcementCtrl.getPublicAnnouncement, req);
+  const req = baseReq({
+    params: { id: ANN_ID },
+    user: { _id: ADMIN_ID, role: "customer" },
+  });
+  const { res, next } = await invoke(
+    announcementCtrl.getPublicAnnouncement,
+    req,
+  );
   assertSuccess(res, next, 200);
   assert.deepEqual(res.body.data.announcement, announcementFixture);
 });
 
 test("GET /announcements/stats — getAnnouncementStats returns 200 with the stats", async () => {
-  const { res, next } = await invoke(announcementCtrl.getAnnouncementStats, baseReq());
+  const { res, next } = await invoke(
+    announcementCtrl.getAnnouncementStats,
+    baseReq(),
+  );
   assertSuccess(res, next, 200);
-  assert.deepEqual(res.body.data.stats, { total: 3, byStatus: { published: 2, draft: 1 }, totalViews: 42 });
+  assert.deepEqual(res.body.data.stats, {
+    total: 3,
+    byStatus: { published: 2, draft: 1 },
+    totalViews: 42,
+  });
 });
 
 test("GET /announcements/:id — getAnnouncement returns 200 with the announcement", async () => {
@@ -626,10 +783,19 @@ test("POST /announcements/:id/publish — publishAnnouncement returns 200 with t
 });
 
 test("POST /announcements/:id/schedule — scheduleAnnouncement returns 200 with the scheduled announcement", async () => {
-  const req = baseReq({ params: { id: ANN_ID }, body: { scheduledAt: "2026-11-01T10:00:00.000Z" } });
-  const { res, next } = await invoke(announcementCtrl.scheduleAnnouncement, req);
+  const req = baseReq({
+    params: { id: ANN_ID },
+    body: { scheduledAt: "2026-11-01T10:00:00.000Z" },
+  });
+  const { res, next } = await invoke(
+    announcementCtrl.scheduleAnnouncement,
+    req,
+  );
   assertSuccess(res, next, 200);
-  assert.match(res.body.message, /Announcement scheduled for 2026-11-01T10:00:00\.000Z/);
+  assert.match(
+    res.body.message,
+    /Announcement scheduled for 2026-11-01T10:00:00\.000Z/,
+  );
   assert.equal(res.body.data.announcement.status, "scheduled");
 });
 
@@ -676,10 +842,16 @@ test("DELETE /promotions/:id — deletePromotion returns 200 with the deletion m
 });
 
 test("POST /promotions/:id/schedule — schedulePromotion returns 200 with the scheduled promotion", async () => {
-  const req = baseReq({ params: { id: PROMO_ID }, body: { scheduledAt: "2026-11-05T09:30:00.000Z" } });
+  const req = baseReq({
+    params: { id: PROMO_ID },
+    body: { scheduledAt: "2026-11-05T09:30:00.000Z" },
+  });
   const { res, next } = await invoke(promotionCtrl.schedulePromotion, req);
   assertSuccess(res, next, 200);
-  assert.match(res.body.message, /Promotion scheduled for 2026-11-05T09:30:00\.000Z/);
+  assert.match(
+    res.body.message,
+    /Promotion scheduled for 2026-11-05T09:30:00\.000Z/,
+  );
   assert.equal(res.body.data.promotion.status, "scheduled");
 });
 
@@ -704,7 +876,10 @@ test("GET /promotions/:id/analytics — getPromotionAnalytics returns 200 with t
 // ===========================================================================
 
 test("GET /contacts — getAllContacts returns 200 with contacts and pagination", async () => {
-  const { res, next } = await invoke(contactCtrl.getAllContacts, baseReq({ query: {} }));
+  const { res, next } = await invoke(
+    contactCtrl.getAllContacts,
+    baseReq({ query: {} }),
+  );
   assertSuccess(res, next, 200);
   assert.equal(res.body.results, contactList.length);
   assert.equal(res.body.data.contacts.length, contactList.length);
@@ -714,7 +889,12 @@ test("GET /contacts — getAllContacts returns 200 with contacts and pagination"
 test("GET /contacts/stats — getContactStats returns 200 with the stats", async () => {
   const { res, next } = await invoke(contactCtrl.getContactStats, baseReq());
   assertSuccess(res, next, 200);
-  assert.deepEqual(res.body.data.stats, { total: 10, unread: 3, statusCounts: { new: 4 }, categoryCounts: { general: 5 } });
+  assert.deepEqual(res.body.data.stats, {
+    total: 10,
+    unread: 3,
+    statusCounts: { new: 4 },
+    categoryCounts: { general: 5 },
+  });
 });
 
 test("GET /contacts/:id — getContact returns 200 with the contact", async () => {
@@ -728,7 +908,10 @@ test("GET /contacts/:id — getContact returns 200 with the contact", async () =
 
 test("PATCH /contacts/:id — updateContact returns 200 with the updated contact", async () => {
   currentContact = freshContact();
-  const req = baseReq({ params: { id: CONTACT_ID }, body: { status: "in-progress", priority: "high" } });
+  const req = baseReq({
+    params: { id: CONTACT_ID },
+    body: { status: "in-progress", priority: "high" },
+  });
   const { res, next } = await invoke(contactCtrl.updateContact, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.contact.status, "in-progress");
@@ -737,7 +920,10 @@ test("PATCH /contacts/:id — updateContact returns 200 with the updated contact
 
 test("POST /contacts/:id/respond — respondToContact returns 200 after the response email is accepted", async () => {
   currentContact = freshContact();
-  const req = baseReq({ params: { id: CONTACT_ID }, body: { message: "Thanks for reaching out!" } });
+  const req = baseReq({
+    params: { id: CONTACT_ID },
+    body: { message: "Thanks for reaching out!" },
+  });
   const { res, next } = await invoke(contactCtrl.respondToContact, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.message, "Response submitted to the email provider");
@@ -758,7 +944,9 @@ test("DELETE /contacts/:id — deleteContact returns 200 with the deletion messa
 // NOTE: the bulk route is shadowed at the routing layer, but the handler
 // itself is invocable — this exercises bulkUpdateContacts directly.
 test("PATCH /contacts/bulk/update — bulkUpdateContacts returns 200 reporting the matched count", async () => {
-  const req = baseReq({ body: { ids: [CONTACT_ID, CONTACT_ID_2], status: "resolved" } });
+  const req = baseReq({
+    body: { ids: [CONTACT_ID, CONTACT_ID_2], status: "resolved" },
+  });
   const { res, next } = await invoke(contactCtrl.bulkUpdateContacts, req);
   assertSuccess(res, next, 200);
   assert.equal(res.body.message, "2 contacts updated successfully");

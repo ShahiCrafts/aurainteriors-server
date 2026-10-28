@@ -19,7 +19,12 @@ const os = require("node:os");
 const path = require("node:path");
 
 const repo = path.join(__dirname, "..", "..", "..");
-const MMS_SCRATCH = path.join(os.homedir(), "workspace", "aura-audit", "mms-data");
+const MMS_SCRATCH = path.join(
+  os.homedir(),
+  "workspace",
+  "aura-audit",
+  "mms-data",
+);
 const PORT_STANDALONE = 39406;
 const PORT_REPLSET = 39407;
 const FATAL_SNIPPET = "requires MongoDB running as a replica set";
@@ -30,8 +35,11 @@ async function waitForHealth(port, timeoutMs = 25000) {
     try {
       const r = await fetch(`http://127.0.0.1:${port}/health`);
       if (r.status === 200) return;
-    } catch { /* not up yet */ }
-    if (Date.now() - start > timeoutMs) throw new Error("server did not come up");
+    } catch {
+      /* not up yet */
+    }
+    if (Date.now() - start > timeoutMs)
+      throw new Error("server did not come up");
     await new Promise((r) => setTimeout(r, 300));
   }
 }
@@ -40,15 +48,23 @@ function spawnServer(port, mongoUri) {
   const child = spawn("node", ["server.js"], {
     cwd: repo,
     env: {
-      PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: "development",
-      PORT: String(port), GOOGLE_CLIENT_ID: "dummy", GOOGLE_CLIENT_SECRET: "dummy",
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      NODE_ENV: "development",
+      PORT: String(port),
+      GOOGLE_CLIENT_ID: "dummy",
+      GOOGLE_CLIENT_SECRET: "dummy",
       MONGO_URI: mongoUri,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let out = "";
-  child.stdout.on("data", (d) => { out += d; });
-  child.stderr.on("data", (d) => { out += d; });
+  child.stdout.on("data", (d) => {
+    out += d;
+  });
+  child.stderr.on("data", (d) => {
+    out += d;
+  });
   return { child, output: () => out };
 }
 
@@ -63,17 +79,28 @@ async function expectStandaloneRefusal(mongoUri) {
       if (child.exitCode !== null) break;
       try {
         const r = await fetch(`http://127.0.0.1:${PORT_STANDALONE}/health`);
-        if (r.status === 200) throw new Error("server answered /health on a standalone mongod (no boot refusal)");
+        if (r.status === 200)
+          throw new Error(
+            "server answered /health on a standalone mongod (no boot refusal)",
+          );
       } catch (err) {
         if (/answered \/health/.test(err.message)) throw err;
         /* not up yet - expected */
       }
-      if (Date.now() - start > 30000) throw new Error("server did not exit on a standalone mongod within 30s (no boot refusal)");
+      if (Date.now() - start > 30000)
+        throw new Error(
+          "server did not exit on a standalone mongod within 30s (no boot refusal)",
+        );
       await new Promise((r) => setTimeout(r, 300));
     }
-    if (child.exitCode === 0) throw new Error("server exited 0 on a standalone mongod (expected a non-zero refusal)");
+    if (child.exitCode === 0)
+      throw new Error(
+        "server exited 0 on a standalone mongod (expected a non-zero refusal)",
+      );
     if (!output().includes(FATAL_SNIPPET)) {
-      throw new Error(`fatal topology line missing from server output:\n${output()}`);
+      throw new Error(
+        `fatal topology line missing from server output:\n${output()}`,
+      );
     }
     console.log(`STANDALONE_EXIT_CODE: ${child.exitCode}`);
     console.log("SERVER_REFUSES_STANDALONE");
@@ -83,7 +110,10 @@ async function expectStandaloneRefusal(mongoUri) {
 }
 
 async function main() {
-  const { MongoMemoryServer, MongoMemoryReplSet } = require("mongodb-memory-server");
+  const {
+    MongoMemoryServer,
+    MongoMemoryReplSet,
+  } = require("mongodb-memory-server");
   const mongoose = require("mongoose");
   fs.mkdirSync(MMS_SCRATCH, { recursive: true });
   const standaloneDir = fs.mkdtempSync(path.join(MMS_SCRATCH, "standalone-"));
@@ -92,7 +122,9 @@ async function main() {
   let replSet;
   let serverChild;
   try {
-    standalone = await MongoMemoryServer.create({ instance: { dbPath: standaloneDir, storageEngine: "wiredTiger" } });
+    standalone = await MongoMemoryServer.create({
+      instance: { dbPath: standaloneDir, storageEngine: "wiredTiger" },
+    });
     const standaloneUri = standalone.getUri("boottest");
 
     await mongoose.connect(standaloneUri);
@@ -100,14 +132,19 @@ async function main() {
     let txnError = null;
     try {
       await session.withTransaction(async () => {
-        await mongoose.connection.db.collection("probe").insertOne({ x: 1 }, { session });
+        await mongoose.connection.db
+          .collection("probe")
+          .insertOne({ x: 1 }, { session });
       });
     } catch (err) {
       txnError = err;
     } finally {
       await session.endSession();
     }
-    if (!txnError) throw new Error("transaction on standalone mongod unexpectedly succeeded");
+    if (!txnError)
+      throw new Error(
+        "transaction on standalone mongod unexpectedly succeeded",
+      );
     console.log(`STANDALONE_TXN_ERROR: ${txnError.message}`);
     await mongoose.disconnect();
 
@@ -128,22 +165,32 @@ async function main() {
     let primaryReady = false;
     for (let i = 0; i < 60 && !primaryReady; i++) {
       try {
-        const hello = await mongoose.connection.db.admin().command({ hello: 1 });
+        const hello = await mongoose.connection.db
+          .admin()
+          .command({ hello: 1 });
         primaryReady = hello.isWritablePrimary === true;
-      } catch { /* not ready yet */ }
+      } catch {
+        /* not ready yet */
+      }
       if (!primaryReady) await new Promise((r) => setTimeout(r, 500));
     }
-    if (!primaryReady) throw new Error("replica set member never became a writable primary");
+    if (!primaryReady)
+      throw new Error("replica set member never became a writable primary");
     const session2 = await mongoose.startSession();
     try {
       await session2.withTransaction(async () => {
-        await mongoose.connection.db.collection("probe").insertOne({ x: 1 }, { session: session2 });
+        await mongoose.connection.db
+          .collection("probe")
+          .insertOne({ x: 1 }, { session: session2 });
       });
     } finally {
       await session2.endSession();
     }
-    const written = await mongoose.connection.db.collection("probe").countDocuments();
-    if (written !== 1) throw new Error(`expected 1 written probe doc, saw ${written}`);
+    const written = await mongoose.connection.db
+      .collection("probe")
+      .countDocuments();
+    if (written !== 1)
+      throw new Error(`expected 1 written probe doc, saw ${written}`);
     console.log("REPLSET_TXN_OK");
     await mongoose.disconnect();
 
@@ -167,5 +214,8 @@ async function main() {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.error(`PROBE_FAIL: ${err.message}`); process.exit(1); },
+  (err) => {
+    console.error(`PROBE_FAIL: ${err.message}`);
+    process.exit(1);
+  },
 );

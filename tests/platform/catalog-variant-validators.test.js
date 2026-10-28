@@ -34,12 +34,18 @@ test("variants: create schema requires sku and price", () => {
 });
 
 test("variants: create schema rejects malformed SKUs and bad numerics", () => {
-  assert.ok(createVariantSchema.validate({ ...validVariant, sku: "bad sku!" }).error);
+  assert.ok(
+    createVariantSchema.validate({ ...validVariant, sku: "bad sku!" }).error,
+  );
   assert.ok(createVariantSchema.validate({ ...validVariant, sku: "" }).error);
   assert.ok(createVariantSchema.validate({ ...validVariant, price: -1 }).error);
-  assert.ok(createVariantSchema.validate({ ...validVariant, stock: 1.5 }).error);
+  assert.ok(
+    createVariantSchema.validate({ ...validVariant, stock: 1.5 }).error,
+  );
   assert.ok(createVariantSchema.validate({ ...validVariant, stock: -2 }).error);
-  assert.ok(createVariantSchema.validate({ ...validVariant, compareAtPrice: -5 }).error);
+  assert.ok(
+    createVariantSchema.validate({ ...validVariant, compareAtPrice: -5 }).error,
+  );
 });
 
 test("variants: update schema needs at least one field; sku is visible to the service", () => {
@@ -51,7 +57,10 @@ test("variants: update schema needs at least one field; sku is visible to the se
   assert.equal(error, undefined);
   assert.equal(value.sku, "NEW-1");
   assert.equal(updateVariantSchema.validate({ price: 10 }).error, undefined);
-  assert.equal(updateVariantSchema.validate({ enabled: false }).error, undefined);
+  assert.equal(
+    updateVariantSchema.validate({ enabled: false }).error,
+    undefined,
+  );
 });
 
 test("variants: productType rides create/update product schemas, lowercased", () => {
@@ -61,15 +70,24 @@ test("variants: productType rides create/update product schemas, lowercased", ()
     category: "64b64c64b64c64b64c64b64c",
     price: 500,
   };
-  const created = createProductSchema.validate({ ...base, productType: "SOFA" });
+  const created = createProductSchema.validate({
+    ...base,
+    productType: "SOFA",
+  });
   assert.equal(created.error, undefined);
   assert.equal(created.value.productType, "sofa");
   const updated = updateProductSchema.validate({ productType: "Office_Chair" });
   assert.equal(updated.error, undefined);
   assert.equal(updated.value.productType, "office_chair");
   // Clearing is expressible on update ("" / null), per category precedent.
-  assert.equal(updateProductSchema.validate({ productType: "" }).error, undefined);
-  assert.equal(updateProductSchema.validate({ productType: null }).error, undefined);
+  assert.equal(
+    updateProductSchema.validate({ productType: "" }).error,
+    undefined,
+  );
+  assert.equal(
+    updateProductSchema.validate({ productType: null }).error,
+    undefined,
+  );
 });
 
 test("variants: variantOptionKeys rides update schema with case preserved", () => {
@@ -81,7 +99,7 @@ test("variants: variantOptionKeys rides update schema with case preserved", () =
   // A JSON-string array (multipart form-data) is also accepted;
   // parsing + registry validation happen in the service.
   assert.equal(
-    updateProductSchema.validate({ variantOptionKeys: "[\"color\"]" }).error,
-    undefined
+    updateProductSchema.validate({ variantOptionKeys: '["color"]' }).error,
+    undefined,
   );
 });

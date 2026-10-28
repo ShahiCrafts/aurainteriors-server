@@ -5,9 +5,16 @@
 // C-06 — same handler's pagination is unbounded (see pagination.test.js).
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { stubModule, makeQuery, mockRes, mockNext, until } = require("./helpers");
+const {
+  stubModule,
+  makeQuery,
+  mockRes,
+  mockNext,
+  until,
+} = require("./helpers");
 
-let productRecord; let lastFilter;
+let productRecord;
+let lastFilter;
 // Phase 0.5 (Cluster A): getCategoryProducts now calls
 // Category.getDescendantIds (owner change; models/category.model.js:93).
 // The stub below carries a faithful port of the model's BFS, reading
@@ -17,7 +24,12 @@ let productRecord; let lastFilter;
 // this fixture: the category itself.
 const CATEGORY_FIXTURE = [{ _id: "aaaaaaaaaaaaaaaaaaaaaaaa", parent: null }];
 stubModule("models/category.model.js", {
-  findOne: () => makeQuery({ _id: "aaaaaaaaaaaaaaaaaaaaaaaa", name: "Chairs", slug: "chairs" }),
+  findOne: () =>
+    makeQuery({
+      _id: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      name: "Chairs",
+      slug: "chairs",
+    }),
   find: () => makeQuery(CATEGORY_FIXTURE),
   getDescendantIds: async function (id) {
     const categories = await this.find({}, "_id parent").lean();
@@ -39,16 +51,25 @@ stubModule("models/category.model.js", {
   },
 });
 stubModule("models/product.model.js", {
-  find: (filter) => { lastFilter = filter; return makeQuery([], productRecord); },
+  find: (filter) => {
+    lastFilter = filter;
+    return makeQuery([], productRecord);
+  },
   countDocuments: async () => 0,
 });
 stubModule("middleware/upload.middleware.js", { deleteFile: async () => {} });
 const categoryController = require("../../controllers/category.controller");
 
 async function categoryProducts(query) {
-  productRecord = {}; lastFilter = undefined;
-  const res = mockRes(); const next = mockNext();
-  categoryController.getCategoryProducts({ params: { id: "chairs" }, query }, res, next);
+  productRecord = {};
+  lastFilter = undefined;
+  const res = mockRes();
+  const next = mockNext();
+  categoryController.getCategoryProducts(
+    { params: { id: "chairs" }, query },
+    res,
+    next,
+  );
   await until(() => res.statusCode !== undefined || next.error !== undefined);
   return { res, next };
 }
@@ -59,14 +80,22 @@ test("C-01: colors=.* is treated literally, not as a wildcard", async () => {
   assert.equal(res.statusCode, 200);
   const re = lastFilter.colors.$in[0];
   assert.ok(re instanceof RegExp);
-  assert.equal(re.source, "^\\.\\*$", "the dot-star must be escaped so it matches only the literal colour '.*'");
+  assert.equal(
+    re.source,
+    "^\\.\\*$",
+    "the dot-star must be escaped so it matches only the literal colour '.*'",
+  );
   assert.ok(re.test(".*"));
   assert.ok(!re.test("red"));
 });
 
 test("C-01: colors=[ must not throw a 500", async () => {
   const { res, next } = await categoryProducts({ colors: "[" });
-  assert.equal(next.error, undefined, `unexpected error: ${next.error && next.error.message}`);
+  assert.equal(
+    next.error,
+    undefined,
+    `unexpected error: ${next.error && next.error.message}`,
+  );
   assert.equal(res.statusCode, 200);
 });
 

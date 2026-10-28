@@ -20,8 +20,19 @@ let capturedJob = null;
 let pipelineRuns = [];
 let createdMessages = [];
 
-const chatDoc = { _id: CHAT_ID, customer: "cust1", guestSession: null, status: "ai_handling", metadata: { botActive: true } };
-const latestDoc = { _id: CHAT_ID, status: "ai_handling", metadata: {}, customer: "cust1" };
+const chatDoc = {
+  _id: CHAT_ID,
+  customer: "cust1",
+  guestSession: null,
+  status: "ai_handling",
+  metadata: { botActive: true },
+};
+const latestDoc = {
+  _id: CHAT_ID,
+  status: "ai_handling",
+  metadata: {},
+  customer: "cust1",
+};
 
 stubModule("models/chat.model", {
   findOne: () => makeQuery(chatDoc),
@@ -35,7 +46,12 @@ stubModule("models/chatMessage.model", {
     const doc = {
       _id: `msg${createdMessages.length}`,
       ...data,
-      toObject: () => ({ _id: `msg${createdMessages.length}`, chat: data.chat, senderRole: data.senderRole, content: data.content }),
+      toObject: () => ({
+        _id: `msg${createdMessages.length}`,
+        chat: data.chat,
+        senderRole: data.senderRole,
+        content: data.content,
+      }),
       populate: async () => doc,
     };
     return doc;
@@ -44,37 +60,72 @@ stubModule("models/chatMessage.model", {
   findOne: () => makeQuery(null),
 });
 stubModule("models/guestSession.model", {});
-stubModule("models/user.model", { findOne: () => makeQuery(null), findById: () => makeQuery(null) });
+stubModule("models/user.model", {
+  findOne: () => makeQuery(null),
+  findById: () => makeQuery(null),
+});
 stubModule("services/notificationEventEmitter", {});
 stubModule("services/chatV2", {
   queue: {
     resume: () => {},
     cancel: () => {},
-    enqueue: (roomId, fn) => { capturedJob = fn; return Promise.resolve(); },
+    enqueue: (roomId, fn) => {
+      capturedJob = fn;
+      return Promise.resolve();
+    },
   },
   pipeline: {
-    run: async (turn) => { pipelineRuns.push(turn); return { text: "Bot reply", productOptions: [], degraded: false }; },
+    run: async (turn) => {
+      pipelineRuns.push(turn);
+      return { text: "Bot reply", productOptions: [], degraded: false };
+    },
   },
 });
-stubModule("services/retrievalService", { retrieveContext: async () => [], embeddingTimeoutMs: () => 250 });
+stubModule("services/retrievalService", {
+  retrieveContext: async () => [],
+  embeddingTimeoutMs: () => 250,
+});
 
 const runtimeContext = require("../../services/runtimeContext"); // AR-33: registry replaces global.notificationGateway
 const service = require("../../services/chatService");
 service.authorizeChat = async () => true;
-runtimeContext.setNotificationGateway({ io: { to: () => ({ emit: () => {} }) } });
+runtimeContext.setNotificationGateway({
+  io: { to: () => ({ emit: () => {} }) },
+});
 
 test("AR-30: CHAT_PIPELINE=legacy is inert — a customer message still routes through the chatV2 queue/pipeline", async () => {
-  capturedJob = null; pipelineRuns = []; createdMessages = [];
-  await service.sendMessage(CHAT_ID, "cust1", "customer", { content: "Hello, need help" });
-  assert.ok(capturedJob, "the v2 turn job must be enqueued even with CHAT_PIPELINE=legacy set");
+  capturedJob = null;
+  pipelineRuns = [];
+  createdMessages = [];
+  await service.sendMessage(CHAT_ID, "cust1", "customer", {
+    content: "Hello, need help",
+  });
+  assert.ok(
+    capturedJob,
+    "the v2 turn job must be enqueued even with CHAT_PIPELINE=legacy set",
+  );
   await capturedJob();
   assert.equal(pipelineRuns.length, 1, "the v2 pipeline must run the turn");
-  assert.ok(createdMessages.some((m) => m.senderRole === "bot"), "the v2 bot reply must be persisted");
+  assert.ok(
+    createdMessages.some((m) => m.senderRole === "bot"),
+    "the v2 bot reply must be persisted",
+  );
 });
 
 test("AR-30: loadChatConfig ignores CHAT_PIPELINE / CHAT_PIPELINE_SHADOW (legacy switch removed)", () => {
   const { loadChatConfig } = require("../../services/chatV2/config/chatConfig");
-  const config = loadChatConfig({ CHAT_PIPELINE: "legacy", CHAT_PIPELINE_SHADOW: "true" });
-  assert.equal(config.enabled, true, "chat is always enabled — there is no legacy pipeline to switch to");
-  assert.equal("shadow" in config, false, "the shadow field is gone (it never had a consumer)");
+  const config = loadChatConfig({
+    CHAT_PIPELINE: "legacy",
+    CHAT_PIPELINE_SHADOW: "true",
+  });
+  assert.equal(
+    config.enabled,
+    true,
+    "chat is always enabled — there is no legacy pipeline to switch to",
+  );
+  assert.equal(
+    "shadow" in config,
+    false,
+    "the shadow field is gone (it never had a consumer)",
+  );
 });

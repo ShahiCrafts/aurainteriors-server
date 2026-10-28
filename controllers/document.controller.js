@@ -5,11 +5,6 @@ const AppError = require("../utils/AppError");
 const { boundedLimit, boundedPage } = require("../utils/listQuery");
 const auditLog = require("../services/auditLog.service"); // VULN-004
 
-// OA-1 -9: Qdrant client is created LAZILY at first use via the shared
-// resolver (config/appConfig.createQdrantClient). Import/construction
-// never throws when QDRANT_URL is unset; the delete operation below
-// fails loudly ("QDRANT_URL is not configured") inside its try/catch,
-// which records the qdrant outcome as failed.
 const getQdrant = () => require("../config/appConfig").createQdrantClient();
 const COLLECTION_NAME = "knowledge_base";
 
@@ -19,8 +14,13 @@ exports.uploadDocument = async (req, res, next) => {
       return next(new AppError("Document file upload failed", 400));
     }
 
-    if (req.body.visibility !== undefined && !["private", "public"].includes(req.body.visibility)) return next(new AppError("Invalid document visibility", 400));
-    const { fileName, fileUrl, cloudinaryPublicId, fileType } = req.processedDocument;
+    if (
+      req.body.visibility !== undefined &&
+      !["private", "public"].includes(req.body.visibility)
+    )
+      return next(new AppError("Invalid document visibility", 400));
+    const { fileName, fileUrl, cloudinaryPublicId, fileType } =
+      req.processedDocument;
 
     const doc = await Document.create({
       fileName,
@@ -94,7 +94,11 @@ exports.deleteDocument = async (req, res, next) => {
     // unconditional; the RESPONSE only changes behind
     // DOCUMENT_DELETE_HONEST_STATUS=on (see FLAGS.md) because the
     // legacy shape cannot express partial failure.
-    const outcomes = { qdrant: "ok", cloudinary: doc.filePublicId ? "ok" : "skipped", database: "ok" };
+    const outcomes = {
+      qdrant: "ok",
+      cloudinary: doc.filePublicId ? "ok" : "skipped",
+      database: "ok",
+    };
 
     // 1. Delete vectors from Qdrant
     try {
@@ -113,7 +117,9 @@ exports.deleteDocument = async (req, res, next) => {
       console.log(`✓ Deleted vectors for document ${doc._id} from Qdrant`);
     } catch (qdrantError) {
       outcomes.qdrant = "failed";
-      console.error(`Failed to delete vectors from Qdrant: ${qdrantError.message}`);
+      console.error(
+        `Failed to delete vectors from Qdrant: ${qdrantError.message}`,
+      );
     }
 
     // 2. Delete file from Cloudinary
@@ -127,24 +133,35 @@ exports.deleteDocument = async (req, res, next) => {
         }
       } catch (cloudinaryError) {
         outcomes.cloudinary = "failed";
-        console.error(`Failed to delete file from Cloudinary: ${cloudinaryError.message}`);
+        console.error(
+          `Failed to delete file from Cloudinary: ${cloudinaryError.message}`,
+        );
       }
     }
 
     // 3. Delete Document record from MongoDB
     await Document.findByIdAndDelete(doc._id);
 
-    const failedSystems = ["qdrant", "cloudinary", "database"].filter((s) => outcomes[s] === "failed");
+    const failedSystems = ["qdrant", "cloudinary", "database"].filter(
+      (s) => outcomes[s] === "failed",
+    );
     if (failedSystems.length > 0) {
-      console.error(JSON.stringify({
-        level: "error",
-        event: "document_delete_partial",
-        documentId: doc._id.toString(),
-        outcomes,
-      }));
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "document_delete_partial",
+          documentId: doc._id.toString(),
+          outcomes,
+        }),
+      );
     }
 
-    if (require("../config/appConfig").getString("DOCUMENT_DELETE_HONEST_STATUS") === "on" && failedSystems.length > 0) {
+    if (
+      require("../config/appConfig").getString(
+        "DOCUMENT_DELETE_HONEST_STATUS",
+      ) === "on" &&
+      failedSystems.length > 0
+    ) {
       return res.status(200).json({
         status: "partial",
         message: `Document deleted from the database, but cleanup failed for: ${failedSystems.join(", ")}. Support has been notified via the error log.`,
@@ -154,7 +171,8 @@ exports.deleteDocument = async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
-      message: "Document deleted successfully from both database and vector store",
+      message:
+        "Document deleted successfully from both database and vector store",
     });
   } catch (error) {
     next(error);
@@ -187,10 +205,16 @@ exports.retryDocumentIngestion = async (req, res, next) => {
 
 exports.updateVisibility = async (req, res, next) => {
   try {
-    if (!["private", "public"].includes(req.body.visibility)) return next(new AppError("Invalid document visibility", 400));
-    const doc = await Document.findByIdAndUpdate(req.params.id, { visibility: req.body.visibility }, { new: true, runValidators: true });
+    if (!["private", "public"].includes(req.body.visibility))
+      return next(new AppError("Invalid document visibility", 400));
+    const doc = await Document.findByIdAndUpdate(
+      req.params.id,
+      { visibility: req.body.visibility },
+      { new: true, runValidators: true },
+    );
     if (!doc) return next(new AppError("Document not found", 404));
-    await auditLog.record({ // VULN-004 (never throws; after-state only — findByIdAndUpdate does not load the prior state)
+    await auditLog.record({
+      // VULN-004 (never throws; after-state only — findByIdAndUpdate does not load the prior state)
       actor: req.user?._id,
       action: "document.visibility.update",
       targetType: "Document",
@@ -202,5 +226,7 @@ exports.updateVisibility = async (req, res, next) => {
     // publishing requires ingestion to update vector payloads as well.
     runDocumentIngestion(String(doc._id));
     res.status(200).json({ status: "success", data: { document: doc } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };

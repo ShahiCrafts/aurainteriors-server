@@ -18,7 +18,9 @@ class GuestUserService {
     const guestEmail = "guest@aura-interiors.local";
 
     // Try to find existing guest user
-    let guestUser = await User.findOne({ email: guestEmail }).select("_id").lean();
+    let guestUser = await User.findOne({ email: guestEmail })
+      .select("_id")
+      .lean();
 
     // If doesn't exist, create it
     if (!guestUser) {
@@ -33,11 +35,15 @@ class GuestUserService {
           password: null, // No password for guest user
           loginCount: 0,
         });
-        console.log(`[GuestUserService] Created system guest user: ${guestUser._id}`);
+        console.log(
+          `[GuestUserService] Created system guest user: ${guestUser._id}`,
+        );
       } catch (error) {
         // Handle unique constraint error - user might have been created by another request
         if (error.code === 11000) {
-          guestUser = await User.findOne({ email: guestEmail }).select("_id").lean();
+          guestUser = await User.findOne({ email: guestEmail })
+            .select("_id")
+            .lean();
         } else {
           throw error;
         }
@@ -60,7 +66,9 @@ class GuestUserService {
           this.guestUserId = guestUser._id;
           return this.guestUserId;
         })
-        .finally(() => { this.guestUserPromise = null; });
+        .finally(() => {
+          this.guestUserPromise = null;
+        });
     }
     return this.guestUserPromise;
   }

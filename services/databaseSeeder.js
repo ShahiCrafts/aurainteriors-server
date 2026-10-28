@@ -33,10 +33,7 @@ const Product = require("../models/product.model");
 // environment) is shared via services/seedCatalog.js. Phase 8: only
 // the user helpers remain in use here — the shared module's catalog
 // data/builders are retired (see seedCatalog.js header).
-const {
-  ensureSeedAdmin,
-  ensureSeedCustomer,
-} = require("./seedCatalog");
+const { ensureSeedAdmin, ensureSeedCustomer } = require("./seedCatalog");
 const { ensureCatalogRegistry } = require("./catalogBootstrap.service");
 
 /**
@@ -47,7 +44,7 @@ const isDatabaseEmpty = async () => {
   try {
     const [categoryCount, productCount] = await Promise.all([
       Category.countDocuments(),
-      Product.countDocuments()
+      Product.countDocuments(),
     ]);
     return categoryCount === 0 && productCount === 0;
   } catch (error) {
@@ -95,7 +92,11 @@ const seedRegistries = async () => {
  * Main seeder function - called from server.js
  */
 const initializeDatabaseIfEmpty = async () => {
-  if (process.env.NODE_ENV !== "development" || process.env.SEED_DEMO_DATA !== "true") return false;
+  if (
+    process.env.NODE_ENV !== "development" ||
+    process.env.SEED_DEMO_DATA !== "true"
+  )
+    return false;
   try {
     getAdminCredentials();
     const isEmpty = await isDatabaseEmpty();
@@ -121,5 +122,5 @@ const initializeDatabaseIfEmpty = async () => {
 
 module.exports = {
   initializeDatabaseIfEmpty,
-  isDatabaseEmpty
+  isDatabaseEmpty,
 };

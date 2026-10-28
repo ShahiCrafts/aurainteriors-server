@@ -33,7 +33,10 @@ router.get("/:id", protect, restrictTo("admin"), async (req, res) => {
           attempts: job.attempts,
           maxAttempts: job.maxAttempts,
           lastError: job.lastError,
-          progress: job.payload && typeof job.payload === "object" ? job.payload.progress ?? null : null,
+          progress:
+            job.payload && typeof job.payload === "object"
+              ? (job.payload.progress ?? null)
+              : null,
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
           completedAt: job.completedAt,
@@ -41,7 +44,9 @@ router.get("/:id", protect, restrictTo("admin"), async (req, res) => {
       },
     });
   } catch (_error) {
-    return res.status(500).json({ success: false, message: "Failed to load job status" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load job status" });
   }
 });
 

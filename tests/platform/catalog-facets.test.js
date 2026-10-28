@@ -24,7 +24,9 @@ function runProbe() {
       { timeout: 240000, maxBuffer: 4 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
-          reject(new Error(`probe failed: ${err.message}\n${stdout}\n${stderr}`));
+          reject(
+            new Error(`probe failed: ${err.message}\n${stdout}\n${stderr}`),
+          );
           return;
         }
         const results = {};
@@ -36,7 +38,7 @@ function runProbe() {
           }
         }
         resolve(results);
-      }
+      },
     );
   });
 }
@@ -47,8 +49,14 @@ test("catalog facets: derivation, disjunctive counts, converged endpoint, perf s
   // Derivation: the sofas scope exposes sofa attributes (and not
   // table/bed ones); the tables scope is the mirror image; an
   // unscoped request unions the types present in scope.
-  assert.equal(r["sofa-keys"], "has-seating=true has-cushion=true has-extendable=false has-bedsize=false");
-  assert.equal(r["table-keys"], "has-extendable=true has-shape=true has-cushion=false");
+  assert.equal(
+    r["sofa-keys"],
+    "has-seating=true has-cushion=true has-extendable=false has-bedsize=false",
+  );
+  assert.equal(
+    r["table-keys"],
+    "has-extendable=true has-shape=true has-cushion=false",
+  );
   assert.equal(r["unscoped-keys"], "has-extendable=true has-cushion=true");
 
   // Unfiltered facet values in the sofas scope.
@@ -79,7 +87,10 @@ test("catalog facets: derivation, disjunctive counts, converged endpoint, perf s
   // Converged endpoint: precursor shape, counts now present on
   // the field facets too, unknown slug 404.
   assert.equal(r.endpoint, "status=200 total=3 slug=probe2-sofas");
-  assert.equal(r["endpoint-facets"], "first3=colors|materials|style colors-red=2 seat3=1");
+  assert.equal(
+    r["endpoint-facets"],
+    "first3=colors|materials|style colors-red=2 seat3=1",
+  );
   assert.equal(r["endpoint-404"], "status=404");
 
   // Perf smoke: the faceted, attribute-filtered call over ~2,000
