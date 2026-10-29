@@ -417,21 +417,37 @@ async function fetchAllFeedsCycle() {
         );
         totalNew += result.upsertedCount || 0;
         // Conditional upgrades avoid clobbering complete existing content.
-        for (const article of articles) {
-          if (readableLength(article.content) < 500) continue;
-          const current = await Blog.findOne(
-            { originalUrl: article.originalUrl },
-            { content: 1 },
+        // PERF-016 (remediation): one batched existence/content read per
+        // feed instead of a findOne per article; the conditional
+        // updateOne (guarded on the previously-read content) is
+        // unchanged, so upgrade semantics are identical.
+        const upgradeCandidates = articles.filter(
+          (article) => readableLength(article.content) >= 500,
+        );
+        if (upgradeCandidates.length) {
+          const existing = await Blog.find(
+            {
+              originalUrl: {
+                $in: upgradeCandidates.map((a) => a.originalUrl),
+              },
+            },
+            { content: 1, originalUrl: 1 },
           ).lean();
-          if (
-            current &&
-            readableLength(article.content) >
-              readableLength(current.content) * 1.5
-          ) {
-            await Blog.updateOne(
-              { _id: current._id, content: current.content },
-              { $set: { content: article.content, excerpt: article.excerpt } },
-            );
+          const byUrl = new Map(existing.map((doc) => [doc.originalUrl, doc]));
+          for (const article of upgradeCandidates) {
+            const current = byUrl.get(article.originalUrl);
+            if (
+              current &&
+              readableLength(article.content) >
+                readableLength(current.content) * 1.5
+            ) {
+              await Blog.updateOne(
+                { _id: current._id, content: current.content },
+                {
+                  $set: { content: article.content, excerpt: article.excerpt },
+                },
+              );
+            }
           }
         }
       }

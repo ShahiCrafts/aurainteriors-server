@@ -42,18 +42,41 @@ async function enqueueNewsletter({ subject, htmlContent, textContent }) {
 // Shared by the newsletter controller (inline mode) and the queued
 // handler: existing active subscriptions need a nonce before their
 // next email (extracted verbatim from newsletter.controller sendTrend).
+// PERF-016 (remediation): the per-subscriber sequential
+// findOneAndUpdate + findById loop is now batched — conditional
+// updateOne ops via bulkWrite in batches of 500, then ONE re-read per
+// batch to populate the local nonce values. Semantics are identical:
+// a nonce is generated per subscriber, written only when the stored
+// nonce is still null (race-safe claim, same filter as before), and
+// every subscriber ends up carrying its stored nonce.
+const NONCE_BATCH_SIZE = 500;
 async function ensureSubscriberNonces(subscribers) {
   const Newsletter = require("../models/newsletter.model");
-  for (const subscriber of subscribers) {
-    if (!subscriber.unsubscribeNonce) {
-      const nonce = crypto.randomBytes(24).toString("hex");
-      const updated = await Newsletter.findOneAndUpdate(
-        { _id: subscriber._id, unsubscribeNonce: null },
-        { $set: { unsubscribeNonce: nonce } },
-        { new: true },
-      );
-      const current = updated || (await Newsletter.findById(subscriber._id));
-      subscriber.unsubscribeNonce = current.unsubscribeNonce;
+  const missing = (subscribers || []).filter((s) => !s.unsubscribeNonce);
+  for (let i = 0; i < missing.length; i += NONCE_BATCH_SIZE) {
+    const batch = missing.slice(i, i + NONCE_BATCH_SIZE);
+    await Newsletter.bulkWrite(
+      batch.map((subscriber) => ({
+        updateOne: {
+          filter: { _id: subscriber._id, unsubscribeNonce: null },
+          update: {
+            $set: {
+              unsubscribeNonce: crypto.randomBytes(24).toString("hex"),
+            },
+          },
+        },
+      })),
+      { ordered: false },
+    );
+    const fresh = await Newsletter.find({
+      _id: { $in: batch.map((s) => s._id) },
+    })
+      .select("unsubscribeNonce")
+      .lean();
+    const byId = new Map(fresh.map((doc) => [String(doc._id), doc]));
+    for (const subscriber of batch) {
+      const doc = byId.get(String(subscriber._id));
+      if (doc) subscriber.unsubscribeNonce = doc.unsubscribeNonce;
     }
   }
   return subscribers;

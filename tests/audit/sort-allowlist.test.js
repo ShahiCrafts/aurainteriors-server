@@ -56,6 +56,10 @@ test("B-26: safeSort drops unknown and dangerous fields, falling back safely", (
 let capturedSort;
 function queryChain(result) {
   const chain = {
+    // PERF-018: getAllProducts now calls .select(PRODUCT_LIST_SELECT)
+    // on the find chain; the stub must expose the same chainable
+    // surface Mongoose provides or the handler never settles.
+    select: () => chain,
     populate: () => chain,
     sort: (s) => {
       capturedSort = s;

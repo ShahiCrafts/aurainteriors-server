@@ -223,6 +223,54 @@ exports.publicEndpointRateLimit = (
   });
 
 /**
+ * SEC-011 (remediation): per email+orderId attempt limiter for the
+ * public order-tracking endpoint. The per-IP limiter alone lets a
+ * distributed attacker keep guessing one victim's orderId+email pair;
+ * keying on the (normalized) pair caps attempts against a single
+ * order regardless of source IP. Uses the same store selection as
+ * every other limiter (Mongo store when RATE_LIMIT_STORE=mongo), so
+ * the cap holds across instances. Requests without both fields share
+ * the "unknown" bucket — the route's validator rejects them anyway.
+ */
+exports.trackAttemptRateLimit = (
+  max = 10,
+  message = "Too many tracking attempts for this order. Please try again later.",
+) =>
+  rateLimit({
+    store: storeFor("trackAttempt"),
+    windowMs: 15 * 60 * 1000,
+    limit: max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const email =
+        typeof req.body?.email === "string"
+          ? req.body.email.trim().toLowerCase()
+          : "";
+      const orderId =
+        typeof req.body?.orderId === "string"
+          ? req.body.orderId.trim().toUpperCase()
+          : "";
+      return email && orderId ? `track_${email}_${orderId}` : "track_unknown";
+    },
+    handler: (req, res) => {
+      const resetTime = req.rateLimit
+        ? req.rateLimit.resetTime
+        : Date.now() + 900000;
+      const secondsRemaining = Math.max(
+        0,
+        Math.ceil((resetTime - Date.now()) / 1000),
+      );
+      return res.status(429).json({
+        status: "error",
+        code: "RATE_LIMIT_EXCEEDED",
+        message,
+        retryAfter: secondsRemaining,
+      });
+    },
+  });
+
+/**
  * Per-user limiter for authenticated endpoints (falls back to IP for
  * anonymous requests). Used on POST /promotions/track (C-09) so one
  * account cannot inflate engagement metrics unboundedly.

@@ -35,6 +35,32 @@ const {
   getAttributeDefinitionsCached,
 } = require("../services/attributeRegistryCache");
 
+// PERF-018 (remediation): explicit projection for the public product
+// LIST paths (plain + cursor). The list previously shipped the full
+// product document. This allowlist covers every field the web
+// catalogue actually renders from list results — checked against
+// aurainteriors-web ProductCard (name, price, priceFrom, hasVariants,
+// catalogVariants, colors, discount inputs originalPrice/price,
+// isFeatured, isNewArrival), CatalogListing and the AR catalog
+// (images, modelUrl, modelFiles, arAvailable) — plus the fields list
+// consumers sort/filter/display by (slug, category, rating, stock,
+// status, timestamps). Internal bookkeeping stays out: reservedStock
+// and rating.sum are already select:false in the model, and __v is
+// not selected. The aggregate (effective-price sort) path keeps its
+// own $project, which already strips its internal fields.
+const PRODUCT_LIST_SELECT =
+  "name slug description shortDescription category price originalPrice " +
+  "stock sku status images modelUrl modelFiles arAvailable productType " +
+  "roomSlugs collectionSlugs catalogAttributes catalogVariants " +
+  "variantOptionKeys hasVariants priceFrom dimensions weight colors " +
+  // Only the client-visible rating subfields: selecting the bare
+  // "rating" path overrides the schema's select:false on the internal
+  // rating.sum bookkeeping field and leaks it (the aggregate path
+  // already projects rating.sum out). Web cards read exactly
+  // rating.average / rating.count (ProductCard.jsx).
+  "materials style rating.average rating.count isFeatured isNewArrival metaTitle " +
+  "metaDescription tags createdAt updatedAt";
+
 const parseJsonField = (field) => {
   if (!field) return undefined;
   if (typeof field === "string") {
@@ -438,11 +464,13 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
           ])
         : cursorMode
           ? Product.find(pageFilter)
+              .select(PRODUCT_LIST_SELECT)
               .populate("category", "name slug")
               .sort({ createdAt: -1, _id: -1 })
               .limit(limitNum + 1)
               .lean()
           : Product.find(filter)
+              .select(PRODUCT_LIST_SELECT)
               .populate("category", "name slug")
               .sort(catalogSort(sort))
               .skip(skip)

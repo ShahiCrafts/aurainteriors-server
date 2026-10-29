@@ -122,7 +122,7 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
       {
         upsert: true,
         updatePipeline: true,
-        new: true,
+        returnDocument: "after",
         projection: { products: 1 },
       },
     ).lean();
@@ -132,7 +132,7 @@ exports.addToWishlist = catchAsync(async (req, res, next) => {
     wishlist = await Wishlist.findOneAndUpdate(
       { user: userObjectId },
       pipeline,
-      { updatePipeline: true, new: true, projection: { products: 1 } },
+      { updatePipeline: true, returnDocument: "after", projection: { products: 1 } },
     ).lean();
   }
   req.wishlistTimings?.push(

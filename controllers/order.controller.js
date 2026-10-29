@@ -1357,7 +1357,7 @@ exports.requestReturn = catchAsync(async (req, res, next) => {
         },
       },
     },
-    { new: true },
+    { returnDocument: "after" },
   ).populate("user", "firstName lastName email");
 
   if (!updatedOrder) {
@@ -1449,7 +1449,7 @@ exports.processReturnRequest = catchAsync(async (req, res, next) => {
   const updatedOrder = await Order.findOneAndUpdate(
     { _id: req.params.id, "returnRequest.status": "requested" },
     update,
-    { new: true },
+    { returnDocument: "after" },
   ).populate("user", "firstName lastName email");
 
   if (!updatedOrder) {
@@ -1521,7 +1521,7 @@ exports.reconcileRefund = catchAsync(async (req, res, next) => {
         "refundRequest.processedBy": req.user._id,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!settled)
     return next(new AppError("Refund state changed; reload the order", 409));

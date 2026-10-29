@@ -29,14 +29,14 @@ exports.createAuthLimiter =
               $inc: { count: 1 },
               $setOnInsert: { expiresAt },
             },
-            { upsert: true, new: true },
+            { upsert: true, returnDocument: "after" },
           );
         } catch (error) {
           if (error.code !== 11000) throw error;
           attempt = await AuthAttempt.findOneAndUpdate(
             { _id },
             { $inc: { count: 1 } },
-            { new: true },
+            { returnDocument: "after" },
           );
         }
         if (!attempt || attempt.count > limit) {

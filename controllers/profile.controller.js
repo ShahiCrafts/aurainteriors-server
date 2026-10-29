@@ -68,7 +68,7 @@ exports.updateProfile = async (req, res) => {
     if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
 
     const user = await User.findByIdAndUpdate(req.user.id, updateData, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     });
 
@@ -104,7 +104,7 @@ exports.updateAvatar = async (req, res) => {
         avatar: req.file.cloudinaryUrl,
         avatarPublicId: req.file.cloudinaryPublicId,
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (oldAvatarPublicId) {
@@ -143,7 +143,7 @@ exports.removeAvatar = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { avatar: null, avatarPublicId: null },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (oldAvatarPublicId) {
@@ -181,7 +181,7 @@ exports.updatePreferences = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: updateData },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
 
     res.status(200).json({

@@ -4,7 +4,7 @@
 // threads the tool's timeout budget through the registry ctx into
 // dbTools as maxTimeMS on every Mongoose query. These stubbed tests
 // capture the options each query is issued with; the real-mongod fault
-// injection lives in tests/platform/ar37-maxtime.test.js.
+// injection lives in tests/platform/query-maxtime.test.js.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { stubModule } = require("./helpers");

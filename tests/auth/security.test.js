@@ -8,11 +8,13 @@ const base = path.resolve(__dirname, "../..");
 function load(file, mocks, logs = []) {
   const module = { exports: {} };
   // AR-33: auth.controller requires the runtimeContext registry (side-effect-free, requires nothing) - resolve it for real.
+  // SEC-009: auth.controller also requires the auditLog service (side-effect-free; record() lazy-requires its model and never throws) - resolve it for real too.
   mocks = {
     "../utils/authToken": {},
     "../models/revokedToken.model": {},
     "../utils/maskEmail": require("../../utils/maskEmail.js"),
     "../services/runtimeContext": require("../../services/runtimeContext.js"),
+    "../services/auditLog.service": require("../../services/auditLog.service.js"),
     ...mocks,
   };
   vm.runInNewContext(fs.readFileSync(path.join(base, file), "utf8"), {

@@ -204,7 +204,7 @@ exports.updatePreferences = async (req, res, next) => {
       userId,
       { $set: preferenceUpdates },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       },
     ).select("preferences");

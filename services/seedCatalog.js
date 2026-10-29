@@ -39,31 +39,31 @@ const Category = require("../models/category.model");
 
 const furnitureImages = {
   sofas: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-house-exterior-evening.webp",
+    "/images/seed/seed-bedroom-bed-linen.webp",
+    "/images/seed/seed-living-room-sofa-tv.webp",
   ],
   beds: [
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-apartment-living-room.webp",
+    "/images/seed/seed-bedroom-dark-bed.webp",
+    "/images/seed/seed-bedroom-wardrobe-bed.webp",
   ],
   dining: [
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-house-exterior-evening.webp",
+    "/images/seed/seed-bedroom-bed-linen.webp",
   ],
   chairs: [
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-living-room-sofa-tv.webp",
+    "/images/seed/seed-apartment-living-room.webp",
   ],
   decor: [
-    "https://images.unsplash.com/photo-1532372320572-cda25653a26d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-bedroom-dark-bed.webp",
+    "/images/seed/seed-bedroom-wardrobe-bed.webp",
+    "/images/seed/seed-house-exterior-evening.webp",
   ],
   lighting: [
-    "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    "/images/seed/seed-bedroom-bed-linen.webp",
+    "/images/seed/seed-living-room-sofa-tv.webp",
   ],
 };
 

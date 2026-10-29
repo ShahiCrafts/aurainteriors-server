@@ -156,7 +156,10 @@ test("catalog faceted filtering: attr semantics, price, availability, collection
   );
 
   // Effective-price sort orders by priceFrom ?? price, and the
-  // aggregation body is field-for-field identical to find()'s.
+  // aggregation body is field-for-field identical to find()'s over
+  // the client-visible shape (PERF-018: the find path's allowlist
+  // omits the internal __v/deletedAt fields by design; the probe
+  // strips exactly those two before comparing).
   assert.equal(
     r["sort-effective"],
     "names=Theta Table|Epsilon Bed|Eta Table|Zeta Bed|Delta Bed|Gamma Sofa|Alpha Sofa|Beta Sofa",

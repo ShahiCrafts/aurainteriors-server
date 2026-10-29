@@ -87,8 +87,8 @@ for (const body of BODIES) {
       nCall.update,
       "$set payloads must be identical",
     );
-    assert.deepEqual(nCall.opts, { new: true, runValidators: true });
-    assert.deepEqual(pCall.opts, { new: true, runValidators: true });
+    assert.deepEqual(nCall.opts, { returnDocument: "after", runValidators: true });
+    assert.deepEqual(pCall.opts, { returnDocument: "after", runValidators: true });
     // Pinned divergences: identity source + response shape.
     assert.equal(nCall.id, "u1");
     assert.equal(pCall.id, "u1");

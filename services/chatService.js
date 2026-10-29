@@ -115,7 +115,7 @@ async function applyMessageBookkeeping(chat, chatId, senderRole, senderId) {
 // by createdAt; the original took the first element of the $lookup
 // array (unspecified order — in practice insertion order). The two
 // coincide on data inserted in createdAt order (asserted by the
-// real-mongod fixture probe, tests/platform/ar16-chat-stats.test.js).
+// real-mongod fixture probe, tests/platform/chat-stats-integration.test.js).
 function firstAdminResponsePipeline() {
   return [
     { $match: { senderRole: "admin" } },
@@ -981,7 +981,7 @@ class ChatService {
     const resolved = await Chat.findByIdAndUpdate(
       chatId,
       { $set: { status: "resolved", closedBy: userId, closedAt: resolvedAt } },
-      { new: true },
+      { returnDocument: "after" },
     ).lean();
 
     // Broadcast resolve event via socket

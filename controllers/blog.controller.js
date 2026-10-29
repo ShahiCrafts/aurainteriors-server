@@ -320,7 +320,7 @@ exports.likeBlog = catchAsync(async (req, res, next) => {
     ? await Blog.findByIdAndUpdate(
         blog._id,
         { $inc: { likes: 1 } },
-        { new: true, runValidators: false },
+        { returnDocument: "after", runValidators: false },
       )
     : blog;
 

@@ -35,7 +35,7 @@ const data = {
       description:
         "Living Room for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -48,7 +48,7 @@ const data = {
       description:
         "Upholstered Sofas for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -61,7 +61,7 @@ const data = {
       description:
         "Two Seater Sofas for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -74,7 +74,7 @@ const data = {
       description:
         "Three Seater Sofas for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -87,7 +87,7 @@ const data = {
       description:
         "Corner Sofas for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -100,7 +100,7 @@ const data = {
       description:
         "Accent Seating for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -113,7 +113,7 @@ const data = {
       description:
         "Lounge Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -126,7 +126,7 @@ const data = {
       description:
         "Armchairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -139,7 +139,7 @@ const data = {
       description:
         "Manual Recliners for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -152,7 +152,7 @@ const data = {
       description:
         "Coffee Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -165,7 +165,7 @@ const data = {
       description:
         "Side Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 4,
       status: "active",
     },
@@ -178,7 +178,7 @@ const data = {
       description:
         "Living Room Consoles for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-house-exterior-evening.webp",
       sortOrder: 5,
       status: "active",
     },
@@ -191,7 +191,7 @@ const data = {
       description:
         "Bedroom for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -204,7 +204,7 @@ const data = {
       description:
         "Bed Frames for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -217,7 +217,7 @@ const data = {
       description:
         "Queen Bed Frames for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -230,7 +230,7 @@ const data = {
       description:
         "King Bed Frames for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -243,7 +243,7 @@ const data = {
       description:
         "Queen Storage Beds for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -256,7 +256,7 @@ const data = {
       description:
         "Wardrobes for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -269,7 +269,7 @@ const data = {
       description:
         "Three Door Wardrobes for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -282,7 +282,7 @@ const data = {
       description:
         "Dressers & Nightstands for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -295,7 +295,7 @@ const data = {
       description:
         "Six Drawer Dressers for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -308,7 +308,7 @@ const data = {
       description:
         "Two Drawer Nightstands for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -321,7 +321,7 @@ const data = {
       description:
         "Sleep Essentials for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 4,
       status: "active",
     },
@@ -334,7 +334,7 @@ const data = {
       description:
         "Queen Pocket Spring Mattresses for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -347,7 +347,7 @@ const data = {
       description:
         "Queen Upholstered Headboards for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -360,7 +360,7 @@ const data = {
       description:
         "Upholstered Bedroom Benches for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-bed-linen.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -373,7 +373,7 @@ const data = {
       description:
         "Dining for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -386,7 +386,7 @@ const data = {
       description:
         "Dining Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -399,7 +399,7 @@ const data = {
       description:
         "Four Seater Dining Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -412,7 +412,7 @@ const data = {
       description:
         "Six Seater Dining Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -425,7 +425,7 @@ const data = {
       description:
         "Eight Seater Dining Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -438,7 +438,7 @@ const data = {
       description:
         "Dining Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -451,7 +451,7 @@ const data = {
       description:
         "Upholstered Dining Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -464,7 +464,7 @@ const data = {
       description:
         "Benches & Stools for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -477,7 +477,7 @@ const data = {
       description:
         "Dining Benches for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -490,7 +490,7 @@ const data = {
       description:
         "Counter Height Stools for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -503,7 +503,7 @@ const data = {
       description:
         "Dining Storage for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 4,
       status: "active",
     },
@@ -516,7 +516,7 @@ const data = {
       description:
         "Three Door Sideboards for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -529,7 +529,7 @@ const data = {
       description:
         "Glass Front Crockery Cabinets for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -542,7 +542,7 @@ const data = {
       description:
         "Two Tier Bar Trolleys for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-bedroom-wardrobe-bed.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -555,7 +555,7 @@ const data = {
       description:
         "Home Office for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 4,
       status: "active",
     },
@@ -568,7 +568,7 @@ const data = {
       description:
         "Office Desks for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -581,7 +581,7 @@ const data = {
       description:
         "Writing Desks for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -594,7 +594,7 @@ const data = {
       description:
         "Computer Desks for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -607,7 +607,7 @@ const data = {
       description:
         "Electric Standing Desks for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -620,7 +620,7 @@ const data = {
       description:
         "Office Seating for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -633,7 +633,7 @@ const data = {
       description:
         "Ergonomic Mesh Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -646,7 +646,7 @@ const data = {
       description:
         "Compact Task Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -659,7 +659,7 @@ const data = {
       description:
         "High Back Office Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -672,7 +672,7 @@ const data = {
       description:
         "Office Storage for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -685,7 +685,7 @@ const data = {
       description:
         "Five Shelf Bookcases for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -698,7 +698,7 @@ const data = {
       description:
         "Two Drawer Filing Cabinets for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -711,7 +711,7 @@ const data = {
       description:
         "Three Drawer Desk Pedestals for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-office-workspace-desks.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -724,7 +724,7 @@ const data = {
       description:
         "Outdoor for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 5,
       status: "active",
     },
@@ -737,7 +737,7 @@ const data = {
       description:
         "Outdoor Seating for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -750,7 +750,7 @@ const data = {
       description:
         "Patio Lounge Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -763,7 +763,7 @@ const data = {
       description:
         "Outdoor Two Seater Sofas for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -776,7 +776,7 @@ const data = {
       description:
         "Freestanding Hanging Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -789,7 +789,7 @@ const data = {
       description:
         "Outdoor Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -802,7 +802,7 @@ const data = {
       description:
         "Round Bistro Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -815,7 +815,7 @@ const data = {
       description:
         "Patio Dining Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -828,7 +828,7 @@ const data = {
       description:
         "Folding Balcony Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -841,7 +841,7 @@ const data = {
       description:
         "Outdoor Extras for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -854,7 +854,7 @@ const data = {
       description:
         "Adjustable Sun Loungers for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -867,7 +867,7 @@ const data = {
       description:
         "Two Seater Garden Benches for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -880,7 +880,7 @@ const data = {
       description:
         "Three Tier Planter Stands for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-living-space.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -893,7 +893,7 @@ const data = {
       description:
         "Lighting for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 6,
       status: "active",
     },
@@ -906,7 +906,7 @@ const data = {
       description:
         "Ceiling Lighting for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -919,7 +919,7 @@ const data = {
       description:
         "Single Pendant Lights for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -932,7 +932,7 @@ const data = {
       description:
         "Six Arm Chandeliers for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -945,7 +945,7 @@ const data = {
       description:
         "Flush Ceiling Lights for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -958,7 +958,7 @@ const data = {
       description:
         "Portable Lighting for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -971,7 +971,7 @@ const data = {
       description:
         "Adjustable Floor Lamps for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -984,7 +984,7 @@ const data = {
       description:
         "Bedside Table Lamps for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -997,7 +997,7 @@ const data = {
       description:
         "Adjustable Desk Lamps for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1010,7 +1010,7 @@ const data = {
       description:
         "Wall Lighting for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1023,7 +1023,7 @@ const data = {
       description:
         "Wall Sconces for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1036,7 +1036,7 @@ const data = {
       description:
         "Adjustable Picture Lights for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1049,7 +1049,7 @@ const data = {
       description:
         "Swing Arm Wall Lights for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-lamp-lighting-ambience.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1062,7 +1062,7 @@ const data = {
       description:
         "Decor for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 7,
       status: "active",
     },
@@ -1075,7 +1075,7 @@ const data = {
       description:
         "Wall Decor for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1088,7 +1088,7 @@ const data = {
       description:
         "Round Wall Mirrors for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1101,7 +1101,7 @@ const data = {
       description:
         "Framed Abstract Prints for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1114,7 +1114,7 @@ const data = {
       description:
         "Floating Wall Shelf Sets for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1127,7 +1127,7 @@ const data = {
       description:
         "Decorative Objects for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1140,7 +1140,7 @@ const data = {
       description:
         "Ceramic Vases for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1153,7 +1153,7 @@ const data = {
       description:
         "Abstract Table Sculptures for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1166,7 +1166,7 @@ const data = {
       description:
         "Decorative Serving Trays for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1179,7 +1179,7 @@ const data = {
       description:
         "Rugs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1192,7 +1192,7 @@ const data = {
       description:
         "Woven Area Rugs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1205,7 +1205,7 @@ const data = {
       description:
         "Cushions & Throws for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 4,
       status: "active",
     },
@@ -1218,7 +1218,7 @@ const data = {
       description:
         "Cushion Cover Sets for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1231,7 +1231,7 @@ const data = {
       description:
         "Textured Sofa Throws for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-interior-room-chair.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1244,7 +1244,7 @@ const data = {
       description:
         "Kids Room for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 8,
       status: "active",
     },
@@ -1257,7 +1257,7 @@ const data = {
       description:
         "Kids Beds for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1270,7 +1270,7 @@ const data = {
       description:
         "Single Kids Beds for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1283,7 +1283,7 @@ const data = {
       description:
         "Twin Bunk Beds for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1296,7 +1296,7 @@ const data = {
       description:
         "Single Trundle Beds for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1309,7 +1309,7 @@ const data = {
       description:
         "Study and Play for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1322,7 +1322,7 @@ const data = {
       description:
         "Kids Study Desks for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1335,7 +1335,7 @@ const data = {
       description:
         "Kids Study Chairs for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1348,7 +1348,7 @@ const data = {
       description:
         "Kids Play Tables for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1361,7 +1361,7 @@ const data = {
       description:
         "Kids Storage for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1374,7 +1374,7 @@ const data = {
       description:
         "Toy Storage Organisers for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 1,
       status: "active",
     },
@@ -1387,7 +1387,7 @@ const data = {
       description:
         "Low Kids Bookcases for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 2,
       status: "active",
     },
@@ -1400,7 +1400,7 @@ const data = {
       description:
         "Two Door Kids Wardrobes for considered home interiors, with coordinated finishes and practical everyday dimensions.",
       image:
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+        "/images/seed/seed-luxury-living-room.webp",
       sortOrder: 3,
       status: "active",
     },
@@ -1421,7 +1421,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for two seater sofa",
           isPrimary: true,
         },
@@ -1479,7 +1479,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for two seater sofa",
           isPrimary: true,
         },
@@ -1536,7 +1536,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for two seater sofa",
           isPrimary: true,
         },
@@ -1593,7 +1593,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for two seater sofa",
           isPrimary: true,
         },
@@ -1646,7 +1646,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for three seater sofa",
           isPrimary: true,
         },
@@ -1703,7 +1703,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for three seater sofa",
           isPrimary: true,
         },
@@ -1760,7 +1760,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for three seater sofa",
           isPrimary: true,
         },
@@ -1817,7 +1817,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for three seater sofa",
           isPrimary: true,
         },
@@ -1871,7 +1871,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for corner sofa",
           isPrimary: true,
         },
@@ -1928,7 +1928,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for corner sofa",
           isPrimary: true,
         },
@@ -1985,7 +1985,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for corner sofa",
           isPrimary: true,
         },
@@ -2042,7 +2042,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for corner sofa",
           isPrimary: true,
         },
@@ -2095,7 +2095,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for lounge chair",
           isPrimary: true,
         },
@@ -2152,7 +2152,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for lounge chair",
           isPrimary: true,
         },
@@ -2209,7 +2209,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for lounge chair",
           isPrimary: true,
         },
@@ -2267,7 +2267,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for lounge chair",
           isPrimary: true,
         },
@@ -2320,7 +2320,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for armchair",
           isPrimary: true,
         },
@@ -2377,7 +2377,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for armchair",
           isPrimary: true,
         },
@@ -2434,7 +2434,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for armchair",
           isPrimary: true,
         },
@@ -2491,7 +2491,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for armchair",
           isPrimary: true,
         },
@@ -2544,7 +2544,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for manual recliner",
           isPrimary: true,
         },
@@ -2601,7 +2601,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for manual recliner",
           isPrimary: true,
         },
@@ -2659,7 +2659,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for manual recliner",
           isPrimary: true,
         },
@@ -2716,7 +2716,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for manual recliner",
           isPrimary: true,
         },
@@ -2769,7 +2769,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for coffee table",
           isPrimary: true,
         },
@@ -2822,7 +2822,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for coffee table",
           isPrimary: true,
         },
@@ -2875,7 +2875,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for coffee table",
           isPrimary: true,
         },
@@ -2928,7 +2928,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for coffee table",
           isPrimary: true,
         },
@@ -2981,7 +2981,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for side table",
           isPrimary: true,
         },
@@ -3035,7 +3035,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for side table",
           isPrimary: true,
         },
@@ -3088,7 +3088,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for side table",
           isPrimary: true,
         },
@@ -3141,7 +3141,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for side table",
           isPrimary: true,
         },
@@ -3194,7 +3194,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for living room console",
           isPrimary: true,
         },
@@ -3247,7 +3247,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for living room console",
           isPrimary: true,
         },
@@ -3300,7 +3300,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for living room console",
           isPrimary: true,
         },
@@ -3353,7 +3353,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-house-exterior-evening.webp",
           alt: "Living Room interior reference for living room console",
           isPrimary: true,
         },
@@ -3407,7 +3407,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen bed frame",
           isPrimary: true,
         },
@@ -3460,7 +3460,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen bed frame",
           isPrimary: true,
         },
@@ -3513,7 +3513,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen bed frame",
           isPrimary: true,
         },
@@ -3566,7 +3566,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen bed frame",
           isPrimary: true,
         },
@@ -3619,7 +3619,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for king bed frame",
           isPrimary: true,
         },
@@ -3672,7 +3672,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for king bed frame",
           isPrimary: true,
         },
@@ -3725,7 +3725,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for king bed frame",
           isPrimary: true,
         },
@@ -3779,7 +3779,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for king bed frame",
           isPrimary: true,
         },
@@ -3832,7 +3832,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen storage bed",
           isPrimary: true,
         },
@@ -3885,7 +3885,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen storage bed",
           isPrimary: true,
         },
@@ -3938,7 +3938,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen storage bed",
           isPrimary: true,
         },
@@ -3991,7 +3991,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen storage bed",
           isPrimary: true,
         },
@@ -4044,7 +4044,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for three door wardrobe",
           isPrimary: true,
         },
@@ -4097,7 +4097,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for three door wardrobe",
           isPrimary: true,
         },
@@ -4151,7 +4151,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for three door wardrobe",
           isPrimary: true,
         },
@@ -4204,7 +4204,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for three door wardrobe",
           isPrimary: true,
         },
@@ -4261,7 +4261,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for six drawer dresser",
           isPrimary: true,
         },
@@ -4318,7 +4318,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for six drawer dresser",
           isPrimary: true,
         },
@@ -4375,7 +4375,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for six drawer dresser",
           isPrimary: true,
         },
@@ -4432,7 +4432,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for six drawer dresser",
           isPrimary: true,
         },
@@ -4489,7 +4489,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for two drawer nightstand",
           isPrimary: true,
         },
@@ -4547,7 +4547,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for two drawer nightstand",
           isPrimary: true,
         },
@@ -4604,7 +4604,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for two drawer nightstand",
           isPrimary: true,
         },
@@ -4661,7 +4661,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for two drawer nightstand",
           isPrimary: true,
         },
@@ -4718,7 +4718,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen pocket spring mattress",
           isPrimary: true,
         },
@@ -4775,7 +4775,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen pocket spring mattress",
           isPrimary: true,
         },
@@ -4832,7 +4832,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen pocket spring mattress",
           isPrimary: true,
         },
@@ -4893,7 +4893,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen pocket spring mattress",
           isPrimary: true,
         },
@@ -4955,7 +4955,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen upholstered headboard",
           isPrimary: true,
         },
@@ -5016,7 +5016,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen upholstered headboard",
           isPrimary: true,
         },
@@ -5077,7 +5077,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen upholstered headboard",
           isPrimary: true,
         },
@@ -5138,7 +5138,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for queen upholstered headboard",
           isPrimary: true,
         },
@@ -5195,7 +5195,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for upholstered bedroom bench",
           isPrimary: true,
         },
@@ -5256,7 +5256,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for upholstered bedroom bench",
           isPrimary: true,
         },
@@ -5317,7 +5317,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for upholstered bedroom bench",
           isPrimary: true,
         },
@@ -5379,7 +5379,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-bed-linen.webp",
           alt: "Bedroom interior reference for upholstered bedroom bench",
           isPrimary: true,
         },
@@ -5432,7 +5432,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for four seater dining table",
           isPrimary: true,
         },
@@ -5485,7 +5485,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for four seater dining table",
           isPrimary: true,
         },
@@ -5538,7 +5538,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for four seater dining table",
           isPrimary: true,
         },
@@ -5591,7 +5591,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for four seater dining table",
           isPrimary: true,
         },
@@ -5644,7 +5644,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for six seater dining table",
           isPrimary: true,
         },
@@ -5697,7 +5697,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for six seater dining table",
           isPrimary: true,
         },
@@ -5751,7 +5751,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for six seater dining table",
           isPrimary: true,
         },
@@ -5804,7 +5804,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for six seater dining table",
           isPrimary: true,
         },
@@ -5857,7 +5857,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for eight seater dining table",
           isPrimary: true,
         },
@@ -5910,7 +5910,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for eight seater dining table",
           isPrimary: true,
         },
@@ -5963,7 +5963,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for eight seater dining table",
           isPrimary: true,
         },
@@ -6016,7 +6016,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for eight seater dining table",
           isPrimary: true,
         },
@@ -6069,7 +6069,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for upholstered dining chair",
           isPrimary: true,
         },
@@ -6127,7 +6127,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for upholstered dining chair",
           isPrimary: true,
         },
@@ -6184,7 +6184,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for upholstered dining chair",
           isPrimary: true,
         },
@@ -6241,7 +6241,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for upholstered dining chair",
           isPrimary: true,
         },
@@ -6294,7 +6294,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for dining bench",
           isPrimary: true,
         },
@@ -6347,7 +6347,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for dining bench",
           isPrimary: true,
         },
@@ -6400,7 +6400,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for dining bench",
           isPrimary: true,
         },
@@ -6453,7 +6453,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for dining bench",
           isPrimary: true,
         },
@@ -6507,7 +6507,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for counter height stool",
           isPrimary: true,
         },
@@ -6560,7 +6560,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for counter height stool",
           isPrimary: true,
         },
@@ -6613,7 +6613,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for counter height stool",
           isPrimary: true,
         },
@@ -6666,7 +6666,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for counter height stool",
           isPrimary: true,
         },
@@ -6719,7 +6719,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for three door sideboard",
           isPrimary: true,
         },
@@ -6772,7 +6772,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for three door sideboard",
           isPrimary: true,
         },
@@ -6825,7 +6825,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for three door sideboard",
           isPrimary: true,
         },
@@ -6879,7 +6879,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for three door sideboard",
           isPrimary: true,
         },
@@ -6936,7 +6936,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for glass front crockery cabinet",
           isPrimary: true,
         },
@@ -6993,7 +6993,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for glass front crockery cabinet",
           isPrimary: true,
         },
@@ -7050,7 +7050,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for glass front crockery cabinet",
           isPrimary: true,
         },
@@ -7107,7 +7107,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for glass front crockery cabinet",
           isPrimary: true,
         },
@@ -7160,7 +7160,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for two tier bar trolley",
           isPrimary: true,
         },
@@ -7213,7 +7213,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for two tier bar trolley",
           isPrimary: true,
         },
@@ -7267,7 +7267,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for two tier bar trolley",
           isPrimary: true,
         },
@@ -7320,7 +7320,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-bedroom-wardrobe-bed.webp",
           alt: "Dining interior reference for two tier bar trolley",
           isPrimary: true,
         },
@@ -7373,7 +7373,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for writing desk",
           isPrimary: true,
         },
@@ -7426,7 +7426,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for writing desk",
           isPrimary: true,
         },
@@ -7479,7 +7479,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for writing desk",
           isPrimary: true,
         },
@@ -7532,7 +7532,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for writing desk",
           isPrimary: true,
         },
@@ -7585,7 +7585,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for computer desk",
           isPrimary: true,
         },
@@ -7639,7 +7639,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for computer desk",
           isPrimary: true,
         },
@@ -7692,7 +7692,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for computer desk",
           isPrimary: true,
         },
@@ -7745,7 +7745,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for computer desk",
           isPrimary: true,
         },
@@ -7798,7 +7798,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for electric standing desk",
           isPrimary: true,
         },
@@ -7851,7 +7851,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for electric standing desk",
           isPrimary: true,
         },
@@ -7904,7 +7904,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for electric standing desk",
           isPrimary: true,
         },
@@ -7957,7 +7957,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for electric standing desk",
           isPrimary: true,
         },
@@ -8011,7 +8011,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for ergonomic mesh chair",
           isPrimary: true,
         },
@@ -8064,7 +8064,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for ergonomic mesh chair",
           isPrimary: true,
         },
@@ -8117,7 +8117,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for ergonomic mesh chair",
           isPrimary: true,
         },
@@ -8170,7 +8170,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for ergonomic mesh chair",
           isPrimary: true,
         },
@@ -8223,7 +8223,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for compact task chair",
           isPrimary: true,
         },
@@ -8276,7 +8276,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for compact task chair",
           isPrimary: true,
         },
@@ -8329,7 +8329,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for compact task chair",
           isPrimary: true,
         },
@@ -8383,7 +8383,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for compact task chair",
           isPrimary: true,
         },
@@ -8440,7 +8440,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for high back office chair",
           isPrimary: true,
         },
@@ -8497,7 +8497,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for high back office chair",
           isPrimary: true,
         },
@@ -8554,7 +8554,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for high back office chair",
           isPrimary: true,
         },
@@ -8611,7 +8611,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for high back office chair",
           isPrimary: true,
         },
@@ -8664,7 +8664,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for five shelf bookcase",
           isPrimary: true,
         },
@@ -8717,7 +8717,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for five shelf bookcase",
           isPrimary: true,
         },
@@ -8771,7 +8771,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for five shelf bookcase",
           isPrimary: true,
         },
@@ -8824,7 +8824,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for five shelf bookcase",
           isPrimary: true,
         },
@@ -8881,7 +8881,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for two drawer filing cabinet",
           isPrimary: true,
         },
@@ -8938,7 +8938,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for two drawer filing cabinet",
           isPrimary: true,
         },
@@ -8995,7 +8995,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for two drawer filing cabinet",
           isPrimary: true,
         },
@@ -9052,7 +9052,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for two drawer filing cabinet",
           isPrimary: true,
         },
@@ -9109,7 +9109,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for three drawer desk pedestal",
           isPrimary: true,
         },
@@ -9167,7 +9167,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for three drawer desk pedestal",
           isPrimary: true,
         },
@@ -9224,7 +9224,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for three drawer desk pedestal",
           isPrimary: true,
         },
@@ -9281,7 +9281,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-office-workspace-desks.webp",
           alt: "Home Office interior reference for three drawer desk pedestal",
           isPrimary: true,
         },
@@ -9334,7 +9334,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio lounge chair",
           isPrimary: true,
         },
@@ -9387,7 +9387,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio lounge chair",
           isPrimary: true,
         },
@@ -9440,7 +9440,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio lounge chair",
           isPrimary: true,
         },
@@ -9493,7 +9493,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio lounge chair",
           isPrimary: true,
         },
@@ -9547,7 +9547,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for outdoor two seater sofa",
           isPrimary: true,
         },
@@ -9600,7 +9600,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for outdoor two seater sofa",
           isPrimary: true,
         },
@@ -9653,7 +9653,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for outdoor two seater sofa",
           isPrimary: true,
         },
@@ -9706,7 +9706,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for outdoor two seater sofa",
           isPrimary: true,
         },
@@ -9763,7 +9763,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for freestanding hanging chair",
           isPrimary: true,
         },
@@ -9820,7 +9820,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for freestanding hanging chair",
           isPrimary: true,
         },
@@ -9877,7 +9877,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for freestanding hanging chair",
           isPrimary: true,
         },
@@ -9935,7 +9935,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for freestanding hanging chair",
           isPrimary: true,
         },
@@ -9988,7 +9988,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for round bistro table",
           isPrimary: true,
         },
@@ -10041,7 +10041,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for round bistro table",
           isPrimary: true,
         },
@@ -10094,7 +10094,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for round bistro table",
           isPrimary: true,
         },
@@ -10147,7 +10147,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for round bistro table",
           isPrimary: true,
         },
@@ -10200,7 +10200,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio dining table",
           isPrimary: true,
         },
@@ -10253,7 +10253,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio dining table",
           isPrimary: true,
         },
@@ -10307,7 +10307,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio dining table",
           isPrimary: true,
         },
@@ -10360,7 +10360,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for patio dining table",
           isPrimary: true,
         },
@@ -10413,7 +10413,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for folding balcony table",
           isPrimary: true,
         },
@@ -10466,7 +10466,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for folding balcony table",
           isPrimary: true,
         },
@@ -10519,7 +10519,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for folding balcony table",
           isPrimary: true,
         },
@@ -10572,7 +10572,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for folding balcony table",
           isPrimary: true,
         },
@@ -10625,7 +10625,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for adjustable sun lounger",
           isPrimary: true,
         },
@@ -10679,7 +10679,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for adjustable sun lounger",
           isPrimary: true,
         },
@@ -10732,7 +10732,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for adjustable sun lounger",
           isPrimary: true,
         },
@@ -10785,7 +10785,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for adjustable sun lounger",
           isPrimary: true,
         },
@@ -10838,7 +10838,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for two seater garden bench",
           isPrimary: true,
         },
@@ -10891,7 +10891,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for two seater garden bench",
           isPrimary: true,
         },
@@ -10944,7 +10944,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for two seater garden bench",
           isPrimary: true,
         },
@@ -10997,7 +10997,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for two seater garden bench",
           isPrimary: true,
         },
@@ -11051,7 +11051,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for three tier planter stand",
           isPrimary: true,
         },
@@ -11104,7 +11104,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for three tier planter stand",
           isPrimary: true,
         },
@@ -11157,7 +11157,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for three tier planter stand",
           isPrimary: true,
         },
@@ -11210,7 +11210,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-living-space.webp",
           alt: "Outdoor interior reference for three tier planter stand",
           isPrimary: true,
         },
@@ -11263,7 +11263,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for single pendant light",
           isPrimary: true,
         },
@@ -11316,7 +11316,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for single pendant light",
           isPrimary: true,
         },
@@ -11369,7 +11369,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for single pendant light",
           isPrimary: true,
         },
@@ -11423,7 +11423,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for single pendant light",
           isPrimary: true,
         },
@@ -11476,7 +11476,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for six arm chandelier",
           isPrimary: true,
         },
@@ -11529,7 +11529,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for six arm chandelier",
           isPrimary: true,
         },
@@ -11582,7 +11582,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for six arm chandelier",
           isPrimary: true,
         },
@@ -11635,7 +11635,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for six arm chandelier",
           isPrimary: true,
         },
@@ -11688,7 +11688,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for flush ceiling light",
           isPrimary: true,
         },
@@ -11741,7 +11741,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for flush ceiling light",
           isPrimary: true,
         },
@@ -11795,7 +11795,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for flush ceiling light",
           isPrimary: true,
         },
@@ -11848,7 +11848,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for flush ceiling light",
           isPrimary: true,
         },
@@ -11901,7 +11901,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable floor lamp",
           isPrimary: true,
         },
@@ -11954,7 +11954,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable floor lamp",
           isPrimary: true,
         },
@@ -12007,7 +12007,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable floor lamp",
           isPrimary: true,
         },
@@ -12060,7 +12060,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable floor lamp",
           isPrimary: true,
         },
@@ -12113,7 +12113,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for bedside table lamp",
           isPrimary: true,
         },
@@ -12167,7 +12167,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for bedside table lamp",
           isPrimary: true,
         },
@@ -12220,7 +12220,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for bedside table lamp",
           isPrimary: true,
         },
@@ -12273,7 +12273,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for bedside table lamp",
           isPrimary: true,
         },
@@ -12326,7 +12326,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable desk lamp",
           isPrimary: true,
         },
@@ -12379,7 +12379,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable desk lamp",
           isPrimary: true,
         },
@@ -12432,7 +12432,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable desk lamp",
           isPrimary: true,
         },
@@ -12485,7 +12485,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable desk lamp",
           isPrimary: true,
         },
@@ -12539,7 +12539,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for wall sconce",
           isPrimary: true,
         },
@@ -12592,7 +12592,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for wall sconce",
           isPrimary: true,
         },
@@ -12645,7 +12645,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for wall sconce",
           isPrimary: true,
         },
@@ -12698,7 +12698,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for wall sconce",
           isPrimary: true,
         },
@@ -12751,7 +12751,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable picture light",
           isPrimary: true,
         },
@@ -12804,7 +12804,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable picture light",
           isPrimary: true,
         },
@@ -12857,7 +12857,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable picture light",
           isPrimary: true,
         },
@@ -12911,7 +12911,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for adjustable picture light",
           isPrimary: true,
         },
@@ -12964,7 +12964,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for swing arm wall light",
           isPrimary: true,
         },
@@ -13017,7 +13017,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for swing arm wall light",
           isPrimary: true,
         },
@@ -13070,7 +13070,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for swing arm wall light",
           isPrimary: true,
         },
@@ -13123,7 +13123,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-lamp-lighting-ambience.webp",
           alt: "Lighting interior reference for swing arm wall light",
           isPrimary: true,
         },
@@ -13176,7 +13176,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for round wall mirror",
           isPrimary: true,
         },
@@ -13229,7 +13229,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for round wall mirror",
           isPrimary: true,
         },
@@ -13283,7 +13283,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for round wall mirror",
           isPrimary: true,
         },
@@ -13336,7 +13336,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for round wall mirror",
           isPrimary: true,
         },
@@ -13389,7 +13389,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for framed abstract print",
           isPrimary: true,
         },
@@ -13446,7 +13446,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for framed abstract print",
           isPrimary: true,
         },
@@ -13503,7 +13503,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for framed abstract print",
           isPrimary: true,
         },
@@ -13560,7 +13560,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for framed abstract print",
           isPrimary: true,
         },
@@ -13617,7 +13617,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for floating wall shelf set",
           isPrimary: true,
         },
@@ -13671,7 +13671,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for floating wall shelf set",
           isPrimary: true,
         },
@@ -13724,7 +13724,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for floating wall shelf set",
           isPrimary: true,
         },
@@ -13777,7 +13777,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for floating wall shelf set",
           isPrimary: true,
         },
@@ -13830,7 +13830,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for ceramic vase",
           isPrimary: true,
         },
@@ -13883,7 +13883,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for ceramic vase",
           isPrimary: true,
         },
@@ -13936,7 +13936,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for ceramic vase",
           isPrimary: true,
         },
@@ -13989,7 +13989,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for ceramic vase",
           isPrimary: true,
         },
@@ -14047,7 +14047,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for abstract table sculpture",
           isPrimary: true,
         },
@@ -14104,7 +14104,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for abstract table sculpture",
           isPrimary: true,
         },
@@ -14161,7 +14161,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for abstract table sculpture",
           isPrimary: true,
         },
@@ -14218,7 +14218,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for abstract table sculpture",
           isPrimary: true,
         },
@@ -14271,7 +14271,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for decorative serving tray",
           isPrimary: true,
         },
@@ -14324,7 +14324,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for decorative serving tray",
           isPrimary: true,
         },
@@ -14377,7 +14377,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for decorative serving tray",
           isPrimary: true,
         },
@@ -14431,7 +14431,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for decorative serving tray",
           isPrimary: true,
         },
@@ -14484,7 +14484,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for woven area rug",
           isPrimary: true,
         },
@@ -14537,7 +14537,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for woven area rug",
           isPrimary: true,
         },
@@ -14590,7 +14590,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for woven area rug",
           isPrimary: true,
         },
@@ -14643,7 +14643,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for woven area rug",
           isPrimary: true,
         },
@@ -14696,7 +14696,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for cushion cover set",
           isPrimary: true,
         },
@@ -14749,7 +14749,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for cushion cover set",
           isPrimary: true,
         },
@@ -14803,7 +14803,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for cushion cover set",
           isPrimary: true,
         },
@@ -14856,7 +14856,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for cushion cover set",
           isPrimary: true,
         },
@@ -14909,7 +14909,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for textured sofa throw",
           isPrimary: true,
         },
@@ -14962,7 +14962,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for textured sofa throw",
           isPrimary: true,
         },
@@ -15015,7 +15015,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for textured sofa throw",
           isPrimary: true,
         },
@@ -15068,7 +15068,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-interior-room-chair.webp",
           alt: "Decor interior reference for textured sofa throw",
           isPrimary: true,
         },
@@ -15121,7 +15121,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single kids bed",
           isPrimary: true,
         },
@@ -15175,7 +15175,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single kids bed",
           isPrimary: true,
         },
@@ -15228,7 +15228,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single kids bed",
           isPrimary: true,
         },
@@ -15281,7 +15281,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single kids bed",
           isPrimary: true,
         },
@@ -15334,7 +15334,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for twin bunk bed",
           isPrimary: true,
         },
@@ -15387,7 +15387,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for twin bunk bed",
           isPrimary: true,
         },
@@ -15440,7 +15440,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for twin bunk bed",
           isPrimary: true,
         },
@@ -15493,7 +15493,7 @@ const data = {
       status: "out_of_stock",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for twin bunk bed",
           isPrimary: true,
         },
@@ -15547,7 +15547,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single trundle bed",
           isPrimary: true,
         },
@@ -15600,7 +15600,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single trundle bed",
           isPrimary: true,
         },
@@ -15653,7 +15653,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single trundle bed",
           isPrimary: true,
         },
@@ -15706,7 +15706,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for single trundle bed",
           isPrimary: true,
         },
@@ -15759,7 +15759,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study desk",
           isPrimary: true,
         },
@@ -15812,7 +15812,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study desk",
           isPrimary: true,
         },
@@ -15865,7 +15865,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study desk",
           isPrimary: true,
         },
@@ -15919,7 +15919,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study desk",
           isPrimary: true,
         },
@@ -15972,7 +15972,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study chair",
           isPrimary: true,
         },
@@ -16025,7 +16025,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study chair",
           isPrimary: true,
         },
@@ -16078,7 +16078,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study chair",
           isPrimary: true,
         },
@@ -16131,7 +16131,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids study chair",
           isPrimary: true,
         },
@@ -16184,7 +16184,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids play table",
           isPrimary: true,
         },
@@ -16237,7 +16237,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids play table",
           isPrimary: true,
         },
@@ -16291,7 +16291,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids play table",
           isPrimary: true,
         },
@@ -16344,7 +16344,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for kids play table",
           isPrimary: true,
         },
@@ -16397,7 +16397,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for toy storage organiser",
           isPrimary: true,
         },
@@ -16450,7 +16450,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for toy storage organiser",
           isPrimary: true,
         },
@@ -16503,7 +16503,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for toy storage organiser",
           isPrimary: true,
         },
@@ -16556,7 +16556,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for toy storage organiser",
           isPrimary: true,
         },
@@ -16609,7 +16609,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for low kids bookcase",
           isPrimary: true,
         },
@@ -16663,7 +16663,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for low kids bookcase",
           isPrimary: true,
         },
@@ -16716,7 +16716,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for low kids bookcase",
           isPrimary: true,
         },
@@ -16769,7 +16769,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for low kids bookcase",
           isPrimary: true,
         },
@@ -16822,7 +16822,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for two door kids wardrobe",
           isPrimary: true,
         },
@@ -16875,7 +16875,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for two door kids wardrobe",
           isPrimary: true,
         },
@@ -16928,7 +16928,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for two door kids wardrobe",
           isPrimary: true,
         },
@@ -16981,7 +16981,7 @@ const data = {
       status: "active",
       images: [
         {
-          url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80",
+          url: "/images/seed/seed-luxury-living-room.webp",
           alt: "Kids Room interior reference for two door kids wardrobe",
           isPrimary: true,
         },
@@ -17120,7 +17120,7 @@ function validateCatalogue(catalogue = data) {
     if (
       product.images.filter((image) => image.isPrimary).length !== 1 ||
       product.images.some(
-        (image) => !image.url.startsWith("https://images.unsplash.com/"),
+        (image) => !image.url.startsWith("/images/seed/"),
       )
     )
       throw configurationError("Invalid reference images");
@@ -17249,8 +17249,25 @@ const DEEP_LEAF_TYPES = {
   "two-door-kids-wardrobes": "wardrobe",
 };
 
-async function seedCatalogue({ Category, Product, catalogue = data }) {
-  validateCatalogue(catalogue);
+async function seedCatalogue({
+  Category,
+  Product,
+  catalogue = data,
+  imageResolver = null,
+}) {
+  // Validate the catalogue AS AUTHORED (seed-local "/images/seed/…"
+  // reference paths) and keep that summary for the return value:
+  // the resolver below rewrites image URLs to Cloudinary secure_urls,
+  // which the authored-data validator would rightly reject.
+  const summary = validateCatalogue(catalogue);
+  // Owner decision (2026-10-29): when an image resolver is supplied
+  // (the CLI run does; unit tests do not), seed-local "/images/seed/…"
+  // paths are uploaded to Cloudinary and written as secure_urls —
+  // see scripts/seedImageUpload.js. The data literal above is never
+  // mutated; the resolver returns a resolved copy.
+  if (imageResolver) {
+    catalogue = await imageResolver.resolveCatalogueImages(catalogue);
+  }
   // Phase 8 (catalog): the VOCABULARY §3 wiring (config/
   // catalogSeedWiring.js) is applied at write time — the data
   // literal above stays the owner's dataset untouched. productType
@@ -17371,7 +17388,7 @@ async function seedCatalogue({ Category, Product, catalogue = data }) {
     // save(), rather than insertMany(), runs this app's slug and status hooks.
     await seedStep(`saving product ${product.sku}`, () => document.save());
   }
-  return { ...validateCatalogue(catalogue), ...counts, wiring: wiringCounts };
+  return { ...summary, ...counts, wiring: wiringCounts };
 }
 
 async function ensureSeedUsers({ User, credentials, customerPassword }) {
@@ -17622,7 +17639,12 @@ async function runSeeder(options = {}) {
     );
     log(JSON.stringify({ registry }));
     const result = await seedStep("writing catalogue", () =>
-      seedCatalogue({ Category, Product }),
+      seedCatalogue({
+        Category,
+        Product,
+        imageResolver:
+          require("./seedImageUpload").createSeedImageResolver(),
+      }),
     );
     await seedStep("rebuilding category ancestors", () =>
       require("../services/categoryHierarchy.service").rebuildAllAncestors(),

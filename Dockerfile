@@ -17,11 +17,16 @@
 # =============================================================================
 
 # ---- Dependencies stage -----------------------------------------------------
-# package.json declares engines node >=20.19.0; the Node 20 line on
-# Alpine satisfies that. Dependencies are installed from the lockfile
+# package.json declares engines node >=20.19.0; CI runs Node 24, so the
+# image uses the Node 24 line on Alpine (PERF-019/SEC-006 remediation:
+# majors aligned with CI). Dependencies are installed from the lockfile
 # only, production packages only (devDependencies — eslint,
 # mongodb-memory-server — are neither needed nor wanted at runtime).
-FROM node:20-alpine AS deps
+# Pinned by digest (resolved from the Docker Hub registry API on
+# 2026-10-29 for node:24-alpine); Dependabot's docker ecosystem keeps
+# the digest current. NOTE: this image has still never been built —
+# the first `docker build` remains an owner-side verification step.
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS deps
 
 WORKDIR /app
 
@@ -32,7 +37,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # ---- Runtime stage ----------------------------------------------------------
-FROM node:20-alpine
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 
 # Production mode is what turns on the boot-time environment
 # enforcement in server.js (required vars, JWT_SECRET length floor,

@@ -48,7 +48,7 @@ async function tryAcquire(name, holderId, ttlMs) {
     const doc = await SchedulerLease.findOneAndUpdate(
       { _id: name, $or: [{ expiresAt: { $lte: now } }, { holderId }] },
       { $set: { holderId, expiresAt, updatedAt: now } },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: "after" },
     );
     return doc && doc.holderId === holderId ? doc : null;
   } catch (error) {

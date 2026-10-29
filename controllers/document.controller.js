@@ -210,7 +210,7 @@ exports.updateVisibility = async (req, res, next) => {
     const doc = await Document.findByIdAndUpdate(
       req.params.id,
       { visibility: req.body.visibility },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!doc) return next(new AppError("Document not found", 404));
     await auditLog.record({

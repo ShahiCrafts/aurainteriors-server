@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { boundedLimit, boundedPage } = require("../utils/listQuery");
 const ChatService = require("../services/chatService");
 const GuestSession = require("../models/guestSession.model");
 const catchAsync = require("../utils/catchAsync");
@@ -94,9 +95,11 @@ exports.startChat = catchAsync(async (req, res, next) => {
 exports.getMyChats = catchAsync(async (req, res, next) => {
   const { page = 1, limit = 20, status } = req.query;
 
+  // PERF-013: clamp at the controller too (the model clamps again) so
+  // limit=100000 / page=-5 / non-numeric input never flows downstream.
   const result = await ChatService.getCustomerChats(req.user._id, {
-    page: parseInt(page, 10),
-    limit: parseInt(limit, 10),
+    page: boundedPage(page),
+    limit: boundedLimit(limit, 20),
     status,
   });
 
@@ -258,9 +261,10 @@ exports.closeChat = catchAsync(async (req, res, next) => {
 exports.getAllChats = catchAsync(async (req, res, next) => {
   const { page = 1, limit = 20, status, priority, sortBy } = req.query;
 
+  // PERF-013: clamp at the controller too (the model clamps again).
   const result = await ChatService.getAllChats({
-    page: parseInt(page, 10),
-    limit: parseInt(limit, 10),
+    page: boundedPage(page),
+    limit: boundedLimit(limit, 20),
     status,
     priority,
     sortBy,
@@ -396,7 +400,7 @@ exports.updateMessageAttachments = catchAsync(async (req, res, next) => {
   const updatedMessage = await ChatMessage.findOneAndUpdate(
     ownership,
     { $set: { attachments: validAttachments } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ).populate("sender", "firstName lastName role avatar");
   if (!updatedMessage)
     return next(new AppError("Message not found or not authored by you", 404));

@@ -1,7 +1,7 @@
 // AR-05 — document ingestion as durable jobs + embed-then-swap +
 // stuck-document recovery sweep.
 //
-// Part 1 (stubbed, style of tests/audit/infra-batch.test.js B-10):
+// Part 1 (stubbed, style of tests/audit/infrastructure-guards.test.js B-10):
 // a RECORDING Qdrant fake proves ingestDocument now embeds and
 // upserts the new version BEFORE deleting the old one, that the
 // delete only removes points from previous runs (must_not on

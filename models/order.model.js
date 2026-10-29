@@ -182,12 +182,18 @@ orderSchema.index({ createdAt: -1 });
 // CQ-F (#194 class): the order id is a lookup key (guest order
 // tracking, eSewa transaction_uuid), so its random suffix must come
 // from a CSPRNG - Math.random is predictable and its base36 output
-// is not uniform. Format and length are unchanged: AU + base36
-// timestamp + 4 chars from [0-9A-Z].
+// is not uniform. Format: AU + base36 timestamp + random suffix
+// from [0-9A-Z].
+// SEC-011 (remediation): the suffix was lengthened from 4 to 8 chars
+// (36^4 ≈ 1.7M → 36^8 ≈ 2.8e12 combinations) to raise the cost of
+// enumerating the public order-tracking endpoint. Existing orders
+// keep their 4-char-suffix IDs and remain fully valid: orderId lookup
+// is an exact string match and no validator, pattern or UI anywhere
+// pins the suffix length (verified across both repos).
 const ORDER_SUFFIX_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 orderSchema.statics.generateOrderSuffix = function () {
   let suffix = "";
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     suffix +=
       ORDER_SUFFIX_ALPHABET[crypto.randomInt(ORDER_SUFFIX_ALPHABET.length)];
   }

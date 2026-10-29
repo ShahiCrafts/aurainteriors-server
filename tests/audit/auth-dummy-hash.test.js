@@ -5,7 +5,7 @@
 // (12) as before; the compare path awaits the precomputed value.
 // The dummy value is not a secret.
 //
-// Harness mirrors tests/fresh/batch6-auth-session.test.js (require
+// Harness mirrors tests/fresh/auth-session.test.js (require
 // cache stubs for the models, real bcrypt so the spies observe the
 // genuine module object the controller calls through).
 const test = require("node:test");

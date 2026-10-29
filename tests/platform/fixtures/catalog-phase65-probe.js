@@ -12,7 +12,7 @@
 // SR-P6-3: the flat category list's productCount and the tree
 // endpoint's count must agree (both exclude soft-deleted products).
 //
-// Prints RESULT lines; tests/platform/catalog-phase65.test.js
+// Prints RESULT lines; tests/platform/catalog-api-gaps.test.js
 // asserts them.
 const path = require("node:path");
 const fs = require("node:fs");

@@ -91,7 +91,7 @@ async function runIngestionRecoverySweep() {
         const claimed = await Document.findOneAndUpdate(
           { _id: doc._id, status: "processing", updatedAt: { $lt: cutoff } },
           { $set: { status: "pending" }, $inc: { ingestRecoveries: 1 } },
-          { new: true },
+          { returnDocument: "after" },
         );
         if (!claimed) continue;
         await enqueueIngestion(doc._id);
@@ -109,7 +109,7 @@ async function runIngestionRecoverySweep() {
                 "Ingestion stalled repeatedly - marked failed by the recovery sweep",
             },
           },
-          { new: true },
+          { returnDocument: "after" },
         );
         if (!claimed) continue;
         failed += 1;

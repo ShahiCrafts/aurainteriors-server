@@ -24,6 +24,49 @@ function ttlMs(env = process.env) {
   return n;
 }
 
+// PERF-015 (remediation): size bound for the store Map, same plain-env
+// pattern as the TTL above (CATALOG_CACHE_MAX_ENTRIES, default 500),
+// with oldest-first (LRU) eviction plus an unref()'d expired-entry
+// sweep — previously entries were only expired when re-read, and the
+// Map could grow unboundedly on fuzzed query strings.
+function maxEntries(env = process.env) {
+  const n = Number(env.CATALOG_CACHE_MAX_ENTRIES);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500;
+}
+
+function evictOverflow(env = process.env) {
+  const max = maxEntries(env);
+  while (store.size > max) {
+    const oldest = store.keys().next().value;
+    if (oldest === undefined) break;
+    store.delete(oldest);
+  }
+}
+
+function sweepExpired(now = Date.now(), env = process.env) {
+  const ttl = ttlMs(env);
+  if (!ttl) return 0;
+  let removed = 0;
+  for (const [key, entry] of store) {
+    if (now - entry.at > ttl) {
+      store.delete(key);
+      removed++;
+    }
+  }
+  return removed;
+}
+const sweepTimer = setInterval(() => {
+  try {
+    sweepExpired();
+  } catch {
+    /* sweep must never crash the process */
+  }
+}, 60 * 1000);
+if (typeof sweepTimer.unref === "function") sweepTimer.unref();
+function stopSweep() {
+  clearInterval(sweepTimer);
+}
+
 // A request may be served from / stored to this cache only when it
 // carries no credential of any kind: the list handler personalises
 // visibility by req.user (draft statuses for admins), so any
@@ -72,7 +115,9 @@ function get(key, env = process.env) {
 
 function set(key, value, env = process.env) {
   if (!ttlMs(env)) return;
+  store.delete(key); // re-insert so insertion order tracks recency
   store.set(key, { at: Date.now(), json: JSON.stringify(value) });
+  evictOverflow(env);
 }
 
 // Called from the admin write handlers for products, categories,
@@ -84,6 +129,9 @@ function invalidateCatalogCache() {
 
 module.exports = {
   ttlMs,
+  maxEntries,
+  sweepExpired,
+  stopSweep,
   isAnonymousRequest,
   canonicalize,
   keyFor,

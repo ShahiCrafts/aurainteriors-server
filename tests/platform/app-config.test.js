@@ -167,6 +167,37 @@ test("production gate: each required missing in turn errors naming it; all prese
   );
 });
 
+test("SEC-012: escape-hatch flags are boot errors in production, not warnings", () => {
+  const withBody = cfg.validateEnv({ ...PROD_OK, RETURN_TOKEN_IN_BODY: "1" });
+  assert.ok(
+    withBody.errors.some((e) => e.includes("RETURN_TOKEN_IN_BODY")),
+    withBody.errors.join(";"),
+  );
+  assert.ok(
+    !withBody.warnings.some((w) => w.includes("RETURN_TOKEN_IN_BODY")),
+    "must be an error, not a warning",
+  );
+  const withIssAud = cfg.validateEnv({ ...PROD_OK, JWT_REQUIRE_ISS_AUD: "0" });
+  assert.ok(
+    withIssAud.errors.some((e) => e.includes("JWT_REQUIRE_ISS_AUD")),
+    withIssAud.errors.join(";"),
+  );
+  // Unset / non-triggering values stay clean in production.
+  assert.deepEqual(cfg.validateEnv(PROD_OK).errors, []);
+  assert.deepEqual(
+    cfg.validateEnv({ ...PROD_OK, RETURN_TOKEN_IN_BODY: "0" }).errors,
+    [],
+  );
+  // Outside production the flags remain usable for local debugging.
+  const dev = cfg.validateEnv({
+    NODE_ENV: "development",
+    RETURN_TOKEN_IN_BODY: "1",
+    JWT_REQUIRE_ISS_AUD: "0",
+  });
+  assert.ok(!dev.errors.some((e) => e.includes("RETURN_TOKEN_IN_BODY")));
+  assert.ok(!dev.errors.some((e) => e.includes("JWT_REQUIRE_ISS_AUD")));
+});
+
 test("placeholder rejection: .env.production template values fail in production; real-looking values pass", () => {
   const text = fs.readFileSync(
     path.join(__dirname, "../../.env.production"),

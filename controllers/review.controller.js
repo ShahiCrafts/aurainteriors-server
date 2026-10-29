@@ -267,7 +267,7 @@ exports.markHelpful = catchAsync(async (req, res, next) => {
       },
       { $set: { helpfulCount: { $size: "$helpfulVotes" } } },
     ],
-    { new: true },
+    { returnDocument: "after", updatePipeline: true },
   );
   const voted = updated.helpfulVotes.some(
     (id) => String(id) === String(userId),
@@ -341,7 +341,7 @@ exports.addAdminResponse = catchAsync(async (req, res, next) => {
         respondedAt: new Date(),
       },
     },
-    { new: true },
+    { returnDocument: "after" },
   ).populate("user", "firstName lastName avatar");
 
   if (!review) {

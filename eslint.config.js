@@ -55,6 +55,26 @@ module.exports = [
     rules: {
       "no-undef": "error",
       "no-unused-vars": "warn",
+      // Mongoose 9 deprecation guard: the `new` / `returnOriginal`
+      // options for findOneAndUpdate() & friends are deprecated and
+      // print a [MONGOOSE] warning on every call. Use
+      // returnDocument: "after" (was new: true) or
+      // returnDocument: "before" (was new: false) instead.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name=/^find(One|ById)And(Update|Replace|Delete)$/] ObjectExpression > Property[key.name='new']",
+          message:
+            "The `new` option is deprecated in Mongoose 9. Use returnDocument: 'after' / 'before' instead.",
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name=/^find(One|ById)And(Update|Replace|Delete)$/] ObjectExpression > Property[key.name='returnOriginal']",
+          message:
+            "The `returnOriginal` option is deprecated in Mongoose 9. Use returnDocument: 'after' / 'before' instead.",
+        },
+      ],
     },
   },
 ];

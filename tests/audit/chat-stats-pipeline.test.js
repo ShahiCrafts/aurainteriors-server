@@ -4,7 +4,7 @@
 // index-supported $match/$sort/$group) joined back to the (small) chats
 // side for createdAt/status filtering. These stubbed tests pin the
 // pipeline shape and the returned-object shape; the real-mongod probe
-// (tests/platform/ar16-chat-stats-probe.test.js) proves the new and old
+// (tests/platform/chat-stats-integration.test.js) proves the new and old
 // pipelines agree on a fixture dataset and that the new plan examines
 // far fewer documents than the total message count.
 const test = require("node:test");

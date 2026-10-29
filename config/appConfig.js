@@ -488,14 +488,18 @@ function validateEnv(env = process.env) {
         "TRUST_PROXY: not set — behind a load balancer req.ip is the proxy address (shared limiter buckets); set it explicitly to the deployment's proxy topology",
       );
     }
+    // SEC-012 (remediation): both escape hatches are break-glass only.
+    // In production they are now boot ERRORS (fail closed), not
+    // warnings — a warning was too easy to miss in deploy logs. This
+    // block only runs in production, so local debugging is unaffected.
     if ((rawOf("RETURN_TOKEN_IN_BODY", env) || "").trim() === "1") {
-      warnings.push(
-        "RETURN_TOKEN_IN_BODY=1: the session JWT is returned in response bodies (readable by page scripts) — the httpOnly-cookie design is weakened",
+      errors.push(
+        "RETURN_TOKEN_IN_BODY=1: the session JWT is returned in response bodies (readable by page scripts) — the httpOnly-cookie design is weakened; refusing to boot in production (break-glass only, never in production)",
       );
     }
     if ((rawOf("JWT_REQUIRE_ISS_AUD", env) || "").trim() === "0") {
-      warnings.push(
-        "JWT_REQUIRE_ISS_AUD=0: JWT issuer/audience enforcement is disabled",
+      errors.push(
+        "JWT_REQUIRE_ISS_AUD=0: JWT issuer/audience enforcement is disabled; refusing to boot in production (break-glass only, never in production)",
       );
     }
     if (rawOf("UPLOAD_MAX_TOTAL_BYTES", env) === undefined) {

@@ -202,7 +202,7 @@ async function drainEmailOutbox({ limit = 25 } = {}) {
         ],
       },
       { $set: { status: "sending" } },
-      { new: true, sort: { nextAttemptAt: 1 } },
+      { returnDocument: "after", sort: { nextAttemptAt: 1 } },
     );
     if (!row) break;
     processed++;

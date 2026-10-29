@@ -106,7 +106,7 @@ async function claimNext(workerId, { types, visibilityMs } = {}) {
         },
         $inc: { attempts: 1 },
       },
-      { new: true, sort: { runAt: 1 } },
+      { returnDocument: "after", sort: { runAt: 1 } },
     );
     if (!job) return null;
     if (job.attempts > job.maxAttempts) {

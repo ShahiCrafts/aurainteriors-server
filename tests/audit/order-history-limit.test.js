@@ -2,7 +2,7 @@
 // history (no limit). It must be bounded to the most recent 20 orders
 // (ORDER_HISTORY_LIMIT), lean, with a projection covering only the
 // fields _formatOrder emits. AR-37 unit coverage lives in
-// ar37-maxtime.test.js (same stubbing technique).
+// query-maxtime.test.js (same stubbing technique).
 //
 // The Order stub below emulates Mongo semantics for limit: the query
 // records limit(n) and applies it when the query resolves.

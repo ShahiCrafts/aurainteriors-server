@@ -1,7 +1,7 @@
 "use strict";
 // Phase 2 (backend performance) remediation tests — PERF-B-01,
 // PERF-B-04, PERF-B-05, PERF-B-06, PERF-B-09, PERF-B-11.
-// Style mirrors tests/remediation/phase1.test.js and the audit
+// Style mirrors tests/remediation/security-remediation.test.js and the audit
 // harness helpers: stub modules are installed in require.cache
 // BEFORE the module under test is required; no DB is touched.
 const { test } = require("node:test");

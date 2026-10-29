@@ -393,7 +393,7 @@ class AnnouncementService {
           {
             $set: { status: "published", publishedAt: now, scheduledAt: null },
           },
-          { new: true },
+          { returnDocument: "after" },
         );
         if (!claimed) continue;
 

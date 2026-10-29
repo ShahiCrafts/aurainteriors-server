@@ -47,7 +47,7 @@ class PushTokenService {
       return await DevicePushToken.findOneAndUpdate(
         { user: userId, deviceId },
         { $set, $setOnInsert: { user: userId, deviceId } },
-        { upsert: true, new: true, runValidators: true },
+        { upsert: true, returnDocument: "after", runValidators: true },
       );
     } catch (error) {
       if (error.code === 11000) {
@@ -83,7 +83,7 @@ class PushTokenService {
           lastFailureAt: new Date(),
           lastFailureReason: reason,
         },
-        { new: true },
+        { returnDocument: "after" },
       );
 
       if (!updated) {
@@ -107,7 +107,7 @@ class PushTokenService {
           lastFailureAt: null,
           lastFailureReason: null,
         },
-        { new: true },
+        { returnDocument: "after" },
       );
 
       if (!updated) {
@@ -154,7 +154,7 @@ class PushTokenService {
           isActive: false,
           updatedAt: new Date(),
         },
-        { new: true },
+        { returnDocument: "after" },
       );
 
       if (!updated) {

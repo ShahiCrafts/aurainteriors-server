@@ -140,9 +140,13 @@ test("VULN-002: upload.middleware rejects SVG for any non-reencode policy (no fa
     src.indexOf('detectImageType(req.file.buffer) === "svg"'),
     src.indexOf("uploadToCloudinary(uploadBuffer"),
   );
+  // Robust to source formatting (the AppError call is wrapped across
+  // lines in the current layout): what matters is the behaviour —
+  // the non-reencode branch returns an AppError rejecting the SVG,
+  // with no fall-through to the Cloudinary upload below.
   assert.match(
     region,
-    /else \{\s*\n\s*return next\(new AppError\("SVG images are not accepted/,
+    /else\s*\{\s*return next\(\s*new AppError\("SVG images are not accepted/,
   );
 });
 
@@ -185,8 +189,12 @@ test("VULN-005/007: production posture warnings fire for weakened/undecided sett
     RETURN_TOKEN_IN_BODY: "1",
     JWT_REQUIRE_ISS_AUD: "0",
   });
-  assert.ok(weakened.warnings.some((w) => w.includes("RETURN_TOKEN_IN_BODY")));
-  assert.ok(weakened.warnings.some((w) => w.includes("JWT_REQUIRE_ISS_AUD")));
+  // SEC-012 (remediation): the two escape-hatch flags are no longer
+  // warnings in production — they are boot errors (fail closed).
+  assert.ok(weakened.errors.some((e) => e.includes("RETURN_TOKEN_IN_BODY")));
+  assert.ok(weakened.errors.some((e) => e.includes("JWT_REQUIRE_ISS_AUD")));
+  assert.ok(!weakened.warnings.some((w) => w.includes("RETURN_TOKEN_IN_BODY")));
+  assert.ok(!weakened.warnings.some((w) => w.includes("JWT_REQUIRE_ISS_AUD")));
   assert.ok(!weakened.warnings.some((w) => w.includes("RATE_LIMIT_STORE")));
   assert.ok(!weakened.warnings.some((w) => w.includes("TRUST_PROXY")));
 });
@@ -299,13 +307,16 @@ test("VULN-008: getAllOrders coerces both status and paymentStatus via asEnum", 
   const start = src.indexOf("exports.getAllOrders");
   assert.ok(start >= 0);
   const region = src.slice(start, start + 3000);
+  // The enum arrays are formatted across multiple lines in the
+  // current source; match the coercion calls + full enum contents
+  // without pinning line layout.
   assert.match(
     region,
-    /asEnum\(status, \["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"\]\)/,
+    /asEnum\(status,\s*\[\s*"pending",\s*"confirmed",\s*"processing",\s*"shipped",\s*"delivered",\s*"cancelled",?\s*\]\)/,
   );
   assert.match(
     region,
-    /asEnum\(paymentStatus, \["pending", "paid", "failed", "refunded"\]\)/,
+    /asEnum\(paymentStatus,\s*\[\s*"pending",\s*"paid",\s*"failed",\s*"refunded",?\s*\]\)/,
   );
   assert.ok(
     !/filter\.orderStatus = status;/.test(region),

@@ -97,7 +97,7 @@ exports.confirmSubscription = async (req, res) => {
           unsubscribedAt: 1,
         },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!subscriber)
       return res

@@ -13,6 +13,7 @@ const { protect, restrictTo } = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
 const {
   publicEndpointRateLimit,
+  trackAttemptRateLimit,
 } = require("../middleware/rateLimit.middleware");
 const {
   guestCheckoutSchema,
@@ -39,6 +40,8 @@ router.post(
     "Too many tracking requests. Please try again later.",
   ),
   validate(orderTrackingSchema),
+  // SEC-011: per email+orderId attempt cap on top of the per-IP cap.
+  trackAttemptRateLimit(10),
   orderController.trackOrder,
 );
 

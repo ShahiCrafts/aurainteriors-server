@@ -13,6 +13,7 @@ dummyPasswordHashPromise.catch(() => {});
 const getDummyPasswordHash = async () =>
   dummyPasswordHash !== null ? dummyPasswordHash : dummyPasswordHashPromise;
 const authToken = require("../utils/authToken");
+const auditLog = require("../services/auditLog.service");
 const runtimeContext = require("../services/runtimeContext");
 const { maskEmail } = require("../utils/maskEmail");
 const RevokedToken = require("../models/revokedToken.model");
@@ -74,6 +75,30 @@ const sendAuthResponse = (user, statusCode, res) => {
     body.token = token;
   res.status(statusCode).json(body);
 };
+// SEC-009 (remediation): authentication success/failure events go to
+// the AuditLog trail (services/auditLog.service.js, VULN-004) so auth
+// attacks are visible after the fact. The email is stored MASKED only
+// (utils/maskEmail); passwords, OTPs and tokens are never passed.
+// record() never throws, and it skips silently when the DB is not
+// connected, so auditing can never change a response. Action shape:
+// `auth.<scope>.<outcome>`; the reason is a stable code, never a
+// user-facing message, so responses stay generic (no enumeration).
+const recordAuthEvent = (req, { scope, outcome, reason, email, userId }) =>
+  auditLog.record({
+    actor: userId || undefined,
+    action: `auth.${scope}.${outcome}`,
+    targetType: "Auth",
+    targetId: email ? maskEmail(email) : undefined,
+    after: {
+      scope,
+      outcome,
+      reason: reason || undefined,
+      email: email ? maskEmail(email) : undefined,
+    },
+    ip: req?.ip,
+  });
+exports._recordAuthEvent = recordAuthEvent; // exported for tests
+
 exports._sendAuthResponse = sendAuthResponse; // exported for tests
 exports._tokenLifetimeMs = tokenLifetimeMs;
 exports._getDummyPasswordHash = getDummyPasswordHash; // exported for tests (AR-34)
@@ -85,6 +110,12 @@ exports.sendMagicLink = async (req, res) => {
         ? req.body.email.trim().toLowerCase()
         : "";
     if (!email || email.length > 254 || !/^\S+@\S+\.\S+$/.test(email)) {
+      await recordAuthEvent(req, {
+        scope: "magic_link_request",
+        outcome: "failure",
+        reason: "invalid_input",
+        email,
+      });
       return res
         .status(400)
         .json({ status: "fail", message: "Email is required" });
@@ -93,6 +124,15 @@ exports.sendMagicLink = async (req, res) => {
     let user = await User.findOne({ email, deletedAt: null });
 
     if (user && (user.role === "admin" || !user.isActive)) {
+      // Response stays the generic success (no enumeration); the
+      // audit trail records internally that nothing was issued.
+      await recordAuthEvent(req, {
+        scope: "magic_link_request",
+        outcome: "failure",
+        reason: "not_issued_admin_or_inactive",
+        email,
+        userId: user._id,
+      });
       return res.status(200).json({
         status: "success",
         message: "Sign-in link sent to your email. It expires in 15 minutes.",
@@ -105,6 +145,13 @@ exports.sendMagicLink = async (req, res) => {
 
     const rawToken = user.createMagicLinkToken();
     await user.save({ validateBeforeSave: false });
+    await recordAuthEvent(req, {
+      scope: "magic_link_request",
+      outcome: "success",
+      reason: "link_issued",
+      email,
+      userId: user._id,
+    });
 
     const magicLink = `${process.env.FRONTEND_URL}/auth/verify?token=${rawToken}`;
     // Bearer links must never be written to logs.
@@ -178,6 +225,11 @@ exports.verifyMagicLink = async (req, res) => {
   try {
     const token = req.body?.token;
     if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) {
+      await recordAuthEvent(req, {
+        scope: "magic_link",
+        outcome: "failure",
+        reason: "invalid_input",
+      });
       return res
         .status(400)
         .json({ status: "fail", message: "Token is required" });
@@ -196,10 +248,15 @@ exports.verifyMagicLink = async (req, res) => {
         $set: { isEmailVerified: true, lastLogin: new Date() },
         $inc: { loginCount: 1 },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!user) {
+      await recordAuthEvent(req, {
+        scope: "magic_link",
+        outcome: "failure",
+        reason: "invalid_or_expired_token",
+      });
       return res.status(400).json({
         status: "fail",
         message:
@@ -208,20 +265,41 @@ exports.verifyMagicLink = async (req, res) => {
     }
 
     if (user.role === "admin") {
+      await recordAuthEvent(req, {
+        scope: "magic_link",
+        outcome: "failure",
+        reason: "admin_scope_rejected",
+        email: user.email,
+        userId: user._id,
+      });
       return res.status(403).json({
         status: "fail",
         message: "Admins must log in through the Admin Portal.",
       });
     }
 
-    if (!user.isActive)
+    if (!user.isActive) {
+      await recordAuthEvent(req, {
+        scope: "magic_link",
+        outcome: "failure",
+        reason: "account_deactivated",
+        email: user.email,
+        userId: user._id,
+      });
       return res
         .status(400)
         .json({
           status: "fail",
           message: "This link is invalid or has expired.",
         });
+    }
 
+    await recordAuthEvent(req, {
+      scope: "magic_link",
+      outcome: "success",
+      email: user.email,
+      userId: user._id,
+    });
     sendAuthResponse(user, 200, res);
   } catch (error) {
     res
@@ -241,10 +319,23 @@ exports.googleCallback = (req, res) => {
     req.user.deletedAt ||
     req.user.role === "admin"
   ) {
+    void recordAuthEvent(req, {
+      scope: "google",
+      outcome: "failure",
+      reason: "unauthorized",
+      email: req.user?.email,
+      userId: req.user?._id,
+    });
     return res.redirect(
       `${process.env.FRONTEND_URL}/?error=unauthorized_admin`,
     );
   }
+  void recordAuthEvent(req, {
+    scope: "google",
+    outcome: "success",
+    email: req.user.email,
+    userId: req.user._id,
+  });
   const token = signToken(req.user);
   attachTokenCookie(res, token);
   res.redirect(`${process.env.FRONTEND_URL}/auth/success`);
@@ -329,6 +420,12 @@ exports.adminLogin = async (req, res) => {
       !password ||
       password.length > 1024
     ) {
+      await recordAuthEvent(req, {
+        scope: "admin_login",
+        outcome: "failure",
+        reason: "invalid_input",
+        email,
+      });
       return res
         .status(400)
         .json({ status: "fail", message: "Email and password are required" });
@@ -345,17 +442,39 @@ exports.adminLogin = async (req, res) => {
       await bcrypt.compare(password, await getDummyPasswordHash());
     }
     if (!user || user.role !== "admin" || !isCorrect) {
+      await recordAuthEvent(req, {
+        scope: "admin_login",
+        outcome: "failure",
+        reason: "invalid_credentials",
+        email,
+        userId: user?._id,
+      });
       return res
         .status(401)
         .json({ status: "fail", message: "Invalid email or password" });
     }
 
     if (!user.isActive) {
+      await recordAuthEvent(req, {
+        scope: "admin_login",
+        outcome: "failure",
+        reason: "account_deactivated",
+        email,
+        userId: user._id,
+      });
       return res.status(403).json({
         status: "fail",
         message: "This account has been deactivated. Please contact support.",
       });
     }
+
+    await recordAuthEvent(req, {
+      scope: "admin_login",
+      outcome: "success",
+      reason: "otp_issued",
+      email,
+      userId: user._id,
+    });
 
     // Generate OTP
     const rawOtp = user.createOtp();
@@ -439,12 +558,19 @@ exports.adminVerifyOtp = async (req, res) => {
       typeof req.body?.email === "string"
         ? req.body.email.trim().toLowerCase()
         : "";
-    const reject = () =>
-      res.status(400).json({
+    const reject = async (reason) => {
+      await recordAuthEvent(req, {
+        scope: "admin_otp",
+        outcome: "failure",
+        reason,
+        email,
+      });
+      return res.status(400).json({
         status: "fail",
         message:
           "The code is invalid or has expired. Please sign in again if necessary.",
       });
+    };
     if (
       !email ||
       email.length > 254 ||
@@ -454,7 +580,7 @@ exports.adminVerifyOtp = async (req, res) => {
       typeof challengeId !== "string" ||
       !/^[a-f0-9]{64}$/.test(challengeId)
     )
-      return reject();
+      return reject("invalid_input");
 
     // Reserve one guess atomically; parallel requests cannot exceed five.
     const filter = {
@@ -468,11 +594,11 @@ exports.adminVerifyOtp = async (req, res) => {
     const attempt = await User.findOneAndUpdate(
       { ...filter, loginOtpAttempts: { $lt: 5 } },
       { $inc: { loginOtpAttempts: 1 } },
-      { new: true },
+      { returnDocument: "after" },
     ).select("+loginOtp");
-    if (!attempt) return reject();
+    if (!attempt) return reject("challenge_not_found_or_exhausted");
     const hashedOtp = require("../utils/otpHash").hashOtp(otp); // must match createOtp (A-12)
-    if (attempt.loginOtp !== hashedOtp) return reject();
+    if (attempt.loginOtp !== hashedOtp) return reject("otp_mismatch");
 
     // Claim the challenge once before issuing a JWT, preventing OTP replay.
     const user = await User.findOneAndUpdate(
@@ -487,10 +613,16 @@ exports.adminVerifyOtp = async (req, res) => {
         $set: { isEmailVerified: true, lastLogin: new Date() },
         $inc: { loginCount: 1 },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
-    if (!user) return reject();
+    if (!user) return reject("claim_lost");
 
+    await recordAuthEvent(req, {
+      scope: "admin_otp",
+      outcome: "success",
+      email,
+      userId: user._id,
+    });
     sendAuthResponse(user, 200, res);
   } catch (error) {
     res

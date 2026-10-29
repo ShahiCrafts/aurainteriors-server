@@ -1,3 +1,4 @@
+const { boundedLimit, boundedPage } = require("../utils/listQuery");
 const mongoose = require("mongoose");
 
 const chatSchema = new mongoose.Schema(
@@ -162,7 +163,11 @@ chatSchema.statics.getCustomerChats = async function (
   customerId,
   options = {},
 ) {
-  const { limit = 20, page = 1, status } = options;
+  const { status } = options;
+  // PERF-013: cap page/limit like getChatMessages (chatMessage.model.js)
+  // so a raw ?limit=100000 cannot reach MongoDB uncapped.
+  const limit = boundedLimit(options.limit, 20);
+  const page = boundedPage(options.page);
   const skip = (page - 1) * limit;
 
   const query = {
@@ -191,13 +196,10 @@ chatSchema.statics.getCustomerChats = async function (
 };
 
 chatSchema.statics.getAllChats = async function (options = {}) {
-  const {
-    limit = 20,
-    page = 1,
-    status,
-    priority,
-    sortBy = "lastMessageAt",
-  } = options;
+  const { status, priority, sortBy = "lastMessageAt" } = options;
+  // PERF-013: cap page/limit like getChatMessages (chatMessage.model.js).
+  const limit = boundedLimit(options.limit, 20);
+  const page = boundedPage(options.page);
   const skip = (page - 1) * limit;
 
   const query = {

@@ -119,7 +119,7 @@ discountSchema.methods.incrementUsage = async function () {
       ],
     },
     { $inc: { currentUsageCount: 1 } },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (updated) {
     // Mirror without dirtying this copy.

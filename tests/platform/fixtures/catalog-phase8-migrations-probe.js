@@ -6,7 +6,7 @@
 // carrying pre-SR-P6-2 lowercased attributeKeys, products with no
 // variants — then runs each migration dry-run -> real -> again,
 // printing RESULT lines for tests/platform/
-// catalog-phase8-migrations.test.js to assert: dry-run writes
+// catalog-migrations.test.js to assert: dry-run writes
 // NOTHING and reports accurately, the real run applies exactly the
 // reported changes, and the second run is a no-op.
 const path = require("node:path");

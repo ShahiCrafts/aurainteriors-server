@@ -144,7 +144,7 @@ class PromotionService {
     const promotion = await Promotion.findOneAndUpdate(
       { _id: promotionId, status: { $in: ["draft", "scheduled"] } },
       { $set: { status: "sending" } },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!promotion)
       throw new AppError("This promotion is already being sent", 409);

@@ -14,7 +14,7 @@ exports.consumeDiscountUsage = async (order, session) => {
       ],
     },
     { $inc: { currentUsageCount: 1 } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
   if (!consumed) throw new Error("DISCOUNT_UNAVAILABLE");
   order.discountUsageConsumed = true;

@@ -14,7 +14,7 @@
 // The REAL routers are mounted in a throwaway express app; models and
 // upload/cloudinary modules are stubbed (audit/helpers technique), so
 // what is exercised end to end is the actual route + guard + auth
-// wiring. Auth uses a locally signed admin JWT (cluster-a pattern).
+// wiring. Auth uses a locally signed admin JWT (controllers-auth-profile pattern).
 process.env.JWT_SECRET = "<redacted>";
 const test = require("node:test");
 const { before, after } = require("node:test");

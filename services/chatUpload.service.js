@@ -95,7 +95,7 @@ async function cleanupExpiredUploads(now = new Date()) {
         ],
       },
       { $set: { state: "deleting", cleanupClaimedAt: now } },
-      { new: true },
+      { returnDocument: "after" },
     );
     if (!upload) continue;
     try {

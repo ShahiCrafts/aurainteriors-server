@@ -1,7 +1,7 @@
 // AR-31(a) characterization + regression tests for discount code resolution.
 //
-// Technique (mirrors tests/happy/cluster-a.test.js): stubModule() pre-populates
-// require.cache BEFORE the controller is required. Unlike cluster-a, the
+// Technique (mirrors tests/happy/controllers-auth-profile.test.js): stubModule() pre-populates
+// require.cache BEFORE the controller is required. Unlike controllers-auth-profile, the
 // Discount.findOne stub here is QUERY-FAITHFUL: it emulates Mongo matching
 // against a stored document whose code is "SAVE10" (codes are stored
 // uppercased by createDiscount/updateDiscount and by the schema's

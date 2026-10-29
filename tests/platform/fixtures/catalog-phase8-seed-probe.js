@@ -13,7 +13,7 @@
 //     the seed's own data literal — nothing invented in transit);
 //   - a leaf category's facets response is sane and nonzero;
 //   - a second runSeeder (upsert) creates nothing new.
-// Prints RESULT lines; tests/platform/catalog-phase8-seed.test.js
+// Prints RESULT lines; tests/platform/catalog-seed-wiring.test.js
 // asserts them.
 const path = require("node:path");
 const fs = require("node:fs");

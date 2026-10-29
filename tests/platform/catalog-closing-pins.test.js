@@ -1,13 +1,13 @@
 // Phase 9+10 (catalog): closing pass — in-process pins: SR-P7-1
 // (production error bodies carry the AppError code) and the catalog
 // index inventory. The MMS-backed sections (SR-P7-2 payloads, the
-// security battery, perf, N+1) live in catalog-phase910-probe.test.js
+// security battery, perf, N+1) live in catalog-security-perf-probe.test.js
 // + fixtures/catalog-phase910-probe.js.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 // ---------------------------------------------------------------------
 // SR-P7-1: production error bodies include the AppError `code`.
-// In-process, following the tests/audit/infra-batch.test.js harness.
+// In-process, following the tests/audit/infrastructure-guards.test.js harness.
 // ---------------------------------------------------------------------
 const errorHandler = require("../../middleware/error.middleware");
 const AppError = require("../../utils/AppError");

@@ -15,8 +15,8 @@ test("CQ-F: order id suffixes are well-formed and crypto-drawn", () => {
     const suffix = Order.generateOrderSuffix();
     assert.match(
       suffix,
-      /^[0-9A-Z]{4}$/,
-      "format/length preserved (AU + base36 ts + 4 chars)",
+      /^[0-9A-Z]{8}$/,
+      "format preserved (AU + base36 ts + suffix); SEC-011 lengthened the suffix 4 -> 8 chars",
     );
     seen.add(suffix);
   }
