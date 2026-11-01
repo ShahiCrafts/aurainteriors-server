@@ -2,17 +2,30 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const RevokedToken = require("../models/revokedToken.model");
 const hash = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+// Session surface scoping lives in utils/authSurface.js (kept
+// dependency-light for isolated test harnesses); extraction below is
+// surface-aware through it: each app only ever presents its own
+// surface's cookie ("jwt" storefront, "jwt_admin" admin).
+const {
+  COOKIE_BY_SURFACE,
+  surfaceOf,
+  cookieNameForSurface,
+  cookieNameForRequest,
+} = require("./authSurface");
+
 const extract = (req) => {
   const bearer = req.headers?.authorization;
   if (typeof bearer === "string" && bearer.startsWith("Bearer "))
     return bearer.slice(7);
-  if (req.cookies?.jwt) return req.cookies.jwt;
+  const name = cookieNameForRequest(req);
+  if (req.cookies?.[name]) return req.cookies[name];
   const cookie = req.headers?.cookie
     ?.split(";")
     .map((v) => v.trim())
-    .find((v) => v.startsWith("jwt="));
+    .find((v) => v.startsWith(`${name}=`));
   try {
-    return cookie ? decodeURIComponent(cookie.slice(4)) : null;
+    return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
   } catch {
     return null;
   }
@@ -36,4 +49,12 @@ const verify = async (token) => {
     throw new Error("Session revoked");
   return decoded;
 };
-module.exports = { hash, extract, verify };
+module.exports = {
+  hash,
+  extract,
+  verify,
+  surfaceOf,
+  cookieNameForSurface,
+  cookieNameForRequest,
+  COOKIE_BY_SURFACE,
+};

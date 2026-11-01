@@ -11,6 +11,10 @@ function load(file, mocks, logs = []) {
   // SEC-009: auth.controller also requires the auditLog service (side-effect-free; record() lazy-requires its model and never throws) - resolve it for real too.
   mocks = {
     "../utils/authToken": {},
+    // Surface scoping (2026-11-01): auth.controller requires the
+    // dependency-light authSurface helpers at top level - resolve
+    // them for real, like runtimeContext/auditLog below.
+    "../utils/authSurface": require("../../utils/authSurface.js"),
     "../models/revokedToken.model": {},
     "../utils/maskEmail": require("../../utils/maskEmail.js"),
     "../services/runtimeContext": require("../../services/runtimeContext.js"),
@@ -166,10 +170,13 @@ test("OTP requires challenge, locks after five guesses, cannot replay or race", 
     }),
   );
   assert.equal(
-    results.filter((r) => r.body?.token === "jwt" || r.cookies?.jwt === "jwt")
-      .length,
+    results.filter(
+      (r) => r.body?.token === "jwt" || r.cookies?.jwt_admin === "jwt",
+    ).length,
     1,
-  ); // FA-02: the session token now travels by cookie
+  ); // FA-02: the session token now travels by cookie — on the admin
+  // surface that cookie is "jwt_admin" (surface scoping, 2026-11-01:
+  // the admin session must not overwrite the storefront "jwt" cookie)
 });
 test("magic link and provider error credentials never reach controller logs", async () => {
   const logs = [];

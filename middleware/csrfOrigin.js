@@ -31,7 +31,9 @@ function createOriginCheck(allowedOrigins) {
   return (req, res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
     const cookieHeader = req.headers.cookie || "";
-    if (!/(?:^|;\s*)jwt=/.test(cookieHeader)) return next();
+    // Either session cookie counts (storefront "jwt", admin
+    // "jwt_admin" — see utils/authSurface.js).
+    if (!/(?:^|;\s*)(?:jwt|jwt_admin)=/.test(cookieHeader)) return next();
     if (EXEMPT_PREFIXES.some((prefix) => req.path?.startsWith(prefix)))
       return next();
     const origin =

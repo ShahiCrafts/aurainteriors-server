@@ -2,6 +2,7 @@ const User = require("../models/user.model");
 const bcrypt = require("bcrypt");
 const RevokedToken = require("../models/revokedToken.model");
 const authToken = require("../utils/authToken");
+const authSurface = require("../utils/authSurface");
 const { deleteFromCloudinary } = require("../config/cloudinary");
 const { buildPreferenceUpdates } = require("../utils/preferenceUpdates");
 
@@ -259,7 +260,7 @@ exports.deleteAccount = async (req, res) => {
     }
     const isProd =
       (process.env.NODE_ENV || "").trim().toLowerCase() === "production";
-    res.cookie("jwt", "loggedout", {
+    res.cookie(authSurface.cookieNameForRequest(req), "loggedout", {
       expires: new Date(Date.now() + 10 * 1000),
       httpOnly: true,
       secure: isProd,

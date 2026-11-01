@@ -13,6 +13,7 @@ dummyPasswordHashPromise.catch(() => {});
 const getDummyPasswordHash = async () =>
   dummyPasswordHash !== null ? dummyPasswordHash : dummyPasswordHashPromise;
 const authToken = require("../utils/authToken");
+const authSurface = require("../utils/authSurface");
 const auditLog = require("../services/auditLog.service");
 const runtimeContext = require("../services/runtimeContext");
 const { maskEmail } = require("../utils/maskEmail");
@@ -57,8 +58,11 @@ const signToken = (user) =>
     },
   );
 
-const attachTokenCookie = (res, token) => {
-  res.cookie("jwt", token, {
+const attachTokenCookie = (res, token, surface = "customer") => {
+  // Session surface scoping (see utils/authSurface.js): the admin
+  // surface gets its own cookie name so an admin sign-in never
+  // overwrites the storefront session in the same browser.
+  res.cookie(authSurface.cookieNameForSurface(surface), token, {
     expires: new Date(Date.now() + tokenLifetimeMs()),
     httpOnly: true,
     secure: isProduction(),
@@ -67,9 +71,9 @@ const attachTokenCookie = (res, token) => {
   });
 };
 
-const sendAuthResponse = (user, statusCode, res) => {
+const sendAuthResponse = (user, statusCode, res, surface = "customer") => {
   const token = signToken(user);
-  attachTokenCookie(res, token);
+  attachTokenCookie(res, token, surface);
   const body = { status: "success", data: { user } };
   if (require("../config/appConfig").getString("RETURN_TOKEN_IN_BODY") === "1")
     body.token = token;
@@ -386,7 +390,9 @@ exports.logout = async (req, res) => {
         }
       }
     }
-    res.clearCookie("jwt", {
+    // Clear only the CALLING surface's cookie: logging out of the
+    // admin panel must not end the storefront session, and vice versa.
+    res.clearCookie(authSurface.cookieNameForRequest(req), {
       httpOnly: true,
       secure: isProduction(),
       sameSite: isProduction() ? "none" : "lax",
@@ -623,7 +629,9 @@ exports.adminVerifyOtp = async (req, res) => {
       email,
       userId: user._id,
     });
-    sendAuthResponse(user, 200, res);
+    // The ONLY admin session issuance point: scoped to the admin
+    // surface's cookie so it cannot clobber the customer session.
+    sendAuthResponse(user, 200, res, "admin");
   } catch (error) {
     res
       .status(500)

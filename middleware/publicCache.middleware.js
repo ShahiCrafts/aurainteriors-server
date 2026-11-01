@@ -14,7 +14,9 @@ module.exports = function publicCache(req, res, next) {
   if (req.method !== "GET") return next();
   const hasAuthorization = Boolean(req.headers && req.headers.authorization);
   const cookieHeader = (req.headers && req.headers.cookie) || "";
-  const hasJwtCookie = /(?:^|;\s*)jwt=/.test(cookieHeader);
+  // Either session cookie counts (storefront "jwt", admin
+  // "jwt_admin" — see utils/authSurface.js).
+  const hasJwtCookie = /(?:^|;\s*)(?:jwt|jwt_admin)=/.test(cookieHeader);
   if (!hasAuthorization && !hasJwtCookie) {
     res.setHeader(
       "Cache-Control",

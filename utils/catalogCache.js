@@ -78,7 +78,9 @@ function isAnonymousRequest(req) {
   const headers = req.headers || {};
   if (headers.authorization) return false;
   const cookieHeader = headers.cookie || "";
-  if (/(?:^|;\s*)jwt=/.test(cookieHeader)) return false;
+  // Either session cookie counts (storefront "jwt", admin
+  // "jwt_admin" — see utils/authSurface.js).
+  if (/(?:^|;\s*)(?:jwt|jwt_admin)=/.test(cookieHeader)) return false;
   return true;
 }
 
