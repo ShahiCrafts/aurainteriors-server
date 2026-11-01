@@ -26,6 +26,31 @@ exports.uploadAttachment = catchAsync(async (req, res) => {
   res.status(201).json({ status: "success", data });
 });
 
+// Direct-upload pair (browser -> Cloudinary, signed): authorizeUpload
+// has already authorised the actor for this chat and set
+// req.attachmentActor. The sign step is stateless; the complete step
+// verifies the asset against Cloudinary's record and writes the
+// upload ledger, returning the exact shape the proxied upload
+// returns so clients treat both transports identically.
+exports.signAttachmentUpload = catchAsync(async (req, res) => {
+  const data =
+    require("../services/chatUpload.service").signDirectUpload();
+  res.status(200).json({ status: "success", data });
+});
+
+exports.completeAttachmentUpload = catchAsync(async (req, res) => {
+  const data =
+    await require("../services/chatUpload.service").completeDirectUpload(
+      req.params.id,
+      req.attachmentActor,
+      {
+        publicId: req.body?.publicId,
+        fileName: req.body?.fileName,
+      },
+    );
+  res.status(201).json({ status: "success", data });
+});
+
 /**
  * Start a new chat (Customer or Guest)
  */

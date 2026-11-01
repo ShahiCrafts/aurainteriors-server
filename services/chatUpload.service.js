@@ -4,6 +4,8 @@ const ChatMessage = require("../models/chatMessage.model");
 const {
   uploadToCloudinary,
   deleteFromCloudinary,
+  signDirectUploadParams,
+  getDirectUploadResource,
 } = require("../config/cloudinary");
 const {
   MAX_ATTACHMENT_BYTES,
@@ -58,6 +60,81 @@ async function uploadAttachment(chatId, actor, file) {
       fileUrl: result.secure_url,
       fileType: resourceType === "raw" ? "document" : "image",
       fileSize: result.bytes || file.size,
+    },
+  };
+}
+
+const CHAT_UPLOAD_FOLDER = "aura/chat";
+// Cloudinary reports image formats without the "image/" prefix.
+const DIRECT_IMAGE_FORMATS = ["jpg", "png", "webp", "gif"];
+
+// Sign one direct browser -> Cloudinary image upload. Stateless:
+// nothing is ledgered until completeDirectUpload verifies the
+// asset, so abandoned signatures leave no server-side state (an
+// unclaimed asset under the chat folder is inert — it is not a
+// valid message attachment until it is ledgered here and then
+// retained by a message send).
+function signDirectUpload() {
+  const publicId = crypto.randomUUID();
+  const signed = signDirectUploadParams({
+    folder: CHAT_UPLOAD_FOLDER,
+    publicId,
+  });
+  return { ...signed, resourceType: "image" };
+}
+
+// Complete a direct upload: verify the asset against Cloudinary's
+// own record (format allowlist, real byte count, our folder), then
+// write the same ChatUpload ledger row the proxied path writes, so
+// retainAttachments treats both transports identically.
+async function completeDirectUpload(chatId, actor, { publicId, fileName }) {
+  if (!/^[a-f0-9-]{36}$/i.test(String(publicId || ""))) {
+    throw new AppError("Invalid upload reference", 400);
+  }
+  const fullPublicId = `${CHAT_UPLOAD_FOLDER}/${publicId}`;
+  let resource;
+  try {
+    resource = await getDirectUploadResource(fullPublicId);
+  } catch {
+    throw new AppError("Uploaded file could not be verified", 400);
+  }
+  if (
+    !resource ||
+    !DIRECT_IMAGE_FORMATS.includes(resource.format) ||
+    !Number.isSafeInteger(resource.bytes) ||
+    resource.bytes <= 0 ||
+    resource.bytes > MAX_ATTACHMENT_BYTES ||
+    !resource.secure_url
+  ) {
+    throw new AppError(
+      "Upload a valid JPEG, PNG, WebP or GIF up to 10 MB",
+      400,
+    );
+  }
+  const expiresAt = new Date(Date.now() + ONE_DAY);
+  try {
+    await ChatUpload.create({
+      chat: chatId,
+      actor,
+      url: resource.secure_url,
+      publicId: fullPublicId,
+      resourceType: "image",
+      expiresAt,
+    });
+  } catch (error) {
+    await deleteFromCloudinary(fullPublicId, "image");
+    throw error;
+  }
+  return {
+    expiresAt,
+    attachment: {
+      fileName:
+        String(fileName || "")
+          .replace(/[\x00-\x1f\x7f]/g, "")
+          .slice(0, 255) || "Attachment",
+      fileUrl: resource.secure_url,
+      fileType: "image",
+      fileSize: resource.bytes,
     },
   };
 }
@@ -125,6 +202,8 @@ async function cleanupExpiredUploads(now = new Date()) {
 module.exports = {
   actorKey,
   uploadAttachment,
+  signDirectUpload,
+  completeDirectUpload,
   retainAttachments,
   cleanupExpiredUploads,
 };

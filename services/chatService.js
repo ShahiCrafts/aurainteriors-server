@@ -750,35 +750,38 @@ class ChatService {
               },
               onToken: null,
             });
-            if (
+            // Per-turn metrics, so reply latency (and the effect of
+            // CHAT_REASONING_EFFORT / model changes) is visible in
+            // the server logs instead of being a matter of feel.
+            console.info("chat_v2_turn_metrics", {
+              chatId: roomId,
+              totalMs: result.metrics?.totalMs ?? null,
+              route: result.metrics?.route ?? null,
+              rounds: result.metrics?.rounds ?? null,
+              provider: result.provider ?? null,
+              model: result.model ?? null,
+              degraded: !!result.degraded,
+            });
+            // Latency: the product-options persist and the
+            // still-AI check are independent reads/writes — run
+            // them in one round-trip window instead of two
+            // sequential Atlas trips after every bot reply.
+            const [, stillAi] = await Promise.all([
               Array.isArray(result.productOptions) &&
               result.productOptions.length
-            ) {
-              await Chat.updateOne(
-                { _id: chatId },
-                {
-                  $set: {
-                    "metadata.lastProductOptions": result.productOptions.slice(
-                      0,
-                      5,
-                    ),
-                  },
-                },
-              );
-            }
-            const stillAi = await Chat.exists({
-              _id: chatId,
-              status: "ai_handling",
-            });
+                ? Chat.updateOne(
+                    { _id: chatId },
+                    {
+                      $set: {
+                        "metadata.lastProductOptions":
+                          result.productOptions.slice(0, 5),
+                      },
+                    },
+                  )
+                : Promise.resolve(),
+              Chat.exists({ _id: chatId, status: "ai_handling" }),
+            ]);
             if (!stillAi) return;
-            const botMessage = await ChatMessage.create({
-              chat: chatId,
-              senderRole: "bot",
-              messageType: "text",
-              isAiGenerated: true,
-              content: result.text,
-              deliveredAt: new Date(),
-            });
             // AR-38: the v2 job previously skipped sendMessage's
             // bookkeeping entirely - lastMessageAt stayed at the
             // customer's message (chat lists mis-ordered), the bot
@@ -786,7 +789,21 @@ class ChatService {
             // chat:messages:read was broadcast. Run the shared path;
             // the bot message stays sender-less in storage, so the
             // read broadcast carries userId null (see CLIENT_IMPACT.md).
-            await applyMessageBookkeeping(latest, chatId, "bot", null);
+            // The bookkeeping does not depend on the created
+            // message, so the two run concurrently; both settle
+            // before the emits below, exactly as when they ran
+            // sequentially.
+            const [botMessage] = await Promise.all([
+              ChatMessage.create({
+                chat: chatId,
+                senderRole: "bot",
+                messageType: "text",
+                isAiGenerated: true,
+                content: result.text,
+                deliveredAt: new Date(),
+              }),
+              applyMessageBookkeeping(latest, chatId, "bot", null),
+            ]);
             emit("chat:message:new", { message: botMessage.toObject() });
             emit("ai:complete", {
               messageId: botMessage._id,

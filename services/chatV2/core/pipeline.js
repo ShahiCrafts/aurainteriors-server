@@ -72,7 +72,9 @@ class Pipeline {
       // maxToolRounds limits tool-execution cycles, not LLM calls. Allow one
       // additional model call after the final tool result so the assistant can
       // synthesize the user-facing answer.
+      let llmCalls = 0;
       for (let round = 0; round <= this.config.maxToolRounds; round += 1) {
+        llmCalls += 1;
         const out = await this.llm.complete({
           messages,
           tools: schemas(),
@@ -92,7 +94,11 @@ class Pipeline {
             provider: lastProvider,
             model: lastModel,
             usage: lastUsage,
-            metrics: { totalMs: Date.now() - started, route: "llm" },
+            metrics: {
+              totalMs: Date.now() - started,
+              route: "llm",
+              rounds: llmCalls,
+            },
           };
         }
 

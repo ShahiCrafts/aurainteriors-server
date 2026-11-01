@@ -75,7 +75,15 @@ function createApp() {
       },
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      // x-guest-session-id is the guest chat credential header
+      // (utils/guestSession.js — header transport is always accepted
+      // server-side). It was missing here, so every cross-origin
+      // preflight that carried it — the attachment upload above
+      // all, plus guest chat reads — failed CORS validation in
+      // the browser and the real request was never sent, even
+      // though the preflight answered 204. Text sends survived
+      // because they carry the session id in the JSON body.
+      allowedHeaders: ["Content-Type", "Authorization", "x-guest-session-id"],
       maxAge: 600,
       exposedHeaders: [
         "Server-Timing",

@@ -69,9 +69,48 @@ const deleteFromCloudinary = async (publicId, resourceType = "image") => {
   }
 };
 
+// Direct (browser -> Cloudinary) signed uploads: the server signs a
+// narrow parameter set (folder + public_id + timestamp) and the
+// browser uploads straight to Cloudinary, skipping the app-server
+// hop entirely. Only the public values (cloud name, API key) ever
+// leave the server; the API secret is used here and nowhere else.
+const signDirectUploadParams = ({ folder, publicId }) => {
+  const client = getCloudinaryConfig();
+  const { cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret } =
+    client.config();
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("Cloudinary is not configured for direct uploads");
+  }
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = client.utils.api_sign_request(
+    { folder, public_id: publicId, timestamp },
+    apiSecret,
+  );
+  return { cloudName, apiKey, timestamp, signature, folder, publicId };
+};
+
+// Read back an asset the browser claims to have uploaded directly,
+// so the completion step can verify it against the attachment
+// policy (real format, real byte count) instead of trusting the
+// client's report.
+const getDirectUploadResource = async (publicId) => {
+  const client = getCloudinaryConfig();
+  const timeoutMs = cloudinaryTimeoutMs();
+  return withDeadline(
+    client.api.resource(publicId, {
+      resource_type: "image",
+      timeout: timeoutMs,
+    }),
+    timeoutMs,
+    "Cloudinary resource lookup",
+  );
+};
+
 module.exports = {
   cloudinary,
   getCloudinaryConfig,
   uploadToCloudinary,
   deleteFromCloudinary,
+  signDirectUploadParams,
+  getDirectUploadResource,
 };

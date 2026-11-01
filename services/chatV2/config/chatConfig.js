@@ -42,6 +42,20 @@ function safeBaseUrl(name, override, env) {
   }
   return override;
 }
+// Reasoning effort (CHAT_REASONING_EFFORT=low|medium|high): the
+// default Groq model (openai/gpt-oss-120b) is a reasoning model — it
+// spends hidden reasoning tokens before every answer and tool call,
+// which is the largest single contributor to bot reply latency.
+// Setting this to "low" asks the provider to reason briefly; the
+// gateway forwards it ONLY to Groq (the gpt-oss family understands
+// it) so Mistral/OpenRouter failovers never see an unknown field.
+// Unset (the default) sends nothing — behavior is exactly as before.
+function reasoningEffort(env = process.env) {
+  const value = String(env.CHAT_REASONING_EFFORT || "")
+    .trim()
+    .toLowerCase();
+  return ["low", "medium", "high"].includes(value) ? value : null;
+}
 // AR-13: maxConcurrentTurns (CHAT_MAX_CONCURRENT_TURNS) bounds global
 // in-flight chat turns via a semaphore in the pipeline. Unset/0 means
 // UNBOUNDED — the pre-AR-13 behavior — so the bound only exists when an
@@ -70,6 +84,7 @@ function loadChatConfig(env = process.env) {
     temperature: Number(env.CHAT_TEMPERATURE || 0.2),
     maxToolRounds: int("CHAT_MAX_TOOL_ROUNDS", 3, 1, 5, env),
     maxConcurrentTurns: int("CHAT_MAX_CONCURRENT_TURNS", 0, 0, 10000, env),
+    reasoningEffort: reasoningEffort(env),
   };
 }
-module.exports = { loadChatConfig, PROVIDER_DEFAULTS };
+module.exports = { loadChatConfig, PROVIDER_DEFAULTS, reasoningEffort };

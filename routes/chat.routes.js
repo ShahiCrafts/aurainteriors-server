@@ -56,6 +56,25 @@ router.post(
   chatController.uploadAttachment,
 );
 
+// Direct signed uploads (browser -> Cloudinary): sign issues a
+// one-asset signature; complete verifies + ledgers the result.
+// Same authorisation chain as the proxied upload.
+router.post(
+  "/:id/attachments/sign",
+  protectOptional,
+  chatRateLimit,
+  authorizeUpload,
+  chatController.signAttachmentUpload,
+);
+
+router.post(
+  "/:id/attachments/complete",
+  protectOptional,
+  chatRateLimit,
+  authorizeUpload,
+  chatController.completeAttachmentUpload,
+);
+
 // Customer chat list - authenticated only (guests don't have persistent lists)
 router.get(
   "/my",

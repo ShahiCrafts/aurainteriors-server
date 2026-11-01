@@ -131,6 +131,11 @@ class LlmGateway {
           tool_choice: "auto",
           temperature: this.config.temperature,
           max_tokens: this.config.maxTokens,
+          // CHAT_REASONING_EFFORT (chatConfig): forwarded only to
+          // Groq, whose gpt-oss models accept reasoning_effort.
+          ...(this.config.reasoningEffort && p.name === "groq"
+            ? { reasoning_effort: this.config.reasoningEffort }
+            : {}),
           stream: false,
         }),
       });
@@ -199,6 +204,11 @@ class LlmGateway {
           tool_choice: "auto",
           temperature: this.config.temperature,
           max_tokens: this.config.maxTokens,
+          // CHAT_REASONING_EFFORT (chatConfig): forwarded only to
+          // Groq, whose gpt-oss models accept reasoning_effort.
+          ...(this.config.reasoningEffort && p.name === "groq"
+            ? { reasoning_effort: this.config.reasoningEffort }
+            : {}),
           stream: true,
           stream_options: { include_usage: true },
         }),
