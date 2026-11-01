@@ -107,6 +107,33 @@ test("FA-19: sandbox endpoints only for ESEWA_ENV=sandbox or NODE_ENV=test", () 
   assert.match(testEnv().paymentUrl, /rc-epay/);
 });
 
+test("sandbox opt-in: production + ESEWA_ENV=sandbox may use the test merchant (testing only)", () => {
+  // The production shop is where eSewa is tested end-to-end before
+  // real credentials exist. An explicit ESEWA_ENV=sandbox is an
+  // intentional testing setup, so EPAYTEST is allowed there — and
+  // only there (the characterization test below still pins the
+  // no-opt-in rejection).
+  const get = loadConfig({
+    NODE_ENV: "production",
+    ESEWA_ENV: "sandbox",
+    ESEWA_MERCHANT_ID: "EPAYTEST",
+    ESEWA_SECRET_KEY: "dummy-sandbox-secret",
+  });
+  const cfg = get();
+  assert.equal(cfg.merchantId, "EPAYTEST");
+  assert.match(cfg.paymentUrl, /rc-epay/);
+});
+
+test("sandbox opt-in: ESEWA_ENV is normalised for case and whitespace", () => {
+  const get = loadConfig({
+    NODE_ENV: "production",
+    ESEWA_ENV: " Sandbox ",
+    ESEWA_MERCHANT_ID: "EPAYTEST",
+    ESEWA_SECRET_KEY: "dummy-sandbox-secret",
+  });
+  assert.match(get().paymentUrl, /rc-epay/);
+});
+
 test("characterization: production rejects the sandbox merchant and missing credentials", () => {
   const getSandbox = loadConfig({
     NODE_ENV: "production",

@@ -11,6 +11,10 @@ const SIGNED_FIELDS =
 // endpoints are used ONLY for ESEWA_ENV=sandbox or NODE_ENV=test;
 // every other environment talks to the production endpoints, and a
 // missing key fails fast instead of falling back to a known secret.
+// ESEWA_ENV=sandbox is honoured on a production deployment too —
+// deliberately, so payments can be tested end-to-end there with the
+// public test merchant before real credentials exist; production
+// without that explicit opt-in still refuses EPAYTEST.
 // Whether the old literal should also be purged from git history is
 // the owner's call (OWNER_DECISIONS.md, FA-19) - it is eSewa's public
 // test value, but it should still stop being this repo's fallback.
@@ -25,7 +29,24 @@ exports.getEsewaConfig = () => {
     .trim()
     .toLowerCase();
   const production = nodeEnv === "production";
-  const sandbox = process.env.ESEWA_ENV === "sandbox" || nodeEnv === "test";
+  // ESEWA_ENV goes through the same registry + normalisation as
+  // NODE_ENV. The old raw `process.env.ESEWA_ENV === "sandbox"`
+  // check silently missed values like "Sandbox" or a trailing
+  // space, in which case the code signed for (and posted to) the
+  // PRODUCTION gateway with test credentials and the eSewa page
+  // never opened.
+  const esewaEnv = String(
+    require("../config/appConfig").get("ESEWA_ENV") || "",
+  )
+    .trim()
+    .toLowerCase();
+  // Explicit sandbox mode is an intentional, opt-in testing setup:
+  // it stays available on a production deployment (that is where
+  // end-to-end payment testing happens before real credentials
+  // exist) and it is the ONLY configuration in which the public
+  // test merchant EPAYTEST may be used. Without ESEWA_ENV=sandbox,
+  // production keeps rejecting EPAYTEST outright (FA-19 unchanged).
+  const sandbox = esewaEnv === "sandbox" || nodeEnv === "test";
   const merchantId = process.env.ESEWA_MERCHANT_ID || "";
   const secretKey = process.env.ESEWA_SECRET_KEY || "";
   if (!merchantId || !secretKey) {
@@ -35,7 +56,7 @@ exports.getEsewaConfig = () => {
         : "eSewa merchant credentials are required: set ESEWA_MERCHANT_ID and ESEWA_SECRET_KEY (for sandbox testing, use eSewa's published test credentials with ESEWA_ENV=sandbox)",
     );
   }
-  if (production && merchantId === "EPAYTEST") {
+  if (production && !sandbox && merchantId === "EPAYTEST") {
     throw new Error("Valid production eSewa merchant credentials are required");
   }
   return {
