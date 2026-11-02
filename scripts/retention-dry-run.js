@@ -29,12 +29,6 @@ const { policies, runRetention } = require("../services/retention.service");
         pol.chatMessages,
         results.chatMessages,
       ],
-      [
-        "RETENTION_BLOG_ENGAGEMENT_DAYS",
-        "blogEngagements",
-        pol.blogEngagements,
-        results.blogEngagements,
-      ],
       ["RETENTION_CONTACT_DAYS", "contacts", pol.contacts, results.contacts],
     ];
     for (const [envName, key, days, count] of lines) {

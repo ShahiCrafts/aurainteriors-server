@@ -163,8 +163,8 @@ const startServer = async () => {
       } catch {
         /* already stopped */
       }
-      // AR-33: clears the heartbeat/cleanup/RSS intervals and the
-      // initial-RSS timer, then stops background tasks and the
+      // AR-33: clears the heartbeat/cleanup intervals, then stops
+      // background tasks and the
       // in-process job worker (the same teardown as before, one call).
       stopScheduledJobs(jobHandles);
       // AR-45: the gateway close is time-bounded. io.close() also

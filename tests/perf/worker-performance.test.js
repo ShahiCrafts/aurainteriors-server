@@ -276,29 +276,6 @@ stubModule("models/address.model.js", {
     }),
 });
 stubModule("models/discount.model.js", { findOne: () => fixed(null) });
-stubModule("models/blog.model.js", {
-  find: (filter) => {
-    S.lastBlogFilter = filter;
-    const rec = {};
-    S.lastBlogRec = rec;
-    return Q(
-      () => [{ _id: oid(9), title: "Sofa guide", content: "BODY" }],
-      rec,
-    );
-  },
-  countDocuments: async () => {
-    S.blogCountCalls++;
-    return S.blogCount;
-  },
-  aggregate: async () => {
-    S.blogAggCalls++;
-    return S.blogAggResult;
-  },
-  findOne: () => fixed(null),
-  getPopular: async () => [],
-  getFeatured: async () => [],
-});
-stubModule("models/blogEngagement.model.js", { create: async () => ({}) });
 stubModule("models/announcement.model.js", {
   find: () => {
     const rec = {};
@@ -321,11 +298,6 @@ stubModule(
     static async createNotification() {}
   },
 );
-stubModule("services/rssFeedService.js", {
-  fetchAllFeeds: async () => ({}),
-  getFeedSources: () => [{ name: "FeedA", url: "https://x" }],
-  updateFeaturedArticles: async () => {},
-});
 stubModule("services/discountUsage.service.js", {
   consumeDiscountUsage: async () => {},
 });
@@ -376,7 +348,6 @@ stubModule("mongoose", {
 
 const analytics = require("../../controllers/analytics.controller");
 const orderCtrl = require("../../controllers/order.controller");
-const blogCtrl = require("../../controllers/blog.controller");
 const productCtrl = require("../../controllers/product.controller");
 const userCtrl = require("../../controllers/user.controller");
 const announcementSvc = require("../../services/announcementService");
@@ -500,39 +471,6 @@ test("AR-11: revenue days param is clamped to 1..365 (behavior-correcting)", asy
   assert.ok(
     ageDays <= 366 && ageDays >= 364,
     `days=10000 must clamp to 365, got age ${ageDays.toFixed(1)}d (unbounded = fail-before)`,
-  );
-});
-
-// ================= AR-17 =====================================================
-test("AR-17: blog stats/categories cached under ANALYTICS_CACHE_TTL_MS; mutation visible after flag off", async () => {
-  resetCacheEnv(60000);
-  S.blogAggCalls = 0;
-  S.blogCountCalls = 0;
-  S.blogAggResult = [{ _id: "news", count: 2 }];
-  const s1 = await call(blogCtrl.getBlogStats, { query: {} });
-  assert.equal(s1.body.data.totalBlogs, 2);
-  const aggAfterFirst = S.blogAggCalls;
-  S.blogAggResult = [{ _id: "news", count: 9 }];
-  S.blogCount = 9; // RSS insert changes count + aggregates
-  const s2 = await call(blogCtrl.getBlogStats, { query: {} });
-  assert.equal(
-    s2.body.data.totalBlogs,
-    2,
-    "within TTL the stale figure is served",
-  );
-  assert.equal(S.blogAggCalls, aggAfterFirst, "no re-aggregation within TTL");
-  const c1 = await call(blogCtrl.getBlogCategories, { query: {} });
-  assert.equal(
-    c1.body.data.categories[0].count,
-    9,
-    "categories use their own cache key, computed fresh on first call",
-  );
-  resetCacheEnv(undefined);
-  const s3 = await call(blogCtrl.getBlogStats, { query: {} });
-  assert.equal(
-    s3.body.data.totalBlogs,
-    9,
-    "flag unset: new article visible immediately",
   );
 });
 
@@ -728,25 +666,3 @@ test("AR-19: cursor walk on admin orders equals page walk", async () => {
   assert.deepEqual(cursorIds, pageIds);
 });
 
-// ================= AR-18 =====================================================
-test("AR-18: blog search — regex mode is the default; text mode uses $text", async () => {
-  delete process.env.BLOG_SEARCH_MODE;
-  await call(blogCtrl.getAllBlogs, { query: { search: "sofa" } });
-  assert.ok(
-    S.lastBlogFilter.$or,
-    "default (regex) mode keeps the $or regex search",
-  );
-  assert.equal(S.lastBlogFilter.$text, undefined);
-  process.env.BLOG_SEARCH_MODE = "text";
-  try {
-    await call(blogCtrl.getAllBlogs, { query: { search: "sofa" } });
-    assert.deepEqual(
-      S.lastBlogFilter.$text,
-      { $search: "sofa" },
-      "text mode must query the scoped text index",
-    );
-    assert.equal(S.lastBlogFilter.$or, undefined);
-  } finally {
-    delete process.env.BLOG_SEARCH_MODE;
-  }
-});

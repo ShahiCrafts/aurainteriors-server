@@ -43,7 +43,6 @@ let cleaningAttachments = false;
 const RETENTION_ENV_KEYS = [
   "RETENTION_CHAT_MESSAGE_DAYS",
   "RETENTION_NOTIFICATION_DAYS",
-  "RETENTION_BLOG_ENGAGEMENT_DAYS",
   "RETENTION_CONTACT_DAYS",
 ];
 function anyRetentionPolicySet() {

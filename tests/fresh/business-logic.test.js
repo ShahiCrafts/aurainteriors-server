@@ -150,54 +150,6 @@ test("FA-48: helpful votes reject self-votes and toggle atomically", async () =>
   assert.equal(res.body.data.voted, true);
 });
 
-test("FA-25: blog likes are idempotent per actor", async () => {
-  let increments = 0;
-  let creates = 0;
-  const blog = {
-    _id: "64b64c2f9f1b2c3d4e5f60bb",
-    slug: "post",
-    likes: 5,
-    incrementViews: async () => {},
-  };
-  stub("models/blog.model.js", {
-    findOne: async () => blog,
-    findByIdAndUpdate: async () => {
-      increments++;
-      return { ...blog, likes: 6 };
-    },
-  });
-  stub("models/blogEngagement.model.js", {
-    create: async () => {
-      creates++;
-      if (creates > 1) {
-        const e = new Error("dup");
-        e.code = 11000;
-        throw e;
-      }
-      return {};
-    },
-  });
-  const ctrl = require(path.join(repo, "controllers/blog.controller.js"));
-  const req = { params: { id: "post" }, cookies: {}, user: { _id: "user-7" } };
-  let res = mkRes();
-  ctrl.likeBlog(req, res, (e) => {
-    throw e;
-  });
-  await flush();
-  assert.equal(res.body.data.likes, 6);
-  res = mkRes();
-  ctrl.likeBlog(req, res, (e) => {
-    throw e;
-  });
-  await flush();
-  assert.equal(
-    increments,
-    1,
-    "second like from the same actor does not move the counter",
-  );
-  assert.equal(res.body.data.likes, 5, "repeat like returns the current count");
-});
-
 test("FA-47: cart quantity write is optimistic-concurrency guarded", async () => {
   const item = { _id: "i1", product: "64b64c2f9f1b2c3d4e5f6001", quantity: 1 };
   const items = [item];

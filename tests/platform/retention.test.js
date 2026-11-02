@@ -47,7 +47,6 @@ test(
     const l = await line("unset");
     assert.equal(field(l, "notifications"), "null");
     assert.equal(field(l, "chatMessages"), "null");
-    assert.equal(field(l, "blogEngagements"), "null");
     assert.equal(field(l, "contacts"), "null");
     assert.equal(field(l, "deleted"), "0");
     assert.equal(field(l, "retentionLogs"), "0");
@@ -65,7 +64,6 @@ test(
       "2",
       "old messages in closed AND resolved chats",
     );
-    assert.equal(field(l, "blogEngagements"), "1", "old VIEW engagements only");
     assert.equal(field(l, "contacts"), "2", "old resolved AND closed contacts");
     assert.equal(
       field(l, "totalAfter"),
@@ -93,7 +91,6 @@ test(
     const l = await line("realRun");
     assert.equal(field(l, "notifications"), "1");
     assert.equal(field(l, "chatMessages"), "2");
-    assert.equal(field(l, "blogEngagements"), "1");
     assert.equal(field(l, "contacts"), "2");
     assert.equal(field(l, "keepNewNotif"), "true");
     assert.equal(
@@ -107,12 +104,6 @@ test(
       "new message in a closed chat is kept",
     );
     assert.equal(field(l, "goneOldClosedMsg"), "true");
-    assert.equal(
-      field(l, "keepOldLike"),
-      "true",
-      "old LIKE engagement is kept (views only)",
-    );
-    assert.equal(field(l, "goneOldView"), "true");
     assert.equal(
       field(l, "keepOldNewContact"),
       "true",

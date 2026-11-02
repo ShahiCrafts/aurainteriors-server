@@ -23,7 +23,7 @@ const newsletterSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["footer", "blog"],
+      enum: ["footer"],
       default: "footer",
     },
     isActive: {

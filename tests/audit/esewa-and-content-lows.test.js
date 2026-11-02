@@ -55,39 +55,6 @@ test("characterization: refund verification accepts a consistent response", asyn
   assert.equal(ref, "REF-1");
 });
 
-// ---------- B-31: blog tag filter is an exact match ----------
-let capturedBlogFilter;
-stubModule("models/blog.model.js", {
-  find: (filter) => {
-    capturedBlogFilter = filter;
-    return makeQuery([]);
-  },
-  countDocuments: async () => 0,
-});
-stubModule("services/rssFeedService.js", {
-  fetchAllFeeds: async () => {},
-  updateFeaturedArticles: async () => {},
-  getFeedSources: async () => [],
-});
-const blogController = require("../../controllers/blog.controller");
-
-test("B-31: filtering blogs by tag matches whole tags, not substrings", async () => {
-  capturedBlogFilter = undefined;
-  const res = mockRes();
-  blogController.getAllBlogs({ query: { tag: "art" } }, res, mockNext());
-  await until(
-    () => capturedBlogFilter !== undefined || res.statusCode !== undefined,
-  );
-  const pattern = capturedBlogFilter.tags.$in[0];
-  assert.ok(pattern instanceof RegExp);
-  assert.ok(pattern.test("art"), "the exact tag matches");
-  assert.ok(
-    !pattern.test("artistic"),
-    "a longer tag containing it must NOT match",
-  );
-  assert.ok(!pattern.test("smart"), "a tag ending with it must NOT match");
-});
-
 // ---------- B-31: chunkText does not duplicate the tail ----------
 // ---------- C-14 ----------
 

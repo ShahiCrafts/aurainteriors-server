@@ -161,35 +161,6 @@ exports.resizeAvatar = async (req, res, next) => {
 
 exports.uploadCategoryImage = withSanitize(upload.single("image"));
 
-exports.uploadBlogImage = withSanitize(upload.single("featuredImage"));
-
-exports.resizeBlogImage = async (req, res, next) => {
-  const badImage = imageContentError(req.file);
-  if (badImage) return next(badImage);
-  try {
-    if (!req.file) return next();
-
-    const resizedBuffer = await sharp(req.file.buffer)
-      .resize(1200, 630, { fit: "cover" })
-      .toFormat("jpeg")
-      .jpeg({ quality: 90 })
-      .toBuffer();
-
-    const result = await uploadToCloudinary(resizedBuffer, {
-      folder: "aura/blogs",
-      public_id: generatePublicId("blog"),
-      resource_type: "image",
-    });
-
-    req.file.cloudinaryUrl = result.secure_url;
-    req.file.cloudinaryPublicId = result.public_id;
-
-    next();
-  } catch (error) {
-    console.error("Blog image upload error:", error);
-    next(new AppError("Error processing image. Please try again.", 500));
-  }
-};
 
 exports.resizeCategoryImage = async (req, res, next) => {
   const badImage = imageContentError(req.file);

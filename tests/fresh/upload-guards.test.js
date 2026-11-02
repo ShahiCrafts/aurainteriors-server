@@ -5,43 +5,6 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const repo = path.resolve(__dirname, "../..");
 
-test("FA-52: sanitizer survives out-of-range numeric character references", () => {
-  const { sanitizeArticleHtml } = require(
-    path.join(repo, "utils/sanitizeArticleHtml.js"),
-  );
-  const html = `<p title="&#x110000;">a</p><p title="&#99999999999999999999;">b</p><p>&#xD800; c</p>`;
-  let out;
-  assert.doesNotThrow(() => {
-    out = sanitizeArticleHtml(html);
-  });
-  assert.ok(out.includes("a") && out.includes("b") && out.includes("c"));
-});
-
-test("FA-53: self-closing or unclosed drop-tags cannot swallow the article", () => {
-  const { sanitizeArticleHtml } = require(
-    path.join(repo, "utils/sanitizeArticleHtml.js"),
-  );
-  const selfClosing = sanitizeArticleHtml(
-    `<script src="https://evil.example/x.js" /><p>hello world</p>`,
-  );
-  assert.ok(
-    selfClosing.includes("hello world"),
-    `self-closing script dropped only itself: ${selfClosing}`,
-  );
-  const unclosed = sanitizeArticleHtml(
-    `<script>${"x".repeat(100500)}<p>after the drop</p>`,
-  );
-  assert.ok(
-    unclosed.includes("after the drop"),
-    "recovery after the drop-region cap",
-  );
-  const normal = sanitizeArticleHtml(`<script>alert(1)</script><p>kept</p>`);
-  assert.ok(
-    !normal.includes("alert(1)") && normal.includes("kept"),
-    "ordinary script still dropped with contents",
-  );
-});
-
 test("FA-79: isDocxBuffer requires word/document.xml inside the ZIP", async () => {
   const JSZip = require("jszip");
   const { isDocxBuffer } = require(path.join(repo, "utils/fileSniff.js"));

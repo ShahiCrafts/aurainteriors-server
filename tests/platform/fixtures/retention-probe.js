@@ -92,20 +92,6 @@ async function main() {
     await db
       .collection("chatmessages")
       .insertMany([oldClosedMsg, oldResolvedMsg, oldOpenMsg, newClosedMsg]);
-    const blogId = oid();
-    const eng = (kind, createdAt, actor) => ({
-      _id: oid(),
-      blog: blogId,
-      actor,
-      kind,
-      createdAt,
-    });
-    const oldView = eng("view", old, "anon:old-view");
-    const oldLike = eng("like", old, "anon:old-like");
-    const newView = eng("view", recent, "anon:new-view");
-    await db
-      .collection("blogengagements")
-      .insertMany([oldView, oldLike, newView]);
     const contact = (status, createdAt, email) => ({
       _id: oid(),
       name: "Probe",
@@ -127,15 +113,12 @@ async function main() {
     const counts = async () => ({
       notifications: await db.collection("notifications").countDocuments({}),
       chatMessages: await db.collection("chatmessages").countDocuments({}),
-      blogEngagements: await db
-        .collection("blogengagements")
-        .countDocuments({}),
       contacts: await db.collection("contacts").countDocuments({}),
     });
     const exists = async (coll, id) =>
       (await db.collection(coll).countDocuments({ _id: id })) === 1;
     const fmt = (r) =>
-      ["notifications", "chatMessages", "blogEngagements", "contacts"]
+      ["notifications", "chatMessages", "contacts"]
         .map((k) => `${k}=${r[k] === null ? "null" : r[k]}`)
         .join(" ");
 
@@ -152,7 +135,6 @@ async function main() {
     for (const k of [
       "RETENTION_CHAT_MESSAGE_DAYS",
       "RETENTION_NOTIFICATION_DAYS",
-      "RETENTION_BLOG_ENGAGEMENT_DAYS",
       "RETENTION_CONTACT_DAYS",
     ])
       delete process.env[k];
@@ -170,18 +152,17 @@ async function main() {
       l.includes("retention_run"),
     ).length;
     console.log(
-      `RESULT unset ${fmt(unsetRun.results)} dry=${fmt(unsetDry.results)} deleted=${beforeA.notifications - afterA.notifications + beforeA.chatMessages - afterA.chatMessages + beforeA.blogEngagements - afterA.blogEngagements + beforeA.contacts - afterA.contacts} retentionLogs=${retentionLogsA}`,
+      `RESULT unset ${fmt(unsetRun.results)} dry=${fmt(unsetDry.results)} deleted=${beforeA.notifications - afterA.notifications + beforeA.chatMessages - afterA.chatMessages + beforeA.contacts - afterA.contacts} retentionLogs=${retentionLogsA}`,
     );
 
     // (b) Policies set (30d): dry-run counts EXACTLY, deletes nothing.
     process.env.RETENTION_NOTIFICATION_DAYS = "30";
     process.env.RETENTION_CHAT_MESSAGE_DAYS = "30";
-    process.env.RETENTION_BLOG_ENGAGEMENT_DAYS = "30";
     process.env.RETENTION_CONTACT_DAYS = "30";
     const dry = await retention.runRetention({ dryRun: true });
     const afterDry = await counts();
     console.log(
-      `RESULT dryRun ${fmt(dry.results)} totalAfter=${afterDry.notifications + afterDry.chatMessages + afterDry.blogEngagements + afterDry.contacts} totalBefore=${beforeA.notifications + beforeA.chatMessages + beforeA.blogEngagements + beforeA.contacts}`,
+      `RESULT dryRun ${fmt(dry.results)} totalAfter=${afterDry.notifications + afterDry.chatMessages + afterDry.contacts} totalBefore=${beforeA.notifications + beforeA.chatMessages + beforeA.contacts}`,
     );
 
     // (c) Dry-run SCRIPT smoke: child process against this MMS URI.
@@ -196,7 +177,6 @@ async function main() {
             MONGO_DB_NAME: DB_NAME,
             RETENTION_NOTIFICATION_DAYS: "30",
             RETENTION_CHAT_MESSAGE_DAYS: "30",
-            RETENTION_BLOG_ENGAGEMENT_DAYS: "30",
             RETENTION_CONTACT_DAYS: "30",
           },
         },
@@ -227,7 +207,7 @@ async function main() {
     // (d) Real run: deletes exactly the eligible rows.
     const real = await retention.runRetention();
     console.log(
-      `RESULT realRun ${fmt(real.results)} keepNewNotif=${await exists("notifications", (await db.collection("notifications").findOne({ title: "new" }))._id)} keepOldOpenMsg=${await exists("chatmessages", oldOpenMsg._id)} keepNewClosedMsg=${await exists("chatmessages", newClosedMsg._id)} goneOldClosedMsg=${!(await exists("chatmessages", oldClosedMsg._id))} keepOldLike=${await exists("blogengagements", oldLike._id)} goneOldView=${!(await exists("blogengagements", oldView._id))} keepOldNewContact=${await exists("contacts", oldNew._id)} keepNewResolved=${await exists("contacts", newResolved._id)} goneOldResolved=${!(await exists("contacts", oldResolved._id))}`,
+      `RESULT realRun ${fmt(real.results)} keepNewNotif=${await exists("notifications", (await db.collection("notifications").findOne({ title: "new" }))._id)} keepOldOpenMsg=${await exists("chatmessages", oldOpenMsg._id)} keepNewClosedMsg=${await exists("chatmessages", newClosedMsg._id)} goneOldClosedMsg=${!(await exists("chatmessages", oldClosedMsg._id))} keepOldNewContact=${await exists("contacts", oldNew._id)} keepNewResolved=${await exists("contacts", newResolved._id)} goneOldResolved=${!(await exists("contacts", oldResolved._id))}`,
     );
 
     // (e) Batch bound: 7 extra old notifications; batchSize 2 x

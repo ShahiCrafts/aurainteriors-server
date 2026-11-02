@@ -26,7 +26,6 @@ const ADMIN_ID = "64b64c2f4f5a6b7c8d9e0f01";
 const DOC_ID = "64b64c2f4f5a6b7c8d9e0f10";
 const CAT_ID = "64b64c2f4f5a6b7c8d9e0f20";
 const PROD_ID = "64b64c2f4f5a6b7c8d9e0f21";
-const BLOG_ID = "64b64c2f4f5a6b7c8d9e0f30";
 const CONTACT_ID = "64b64c2f4f5a6b7c8d9e0f40";
 const CONTACT_ID_2 = "64b64c2f4f5a6b7c8d9e0f41";
 const ANN_ID = "64b64c2f4f5a6b7c8d9e0f50";
@@ -194,50 +193,6 @@ stubModule("models/attributeDefinition.model", {
 });
 
 // ---------------------------------------------------------------------------
-// Stubs — blog cluster
-// ---------------------------------------------------------------------------
-const blogDoc = {
-  _id: BLOG_ID,
-  title: "Design Guide",
-  slug: "design-guide",
-  category: "trends",
-  tags: ["modern"],
-  source: { name: "Dezeen" },
-  views: 10,
-  incrementViews: async () => {},
-};
-const relatedBlogList = [
-  { _id: "64b64c2f4f5a6b7c8d9e0f31", title: "Related One" },
-  { _id: "64b64c2f4f5a6b7c8d9e0f32", title: "Related Two" },
-];
-
-stubModule("models/blog.model", {
-  findOne: async () => blogDoc,
-  find: () => makeQuery(relatedBlogList),
-  countDocuments: async () => 12,
-  aggregate: async (pipeline) => {
-    const group = pipeline && pipeline[0] && pipeline[0].$group;
-    if (group && group._id === null) return [{ _id: null, total: 999 }];
-    return [
-      { _id: "trends", count: 3 },
-      { _id: "guides", count: 2 },
-    ];
-  },
-  getPopular: async () => [blogDoc],
-  getFeatured: async () => [blogDoc],
-});
-
-stubModule("models/blogEngagement.model", {
-  create: async () => ({}),
-});
-
-stubModule("services/rssFeedService", {
-  fetchAllFeeds: async () => ({ newArticles: 7, totalFetched: 20, errors: [] }),
-  getFeedSources: () => [{ name: "Dezeen", url: "https://www.dezeen.com" }],
-  updateFeaturedArticles: async () => {},
-});
-
-// ---------------------------------------------------------------------------
 // Stubs — newsletter cluster (email service is shared with contact below)
 // ---------------------------------------------------------------------------
 stubModule("models/newsletter.model", {
@@ -393,7 +348,6 @@ stubModule("services/notificationEventEmitter", {
 const documentCtrl = require("../../controllers/document.controller");
 const categoryCtrl = require("../../controllers/category.controller");
 const productCtrl = require("../../controllers/product.controller");
-const blogCtrl = require("../../controllers/blog.controller");
 const newsletterCtrl = require("../../controllers/newsletter.controller");
 const announcementCtrl = require("../../controllers/announcement.controller");
 const promotionCtrl = require("../../controllers/promotion.controller");
@@ -614,76 +568,6 @@ test("PATCH /products/:id/stock — updateStock returns 200 and reactivates an o
   assertSuccess(res, next, 200);
   assert.equal(res.body.data.product.stock, 9);
   assert.equal(res.body.data.product.status, "active");
-});
-
-// ===========================================================================
-// controllers/blog.controller.js
-// ===========================================================================
-
-test("GET /blogs/categories — getBlogCategories returns 200 with formatted categories and a total", async () => {
-  const { res, next } = await invoke(blogCtrl.getBlogCategories, baseReq());
-  assertSuccess(res, next, 200);
-  assert.equal(res.body.data.categories[0].slug, "all");
-  assert.equal(res.body.data.categories[0].count, 5);
-  assert.deepEqual(res.body.data.categories[1], {
-    slug: "trends",
-    name: "Trends",
-    count: 3,
-  });
-});
-
-test("GET /blogs/popular — getPopularBlogs returns 200 with the popular blogs", async () => {
-  const { res, next } = await invoke(
-    blogCtrl.getPopularBlogs,
-    baseReq({ query: { limit: "5" } }),
-  );
-  assertSuccess(res, next, 200);
-  assert.equal(res.body.results, 1);
-  assert.deepEqual(res.body.data.blogs, [blogDoc]);
-});
-
-test("GET /blogs/featured — getFeaturedBlogs returns 200 with the featured blogs", async () => {
-  const { res, next } = await invoke(
-    blogCtrl.getFeaturedBlogs,
-    baseReq({ query: { limit: "3" } }),
-  );
-  assertSuccess(res, next, 200);
-  assert.equal(res.body.results, 1);
-  assert.deepEqual(res.body.data.blogs, [blogDoc]);
-});
-
-test("GET /blogs/stats — getBlogStats returns 200 with totals and counts", async () => {
-  const { res, next } = await invoke(blogCtrl.getBlogStats, baseReq());
-  assertSuccess(res, next, 200);
-  assert.equal(res.body.data.totalBlogs, 12);
-  assert.equal(res.body.data.totalViews, 999);
-  assert.equal(res.body.data.categoryCounts.length, 2);
-  assert.equal(res.body.data.sourceCounts.length, 2);
-});
-
-test("GET /blogs/:id — getBlog returns 200 with the blog post", async () => {
-  const req = baseReq({
-    params: { id: "design-guide" },
-    user: { _id: ADMIN_ID, role: "customer" },
-  });
-  const { res, next } = await invoke(blogCtrl.getBlog, req);
-  assertSuccess(res, next, 200);
-  assert.deepEqual(res.body.data.blog, blogDoc);
-});
-
-test("GET /blogs/:id/related — getRelatedBlogs returns 200 with related posts", async () => {
-  const req = baseReq({ params: { id: BLOG_ID }, query: { limit: "3" } });
-  const { res, next } = await invoke(blogCtrl.getRelatedBlogs, req);
-  assertSuccess(res, next, 200);
-  assert.equal(res.body.results, relatedBlogList.length);
-  assert.deepEqual(res.body.data.blogs, relatedBlogList);
-});
-
-test("POST /blogs/refresh — refreshFeeds returns 200 reporting the new article count", async () => {
-  const { res, next } = await invoke(blogCtrl.refreshFeeds, baseReq());
-  assertSuccess(res, next, 200);
-  assert.match(res.body.message, /Added 7 new articles/);
-  assert.equal(res.body.data.newArticles, 7);
 });
 
 // ===========================================================================

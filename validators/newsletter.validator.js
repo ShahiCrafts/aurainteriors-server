@@ -6,8 +6,8 @@ exports.subscribeSchema = Joi.object({
     "any.required": "Email is required",
     "string.empty": "Email cannot be empty",
   }),
-  source: Joi.string().valid("footer", "blog").default("footer").messages({
-    "any.only": "Source must be either footer or blog",
+  source: Joi.string().valid("footer").default("footer").messages({
+    "any.only": "Source must be footer",
   }),
 });
 

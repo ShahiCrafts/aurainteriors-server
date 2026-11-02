@@ -231,7 +231,6 @@ function createApp() {
   app.use("/api/v1/announcements", require("./routes/announcement.routes"));
   app.use("/api/v1/chats", require("./routes/chat.routes"));
   app.use("/api/v1/documents", require("./routes/document.routes"));
-  app.use("/api/v1/blogs", require("./routes/blog.routes"));
   app.use("/api/v1/contacts", require("./routes/contact.routes"));
   app.use("/api/v1/analytics", require("./routes/analytics.routes"));
   app.use("/api/v1/newsletter", require("./routes/newsletter.routes"));

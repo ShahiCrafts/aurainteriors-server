@@ -40,7 +40,6 @@ test("defaults: every registered key parses to its pinned default under an empty
     GUEST_STOCK_RESERVATION_TTL_MINUTES: 30,
     GUEST_COD_HOLD_RELEASE_HOURS: 0,
     CATEGORY_SVG_POLICY: "reencode",
-    BLOG_SEARCH_MODE: "regex",
     ANALYTICS_CACHE_TTL_MS: 0,
     SOCKET_REVALIDATE_INTERVAL_MS: 0,
     SOCKET_ADAPTER: "none",
@@ -368,7 +367,6 @@ test("no import-time throws: consumers require cleanly with an empty env, and wi
     'require("./services/ingestionService");',
     'require("./services/retrievalService");',
     'require("./services/email.service");',
-    'require("./utils/emailTemplate");',
     'require("./controllers/order.controller");',
     'console.log("imports-ok");',
   ].join("");

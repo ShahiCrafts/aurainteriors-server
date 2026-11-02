@@ -11,8 +11,6 @@
 //   notifications:    createdAt < cutoff
 //   chatMessages:     createdAt < cutoff AND the message's chat is
 //                     closed/resolved (open-chat history is kept)
-//   blogEngagements:  kind === "view" AND createdAt < cutoff (likes
-//                     are permanent engagement records, not views)
 //   contacts:         status in ["resolved","closed"] AND
 //                     createdAt < cutoff (unresolved mail is kept)
 // Deletion is batched: find up to batchSize matching _ids, deleteMany
@@ -22,7 +20,6 @@
 const Notification = require("../models/notification.model");
 const ChatMessage = require("../models/chatMessage.model");
 const Chat = require("../models/chat.model");
-const BlogEngagement = require("../models/blogEngagement.model");
 const Contact = require("../models/contact.model");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,7 +33,6 @@ function policies(env = process.env) {
   return {
     chatMessages: parseDays(env.RETENTION_CHAT_MESSAGE_DAYS),
     notifications: parseDays(env.RETENTION_NOTIFICATION_DAYS),
-    blogEngagements: parseDays(env.RETENTION_BLOG_ENGAGEMENT_DAYS),
     contacts: parseDays(env.RETENTION_CONTACT_DAYS),
   };
 }
@@ -68,7 +64,6 @@ async function runRetention({
   const results = {
     notifications: null,
     chatMessages: null,
-    blogEngagements: null,
     contacts: null,
   };
   const cutoff = (days) => new Date(now.getTime() - days * DAY_MS);
@@ -107,12 +102,6 @@ async function runRetention({
       lastChatId = batch[batch.length - 1]._id;
     }
     results.chatMessages = chatMessagesTotal;
-  }
-  if (pol.blogEngagements !== null) {
-    results.blogEngagements = await apply(BlogEngagement, {
-      kind: "view",
-      createdAt: { $lt: cutoff(pol.blogEngagements) },
-    });
   }
   if (pol.contacts !== null) {
     results.contacts = await apply(Contact, {

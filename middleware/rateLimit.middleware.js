@@ -187,8 +187,8 @@ exports.startChatRateLimit = rateLimit({
 /**
  * Per-endpoint limiter for public, unauthenticated abuse targets
  * (B-13): order tracking (order-id enumeration), guest checkout and
- * the eSewa return (order creation / payment-flow abuse), and the
- * public blog like counter. Keyed by IP via ipKeyGenerator.
+ * the eSewa return (order creation / payment-flow abuse).
+ * Keyed by IP via ipKeyGenerator.
  * NOTE: req.ip is the proxy's address until the trust-proxy decision
  * (ND-4) is made; budgets are set generously so a shared proxy bucket
  * cannot throttle ordinary traffic, while still capping floods.

@@ -1,6 +1,6 @@
-// SSRF + content class: B-22 (allowlist sanitizer), B-08 (RSS fetch
-// private-IP guard), B-09 (ingestion fetch bounds), B-28 (blog
-// counters atomic), B-29 (return-request conditional writes).
+// SSRF + content class: B-08 (fetch private-IP guard),
+// B-09 (ingestion fetch bounds), B-29 (return-request
+// conditional writes).
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
@@ -11,69 +11,8 @@ const {
   until,
 } = require("./helpers");
 
-// ---------- B-22 ----------
-const { sanitizeArticleHtml } = require("../../utils/sanitizeArticleHtml");
-
-test("B-22: sanitizer keeps ordinary article markup", () => {
-  const html = sanitizeArticleHtml(
-    '<h2>Title</h2><p>Text with <strong>bold</strong> and <a href="https://example.com/a?x=1&y=2">a link</a>.</p>' +
-      '<ul><li>one</li><li>two</li></ul><img src="https://cdn.example.com/i.jpg" alt="pic" width="600">',
-  );
-  assert.match(html, /<h2>Title<\/h2>/);
-  assert.match(html, /href="https:\/\/example\.com\/a\?x=1&amp;y=2"/);
-  assert.match(
-    html,
-    /<img src="https:\/\/cdn\.example\.com\/i\.jpg" alt="pic" width="600">/,
-  );
-});
-
-test("B-22: sanitizer defeats the denylist bypass battery", () => {
-  const attacks = [
-    '<a href="javascript:alert(1)">x</a>',
-    '<a href="JaVaScRiPt:alert(1)">x</a>',
-    '<a href="java&#115;cript:alert(1)">x</a>',
-    '<a href="&#106;avascript:alert(1)">x</a>',
-    '<a href="java\tscript:alert(1)">x</a>',
-    '<a href="  javascript:alert(1)">x</a>',
-    '<a href="//evil.example/phish">x</a>',
-    '<img src="https://e.example/i.png" onerror="alert(1)">',
-    "<img src=x onerror=alert(1)>",
-    '<img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=">',
-    '<svg onload="alert(1)"><script>alert(2)</script></svg>',
-    "<math><mtext><script>alert(1)</script></mtext></math>",
-    '<iframe src="https://evil.example"></iframe>',
-    '<object data="https://evil.example/x.swf"></object>',
-    '<meta http-equiv="refresh" content="0;url=https://evil.example">',
-    '<base href="https://evil.example/">',
-    '<form action="https://evil.example"><input type="submit"></form>',
-    '<p onclick="alert(1)" style="xss:expression(alert(1))">t</p>',
-    '<div href="javascript:alert(1)">t</div>',
-  ];
-  for (const attack of attacks) {
-    const out = sanitizeArticleHtml(`<p>before</p>${attack}<p>after</p>`);
-    assert.ok(
-      !/javascript:/i.test(out),
-      `javascript: survived: ${attack} -> ${out}`,
-    );
-    assert.ok(
-      !/onerror|onclick|onload/i.test(out),
-      `event handler survived: ${attack} -> ${out}`,
-    );
-    assert.ok(
-      !/<(svg|math|iframe|object|meta|base|form|input|script)/i.test(out),
-      `dangerous tag survived: ${attack} -> ${out}`,
-    );
-    assert.ok(
-      !/data:image/i.test(out),
-      `data: URL survived: ${attack} -> ${out}`,
-    );
-    assert.match(out, /<p>before<\/p>/);
-    assert.match(out, /<p>after<\/p>/);
-  }
-});
-
 // ---------- B-08 ----------
-const { isPrivateIp, assertPublicHost } = require("../../utils/ssrfGuard");
+const { isPrivateIp, assertPublicHost } = require("../../utils/guardedFetch");
 
 test("B-08: private/reserved IP ranges are recognised", () => {
   for (const ip of [
@@ -109,44 +48,6 @@ test("B-08: assertPublicHost rejects loopback hosts and IP literals", async () =
   await assert.rejects(() => assertPublicHost("127.0.0.1"), /SSRF guard/);
   await assert.rejects(() => assertPublicHost("192.168.0.10"), /SSRF guard/);
   await assertPublicHost("8.8.8.8"); // public literal passes without DNS
-});
-
-// ---------- B-28 ----------
-// FA-25 (FRESH) supersedes the like flow's shape: the counter still moves
-// via ONE atomic $inc (B-28's property), but only when the caller's
-// unique engagement record is newly inserted (per-actor dedup).
-let blogUpdate;
-stubModule("models/blog.model.js", {
-  findById: async () => {
-    throw new Error("findById must not be used for the like counter");
-  },
-  findOne: async () => ({ _id: "507f1f77bcf86cd799439011", likes: 41 }),
-  findByIdAndUpdate: async (id, update, options) => {
-    blogUpdate = { id, update, options };
-    return { _id: id, likes: 42 };
-  },
-});
-stubModule("models/blogEngagement.model.js", { create: async () => ({}) });
-const blogController = require("../../controllers/blog.controller");
-
-test("B-28: liking a blog is one atomic $inc, not read-modify-write", async () => {
-  blogUpdate = undefined;
-  const res = mockRes();
-  const next = mockNext();
-  blogController.likeBlog(
-    {
-      params: { id: "507f1f77bcf86cd799439011" },
-      cookies: {},
-      user: { _id: "507f1f77bcf86cd799439012" },
-    },
-    res,
-    next,
-  );
-  await until(() => res.statusCode !== undefined || next.error);
-  assert.equal(next.error, undefined, next.error && next.error.message);
-  assert.equal(res.statusCode, 200);
-  assert.deepEqual(blogUpdate.update, { $inc: { likes: 1 } });
-  assert.equal(res.body.data.likes, 42);
 });
 
 // ---------- B-29 ----------

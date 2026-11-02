@@ -514,11 +514,6 @@ test("PERF-B-05/B-09: source pins — bounded category list, chat queue limit, p
     newsletterCtrl.includes("Promise.all"),
     "subscriber list parallelises find+count",
   );
-  const blogModel = read("models/blog.model.js");
-  assert.ok(
-    /getPopular[\s\S]{0,300}\.select\("-content"\)/.test(blogModel),
-    "getPopular excludes content",
-  );
   const userModel = read("models/user.model.js");
   assert.ok(
     !userModel.includes("findActive"),

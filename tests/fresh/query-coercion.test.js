@@ -125,32 +125,6 @@ test("FA-49: getCategoryProducts survives repeated-param arrays", async () => {
   assert.equal(res.code, 200);
 });
 
-test("FA-51: blog list drops non-scalar category values", async () => {
-  let seenFilter = null;
-  stub("models/blog.model.js", {
-    find: (f) => {
-      seenFilter = f;
-      return chain([]);
-    },
-    countDocuments: async () => 0,
-  });
-  stub("models/blogEngagement.model.js", { create: async () => ({}) });
-  const ctrl = require(path.join(repo, "controllers/blog.controller.js"));
-  const res = mkRes();
-  let nextErr = null;
-  ctrl.getAllBlogs(
-    { query: { category: { $ne: null }, tag: ["a", "b"] }, cookies: {} },
-    res,
-    (e) => {
-      nextErr = e;
-    },
-  );
-  await flush();
-  assert.equal(nextErr, null);
-  assert.equal(seenFilter.category, undefined);
-  assert.equal(seenFilter.tags, undefined);
-});
-
 test("FA-46: admin user list coerces role/isActive/search", async () => {
   let seenFilter = null;
   stub("models/user.model.js", {
