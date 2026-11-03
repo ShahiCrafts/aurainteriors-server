@@ -34,6 +34,9 @@ const { applyMaxTime } = require("../utils/queryTimeout");
 const {
   getAttributeDefinitionsCached,
 } = require("../services/attributeRegistryCache");
+const {
+  rankRecommendations,
+} = require("../utils/recommendationEngine");
 
 // PERF-018 (remediation): explicit projection for the public product
 // LIST paths (plain + cursor). The list previously shipped the full
@@ -1068,7 +1071,31 @@ exports.setPrimaryImage = catchAsync(async (req, res, next) => {
   });
 });
 
-// Get related products (Enhanced Multi-Tiered Rule Engine)
+// Get related / recommended products — weighted Recommendation
+// Engine (utils/recommendationEngine.js). Replaces the old 3-tier
+// rule cascade (same category+style → same category → shared tags,
+// first-come order) which could not weigh price, room, collection,
+// materials or quality against each other and returned whichever
+// rows Mongo happened to surface first.
+//
+// How it works now:
+//  1. Candidate generation — one broad query for every product
+//     sharing at least one real signal with the source (category,
+//     productType, style, room, collection, tag, material, colour).
+//  2. Scoring — the engine scores the whole pool on all signals at
+//     once (see WEIGHTS in the engine file) and ranks it; each
+//     product returns with recommendationScore / Reasons / Kind
+//     (`similar` | `complement`) so the PDP can explain every pick.
+//  3. Cold-start fill — if the scored pool cannot fill `limit`
+//     (sparse catalog), featured / top-rated active products fill
+//     the remainder, labelled "Popular right now". They never
+//     outrank a scored match: they are appended after it.
+const RECOMMENDATION_CARD_SELECT =
+  "name slug price originalPrice images rating.average rating.count " +
+  "category style tags hasVariants priceFrom catalogVariants " +
+  "shortDescription colors materials isFeatured isNewArrival " +
+  "arAvailable stock status productType roomSlugs collectionSlugs createdAt";
+
 exports.getRelatedProducts = catchAsync(async (req, res, next) => {
   // Route param is :productId (strict ObjectId guard) — this handler
   // has no slug branch, unlike getProduct (SR-8).
@@ -1086,74 +1113,81 @@ exports.getRelatedProducts = catchAsync(async (req, res, next) => {
     return next(new AppError("Product not found", 404));
   }
 
-  // Tier 1: Same Category + Same Style
-  let query = {
-    category: product.category,
-    style: product.style,
-    _id: { $ne: product._id },
-    deletedAt: null,
-    status: "active",
-  };
+  const signalFilters = [];
+  if (product.category) signalFilters.push({ category: product.category });
+  if (product.productType) signalFilters.push({ productType: product.productType });
+  if (product.style) signalFilters.push({ style: product.style });
+  if (product.roomSlugs?.length) signalFilters.push({ roomSlugs: { $in: product.roomSlugs } });
+  if (product.collectionSlugs?.length) {
+    signalFilters.push({ collectionSlugs: { $in: product.collectionSlugs } });
+  }
+  if (product.tags?.length) signalFilters.push({ tags: { $in: product.tags } });
+  if (product.materials?.length) signalFilters.push({ materials: { $in: product.materials } });
+  if (product.colors?.length) signalFilters.push({ colors: { $in: product.colors } });
 
-  let relatedProducts = await Product.find(query)
-    .limit(limitNum)
-    // SR-P7-2 (Phase 9+10): hasVariants/priceFrom/catalogVariants
-    // ride every card feed so ProductCard can render "From" pricing
-    // and judge variant availability (the main list ships full docs;
-    // these curated selects were the only card feeds missing them).
-    .select(
-      "name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants",
-    )
-    .populate("category", "name slug")
-    .lean();
+  const candidates = signalFilters.length
+    ? await Product.find({
+        _id: { $ne: product._id },
+        deletedAt: null,
+        status: "active",
+        $or: signalFilters,
+      })
+        .limit(150)
+        .select(RECOMMENDATION_CARD_SELECT)
+        .populate("category", "name slug")
+        .lean()
+    : [];
 
-  // Tier 2: Same Category (if Tier 1 didn't fill limit)
-  if (relatedProducts.length < limitNum) {
-    const existingIds = relatedProducts.map((p) => p._id);
-    const tier2Query = {
-      category: product.category,
-      _id: { $ne: product._id, $nin: existingIds },
+  const ranked = rankRecommendations(product, candidates, { limit: limitNum });
+
+  // Cold-start / sparse-catalog fill, appended after scored matches.
+  if (ranked.length < limitNum) {
+    const taken = new Set(ranked.map((entry) => String(entry.product._id)));
+    const fill = await Product.find({
+      _id: { $ne: product._id, $nin: [...taken] },
       deletedAt: null,
       status: "active",
-    };
-
-    const tier2Products = await Product.find(tier2Query)
-      .limit(limitNum - relatedProducts.length)
-      .select(
-        "name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants",
-      )
+      $or: [{ isFeatured: true }, { "rating.average": { $gte: 4 } }],
+    })
+      .sort({ isFeatured: -1, "rating.average": -1, "rating.count": -1, createdAt: -1 })
+      .limit(limitNum - ranked.length)
+      .select(RECOMMENDATION_CARD_SELECT)
       .populate("category", "name slug")
       .lean();
-
-    relatedProducts = [...relatedProducts, ...tier2Products];
+    for (const fillProduct of fill) {
+      // The query already excludes the source and the scored picks;
+      // re-check in code so a fill row can never duplicate either.
+      if (String(fillProduct._id) === String(product._id)) continue;
+      if (taken.has(String(fillProduct._id))) continue;
+      if (fillProduct.stock <= 0 && !fillProduct.hasVariants) continue;
+      ranked.push({
+        product: fillProduct,
+        score: 0,
+        breakdown: {},
+        reasons: ["Popular right now"],
+        kind: "complement",
+      });
+    }
   }
 
-  // Tier 3: Shared Tags (if still below limit)
-  if (relatedProducts.length < limitNum && product.tags?.length > 0) {
-    const existingIds = relatedProducts.map((p) => p._id);
-    const tier3Query = {
-      tags: { $in: product.tags },
-      _id: { $ne: product._id, $nin: existingIds },
-      deletedAt: null,
-      status: "active",
-    };
-
-    const tier3Products = await Product.find(tier3Query)
-      .limit(limitNum - relatedProducts.length)
-      .select(
-        "name slug price originalPrice images rating category style tags hasVariants priceFrom catalogVariants",
-      )
-      .populate("category", "name slug")
-      .lean();
-
-    relatedProducts = [...relatedProducts, ...tier3Products];
-  }
+  const relatedProducts = ranked.map(({ product: item, score, reasons, kind }) => ({
+    ...item,
+    // .lean() rows carry no virtuals; ProductCard reads this field.
+    discountPercentage:
+      item.originalPrice && item.originalPrice > item.price
+        ? Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)
+        : 0,
+    recommendationScore: score,
+    recommendationReasons: reasons,
+    recommendationKind: kind,
+  }));
 
   res.status(200).json({
     status: "success",
     results: relatedProducts.length,
     data: {
       products: relatedProducts,
+      recommendation: { engine: "weighted-v1", sourceId: String(product._id) },
     },
   });
 });

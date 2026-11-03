@@ -502,19 +502,32 @@ test("GET /products/new-arrivals — getNewArrivals returns 200 with the new arr
   assert.deepEqual(res.body.data.products, productList);
 });
 
-test("GET /products/:id/related — getRelatedProducts returns 200 with related products", async () => {
+test("GET /products/:id/related — getRelatedProducts returns 200 with engine-ranked recommendations", async () => {
   currentProduct = freshProduct();
   // SR-8 (Phase 0.5): the route binds the related product as
   // :productId (strict ObjectId guard), so the handler reads
   // req.params.productId; the direct invocation follows the route.
+  //
+  // Recommendation Engine contract (replaces the old tier cascade's
+  // raw pass-through this test used to deep-equal): the stub pool is
+  // productList = [the source product itself, one Armchair]. The
+  // engine always excludes the source, so exactly one recommendation
+  // survives — enriched with its score / reasons / kind — and the
+  // cold-start fill cannot re-add the source or duplicate the pick.
   const req = baseReq({
     params: { productId: PROD_ID },
     query: { limit: "2" },
   });
   const { res, next } = await invoke(productCtrl.getRelatedProducts, req);
   assertSuccess(res, next, 200);
-  assert.equal(res.body.results, productList.length);
-  assert.deepEqual(res.body.data.products, productList);
+  assert.equal(res.body.results, 1);
+  assert.equal(res.body.data.products.length, 1);
+  const [pick] = res.body.data.products;
+  assert.equal(pick._id, "64b64c2f4f5a6b7c8d9e0f24");
+  assert.equal(typeof pick.recommendationScore, "number");
+  assert.ok(Array.isArray(pick.recommendationReasons));
+  assert.ok(["similar", "complement"].includes(pick.recommendationKind));
+  assert.equal(res.body.data.recommendation.engine, "weighted-v1");
 });
 
 test("PATCH /products/:id — updateProduct returns 200 with the updated product", async () => {
