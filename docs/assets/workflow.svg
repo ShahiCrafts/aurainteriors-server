@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 656 630" width="656" height="630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img">
+<rect x="0" y="0" width="656" height="100%" fill="#0d1117"/>
+<text x="36" y="46" fill="#e6e9f2" font-size="20" font-weight="700">aurainteriors-server — request lifecycle</text>
+<text x="36" y="70" fill="#9aa3b8" font-size="13">From HTTP request to persisted result</text>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#5c8dff"/></marker></defs>
+<circle cx="52" cy="133.0" r="15" fill="#7c5cf0"/>
+<text x="52" y="138.0" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">1</text>
+<rect x="86" y="96" width="506.96000000000004" height="74" rx="10" fill="#221a3d" stroke="#7c5cf0" stroke-width="1.5"/>
+<text x="339.48" y="122" fill="#e6e9f2" font-size="14" font-weight="600" text-anchor="middle">Request arrives</text>
+<text x="339.48" y="140" fill="#9aa3b8" font-size="12" text-anchor="middle">Morgan logging; Helmet and CORS applied in app.js</text>
+<line x1="52" y1="185" x2="52" y2="200" stroke="#5c8dff" stroke-width="1.8" marker-end="url(#arr)"/>
+<circle cx="52" cy="241.0" r="15" fill="#7c5cf0"/>
+<text x="52" y="246.0" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">2</text>
+<rect x="86" y="204" width="506.96000000000004" height="74" rx="10" fill="#161b26" stroke="#2e3650" stroke-width="1.5"/>
+<text x="339.48" y="230" fill="#e6e9f2" font-size="14" font-weight="600" text-anchor="middle">Protection and validation</text>
+<text x="339.48" y="248" fill="#9aa3b8" font-size="12" text-anchor="middle">Rate limits, CSRF-origin and NoSQL checks; Joi validators run</text>
+<line x1="52" y1="293" x2="52" y2="308" stroke="#5c8dff" stroke-width="1.8" marker-end="url(#arr)"/>
+<circle cx="52" cy="349.0" r="15" fill="#7c5cf0"/>
+<text x="52" y="354.0" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">3</text>
+<rect x="86" y="312" width="506.96000000000004" height="74" rx="10" fill="#161b26" stroke="#2e3650" stroke-width="1.5"/>
+<text x="339.48" y="338" fill="#e6e9f2" font-size="14" font-weight="600" text-anchor="middle">Authentication</text>
+<text x="339.48" y="356" fill="#9aa3b8" font-size="12" text-anchor="middle">Auth middleware verifies the session/JWT where the route requires it</text>
+<line x1="52" y1="401" x2="52" y2="416" stroke="#5c8dff" stroke-width="1.8" marker-end="url(#arr)"/>
+<circle cx="52" cy="457.0" r="15" fill="#7c5cf0"/>
+<text x="52" y="462.0" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">4</text>
+<rect x="86" y="420" width="506.96000000000004" height="74" rx="10" fill="#161b26" stroke="#2e3650" stroke-width="1.5"/>
+<text x="339.48" y="446" fill="#e6e9f2" font-size="14" font-weight="600" text-anchor="middle">Business logic</text>
+<text x="339.48" y="464" fill="#9aa3b8" font-size="12" text-anchor="middle">Controller calls services; services read and write Mongoose models</text>
+<line x1="52" y1="509" x2="52" y2="524" stroke="#5c8dff" stroke-width="1.8" marker-end="url(#arr)"/>
+<circle cx="52" cy="565.0" r="15" fill="#7c5cf0"/>
+<text x="52" y="570.0" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">5</text>
+<rect x="86" y="528" width="506.96000000000004" height="74" rx="10" fill="#161b26" stroke="#2e3650" stroke-width="1.5"/>
+<text x="339.48" y="554" fill="#e6e9f2" font-size="14" font-weight="600" text-anchor="middle">Side effects</text>
+<text x="339.48" y="572" fill="#9aa3b8" font-size="12" text-anchor="middle">Jobs, email outbox, broadcasts and Socket.IO events fire as needed</text>
+</svg>
