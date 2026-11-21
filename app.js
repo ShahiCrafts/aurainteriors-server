@@ -154,7 +154,12 @@ function createApp() {
   // keeps the store fast while prices/stock refresh in the background.
   // Authenticated requests are never publicly cached.
   app.use(
-    ["/api/v1/products", "/api/v1/categories", "/api/v1/catalog"],
+    [
+      "/api/v1/products",
+      "/api/v1/categories",
+      "/api/v1/catalog",
+      "/api/v1/settings",
+    ],
     (req, res, next) => {
       if (req.method === "GET" && !req.headers.authorization) {
         res.set(
@@ -189,6 +194,8 @@ function createApp() {
   app.use("/api/v1/newsletter", require("./routes/newsletter.routes"));
   app.use("/api/v1/system", require("./routes/system.routes"));
   app.use("/api/v1/jobs", require("./routes/job.routes"));
+  app.use("/api/v1/settings", require("./routes/settings.routes"));
+  app.use("/api/v1/admin", require("./routes/adminSettings.routes"));
 
   app.use((req, res, next) => {
     next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));

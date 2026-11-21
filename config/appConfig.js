@@ -31,6 +31,17 @@ const REGISTRY = {
   JWT_EXPIRES_IN: { type: "string", def: "7d", semantics: "live" },
   JWT_COOKIE_EXPIRES_IN: { type: "int", def: 7, semantics: "live" },
   JWT_REQUIRE_ISS_AUD: { type: "string", def: null, semantics: "live" }, // off only when exactly "0"
+  // Batch 1 (Settings + Secrets): AES-256-GCM master key for
+  // integration secrets at rest (utils/secretCrypto.js). "frozen":
+  // changing it makes previously stored secrets undecryptable (they
+  // must be re-saved). Optional — secretCrypto falls back to a
+  // JWT_SECRET-derived key when unset; set it in production.
+  SETTINGS_ENCRYPTION_KEY: {
+    type: "string",
+    def: null,
+    secret: true,
+    semantics: "frozen",
+  },
   OTP_PEPPER: {
     type: "string",
     def: null,
