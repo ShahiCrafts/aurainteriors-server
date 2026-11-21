@@ -18,7 +18,27 @@ const SIGNED_FIELDS =
 // Whether the old literal should also be purged from git history is
 // the owner's call (OWNER_DECISIONS.md, FA-19) - it is eSewa's public
 // test value, but it should still stop being this repo's fallback.
-exports.getEsewaConfig = () => {
+// Batch 2: credential resolution is split from config building so
+// the sandbox/production guards below apply IDENTICALLY to env and
+// admin-Settings credentials.
+//   resolveEsewaCredentials (pure): settings merchantId wins over
+//     ESEWA_MERCHANT_ID; the resolved secret (admin-encrypted, else
+//     env — secretsService already falls back) wins over
+//     ESEWA_SECRET_KEY.
+//   buildEsewaConfig (pure apart from the appConfig env registry):
+//     every guard/URL rule that used to live in getEsewaConfig.
+function resolveEsewaCredentials(resolved, env = process.env) {
+  const r = resolved || {};
+  return {
+    merchantId:
+      (typeof r.settingsMerchantId === "string" && r.settingsMerchantId.trim()) ||
+      env.ESEWA_MERCHANT_ID ||
+      "",
+    secretKey: r.resolvedSecret || env.ESEWA_SECRET_KEY || "",
+  };
+}
+
+function buildEsewaConfig(merchantId, secretKey) {
   // Lead review item 3 (GROUP C): the NODE_ENV "development" default lived
   // at ~6 call sites pre-AR-32; it now lives only in the registry and this
   // reads it from there. Behavior is identical for set/unset values (the
@@ -47,8 +67,6 @@ exports.getEsewaConfig = () => {
   // test merchant EPAYTEST may be used. Without ESEWA_ENV=sandbox,
   // production keeps rejecting EPAYTEST outright (FA-19 unchanged).
   const sandbox = esewaEnv === "sandbox" || nodeEnv === "test";
-  const merchantId = process.env.ESEWA_MERCHANT_ID || "";
-  const secretKey = process.env.ESEWA_SECRET_KEY || "";
   if (!merchantId || !secretKey) {
     throw new Error(
       production
@@ -69,7 +87,52 @@ exports.getEsewaConfig = () => {
       ? "https://uat.esewa.com.np/api/epay/transaction/status/"
       : "https://epay.esewa.com.np/api/epay/transaction/status/",
   };
+}
+
+exports.getEsewaConfig = () => {
+  const { merchantId, secretKey } = resolveEsewaCredentials({}, process.env);
+  return buildEsewaConfig(merchantId, secretKey);
 };
+
+// Batch 2: async settings-backed variant. merchantId comes from the
+// RAW stored settings doc (integrations.esewa.merchantId) and the
+// secret from getResolvedSecret('payments.esewaSecret'); both fall
+// back to env per-field, and ANY failure (no DB, read error) degrades
+// to exactly getEsewaConfig(). ESEWA_ENV handling and all guards are
+// shared via buildEsewaConfig, so semantics cannot drift.
+exports.getEsewaConfigAsync = async () => {
+  try {
+    const settingsService = require("./settings/settingsService");
+    if (settingsService.isDbReady()) {
+      const raw = await settingsService.getRawStoredData();
+      const settingsMerchantId =
+        raw &&
+        raw.integrations &&
+        raw.integrations.esewa &&
+        typeof raw.integrations.esewa.merchantId === "string"
+          ? raw.integrations.esewa.merchantId
+          : "";
+      const secretsService = require("./settings/secretsService");
+      const resolvedSecret = await secretsService
+        .getResolvedSecret("payments.esewaSecret")
+        .catch(() => null);
+      const { merchantId, secretKey } = resolveEsewaCredentials(
+        { settingsMerchantId, resolvedSecret },
+        process.env,
+      );
+      return buildEsewaConfig(merchantId, secretKey);
+    }
+  } catch (error) {
+    // A settings-read failure must never mask the real credential
+    // error: rethrow build errors (missing credentials), fall back
+    // only for infrastructure failures.
+    if (/eSewa/i.test(String(error && error.message))) throw error;
+  }
+  return exports.getEsewaConfig();
+};
+
+exports._resolveEsewaCredentials = resolveEsewaCredentials;
+exports._buildEsewaConfig = buildEsewaConfig;
 const amountMinor = (value) => {
   if (typeof value !== "number" && typeof value !== "string") return null;
   const raw = String(value);

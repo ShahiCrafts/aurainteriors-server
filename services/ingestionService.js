@@ -20,6 +20,110 @@ class IngestionService {
     return this.qdrant;
   }
 
+  // Batch 2: settings-backed Qdrant client. When an admin has saved a
+  // qdrant URL in Settings (checked on the RAW stored doc, so Batch-1
+  // defaults never shadow the env), the client is built from that URL
+  // + the resolved vector.qdrant secret (admin, else env). An admin
+  // secret alone (no saved URL) keeps the env URL with the admin key.
+  // Anything else — no DB, no saved values, any error — is exactly the
+  // appConfig env path. The client is cached on the instance as
+  // before, so a mid-process settings change is NOT picked up until
+  // the process restarts (known limitation, same as the old cache).
+  async resolveQdrantClient() {
+    if (this.qdrant) return this.qdrant;
+    try {
+      const settingsService = require("./settings/settingsService");
+      const secretsService = require("./settings/secretsService");
+      if (settingsService.isDbReady()) {
+        const raw = await settingsService.getRawStoredData();
+        const savedUrl =
+          raw &&
+          raw.integrations &&
+          raw.integrations.qdrant &&
+          typeof raw.integrations.qdrant.url === "string"
+            ? raw.integrations.qdrant.url.trim()
+            : "";
+        const resolvedKey = await secretsService
+          .getResolvedSecret("vector.qdrant")
+          .catch(() => null);
+        const adminKey =
+          resolvedKey && resolvedKey !== (process.env.QDRANT_API_KEY || "")
+            ? resolvedKey
+            : null;
+        if (savedUrl || adminKey) {
+          const { QdrantClient } = require("@qdrant/js-client-rest");
+          const url = savedUrl
+            ? savedUrl
+            : require("../config/appConfig").qdrantConfig(process.env).url;
+          this.qdrant = new QdrantClient({
+            url,
+            apiKey: resolvedKey || undefined,
+          });
+          return this.qdrant;
+        }
+      }
+    } catch {
+      // fall through to the env path
+    }
+    return this.qdrantClient();
+  }
+
+  // Batch 2: embedding credential resolution. Order (documented):
+  // resolved nvidia secret, resolved openrouter secret, resolved
+  // gemini secret — getResolvedSecret already falls back per-service
+  // to its env var, so this subsumes the historical env chain — then
+  // the untouched env chain NVIDIA_API_KEY || OPENROUTER_API_KEY ||
+  // GEMINI_API_KEY as the final fallback (also the only path when the
+  // DB is unavailable).
+  async resolveEmbeddingApiKey() {
+    try {
+      const settingsService = require("./settings/settingsService");
+      if (settingsService.isDbReady()) {
+        const secretsService = require("./settings/secretsService");
+        for (const service of [
+          "embeddings.nvidia",
+          "ai.openrouter",
+          "ai.gemini",
+        ]) {
+          const value = await secretsService
+            .getResolvedSecret(service)
+            .catch(() => null);
+          if (value) return value;
+        }
+      }
+    } catch {
+      // fall through to the env chain
+    }
+    return (
+      process.env.NVIDIA_API_KEY ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      null
+    );
+  }
+
+  // Batch 2: the settings embeddings.model wins ONLY when an admin
+  // actually saved it (raw stored doc); otherwise env as before.
+  async resolveEmbeddingModel() {
+    try {
+      const settingsService = require("./settings/settingsService");
+      if (settingsService.isDbReady()) {
+        const raw = await settingsService.getRawStoredData();
+        const saved =
+          raw &&
+          raw.integrations &&
+          raw.integrations.embeddings &&
+          typeof raw.integrations.embeddings.model === "string"
+            ? raw.integrations.embeddings.model.trim()
+            : "";
+        if (saved) return saved;
+      }
+    } catch {
+      // fall through to env
+    }
+    return process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
+  }
+
   /**
    * Parse uploaded file to extract raw text
    */
@@ -91,10 +195,7 @@ class IngestionService {
    * Call embedding API to generate vector
    */
   async getEmbedding(text, inputType = "passage") {
-    const apiKey =
-      process.env.NVIDIA_API_KEY ||
-      process.env.OPENROUTER_API_KEY ||
-      process.env.GEMINI_API_KEY;
+    const apiKey = await this.resolveEmbeddingApiKey();
     if (!apiKey) {
       throw new Error(
         "Missing API Key for embedding model in environment variables.",
@@ -105,8 +206,7 @@ class IngestionService {
     const url =
       process.env.EMBEDDING_API_URL ||
       "https://integrate.api.nvidia.com/v1/embeddings";
-    const model =
-      process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
+    const model = await this.resolveEmbeddingModel();
 
     try {
       const response = await fetch(url, {
@@ -148,13 +248,13 @@ class IngestionService {
    */
   async initCollection() {
     try {
-      const collections = await this.qdrantClient().getCollections();
+      const collections = await (await this.resolveQdrantClient()).getCollections();
       const exists = collections.collections.some(
         (c) => c.name === this.collectionName,
       );
 
       if (!exists) {
-        await this.qdrantClient().createCollection(this.collectionName, {
+        await (await this.resolveQdrantClient()).createCollection(this.collectionName, {
           vectors: {
             size: this.vectorSize,
             distance: "Cosine",
@@ -195,8 +295,8 @@ class IngestionService {
       if (doc.filePublicId) {
         try {
           const cloudinary = require("cloudinary").v2;
-          const { getCloudinaryConfig } = require("../config/cloudinary");
-          getCloudinaryConfig(); // Ensure config initialized
+          const { resolveCloudinaryConfig } = require("../config/cloudinary");
+          await resolveCloudinaryConfig(); // Ensure config initialized (Batch 2: settings-aware)
 
           downloadUrl = cloudinary.utils.private_download_url(
             doc.filePublicId,
@@ -317,7 +417,7 @@ class IngestionService {
       }
 
       // Batch upload points to Qdrant
-      await this.qdrantClient().upsert(this.collectionName, {
+      await (await this.resolveQdrantClient()).upsert(this.collectionName, {
         wait: true,
         points: points,
       });
@@ -325,7 +425,7 @@ class IngestionService {
       // AR-05: ONLY after the new version is live, delete the
       // previous version's points - every point of this document
       // that does NOT belong to this run.
-      await this.qdrantClient().delete(this.collectionName, {
+      await (await this.resolveQdrantClient()).delete(this.collectionName, {
         filter: {
           must: [
             {

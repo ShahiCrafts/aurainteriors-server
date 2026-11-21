@@ -25,16 +25,11 @@ if (!googleConfigured && !googleCallbackURL) {
   }
 }
 
-if (googleConfigured)
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: googleCallbackURL,
-        proxy: true,
-      },
-      async (accessToken, refreshToken, profile, done) => {
+// Batch 2: the verify callback is a named function so the strategy
+// can be (re)registered after the DB connects with admin-Settings
+// credentials (see initGoogleOAuthFromSettings below). Behaviour of
+// the callback itself is unchanged.
+async function googleVerifyCallback(accessToken, refreshToken, profile, done) {
         try {
           let user = await User.findOne({ googleId: profile.id });
 
@@ -104,9 +99,89 @@ if (googleConfigured)
         } catch (error) {
           return done(error, null);
         }
+}
+
+let googleRegisteredSignature = null;
+function registerGoogleStrategy(clientID, clientSecret, callbackURL) {
+  const signature = `${clientID}|${callbackURL}`;
+  if (signature === googleRegisteredSignature) return false;
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID,
+        clientSecret,
+        callbackURL,
+        proxy: true,
       },
+      googleVerifyCallback,
     ),
   );
+  googleRegisteredSignature = signature;
+  return true;
+}
+
+if (googleConfigured) {
+  registerGoogleStrategy(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    googleCallbackURL,
+  );
+}
+
+// Batch 2: settings-backed Google OAuth registration.
+//
+// Boot order (server.js): config/passport is required (via ./app)
+// BEFORE mongoose connects, but startServer() awaits
+// connectDatabase() before listen() — so this async init, called
+// from startServer() after the DB connects, can still register the
+// strategy before any request arrives. passport.use() with the same
+// strategy name replaces the env-registered one. Resolution:
+// clientId from the RAW stored settings doc (integrations.google)
+// else env; secret via getResolvedSecret('auth.googleSecret')
+// (admin else env). Any failure leaves the env registration (or the
+// disabled state) exactly as at load. NOTE: this runs once at boot —
+// changing Google credentials in admin afterwards still requires a
+// server restart to take effect.
+async function initGoogleOAuthFromSettings() {
+  try {
+    const settingsService = require("../services/settings/settingsService");
+    if (!settingsService.isDbReady()) return false;
+    const raw = await settingsService.getRawStoredData();
+    const savedClientId =
+      raw &&
+      raw.integrations &&
+      raw.integrations.google &&
+      typeof raw.integrations.google.clientId === "string" &&
+      raw.integrations.google.clientId.trim()
+        ? raw.integrations.google.clientId.trim()
+        : null;
+    const clientID = savedClientId || process.env.GOOGLE_CLIENT_ID;
+    const secretsService = require("../services/settings/secretsService");
+    const clientSecret = await secretsService
+      .getResolvedSecret("auth.googleSecret")
+      .catch(() => null);
+    if (!clientID || !clientSecret) return false;
+    let callbackURL = googleCallbackURL;
+    if (!callbackURL) {
+      try {
+        callbackURL = `${require("./appConfig").requireAtUse("BACKEND_URL")}/api/v1/auth/google/callback`;
+      } catch {
+        return false;
+      }
+    }
+    const changed = registerGoogleStrategy(clientID, clientSecret, callbackURL);
+    if (changed) {
+      googleConfigured = true;
+      googleCallbackURL = callbackURL;
+      console.log(
+        "[Auth] Google OAuth strategy registered from admin Settings/env resolution.",
+      );
+    }
+    return changed;
+  } catch {
+    return false;
+  }
+}
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -122,3 +197,5 @@ passport.deserializeUser(async (id, done) => {
 });
 
 module.exports = passport;
+module.exports.initGoogleOAuthFromSettings = initGoogleOAuthFromSettings;
+module.exports._registerGoogleStrategy = registerGoogleStrategy;

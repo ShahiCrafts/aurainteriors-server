@@ -25,6 +25,53 @@ const brevoClient = axios.create({
   },
 });
 
+// Batch 2: the Brevo key is resolved at SEND time, not frozen at
+// import. An admin-saved key (secretsService 'email.brevo') beats the
+// env key; any failure — no DB connection (tests/boot), settings read
+// error — silently falls back to the env const above, so behaviour is
+// identical when nothing is saved in admin. Resolutions are cached
+// for 60s so broadcasts don't hit the DB per recipient.
+const BREVO_KEY_CACHE_MS = 60_000;
+let brevoKeyCache = { value: undefined, at: 0 };
+async function resolveBrevoApiKey() {
+  const now = Date.now();
+  if (brevoKeyCache.value !== undefined && now - brevoKeyCache.at < BREVO_KEY_CACHE_MS) {
+    return brevoKeyCache.value;
+  }
+  let value = BREVO_API_KEY;
+  try {
+    const settingsService = require("./settings/settingsService");
+    if (settingsService.isDbReady()) {
+      const resolved = await require("./settings/secretsService").getResolvedSecret(
+        "email.brevo",
+      );
+      if (resolved) value = resolved;
+    }
+  } catch {
+    // env fallback already in `value`
+  }
+  brevoKeyCache = { value, at: now };
+  return value;
+}
+// Guarded: some test harnesses stub axios.create() with a bare
+// { post } fake that has no interceptors — registration must not
+// crash module load there (real axios always provides them).
+if (
+  brevoClient.interceptors &&
+  brevoClient.interceptors.request &&
+  typeof brevoClient.interceptors.request.use === "function"
+) brevoClient.interceptors.request.use(async (config) => {
+  const key = await resolveBrevoApiKey();
+  if (key) {
+    if (config.headers && typeof config.headers.set === "function") {
+      config.headers.set("api-key", key);
+    } else if (config.headers) {
+      config.headers["api-key"] = key;
+    }
+  }
+  return config;
+});
+
 // OA-1: EMAIL_FROM / FRONTEND_URL fallbacks REMOVED. Resolved live at
 // use; using either while unset throws an error naming the variable.
 const FROM = () => appConfig.requireAtUse("EMAIL_FROM");
@@ -113,6 +160,11 @@ const ctaButton = (href, label) =>
     ${escapeHtml(label)}
   </a>`;
 exports.ctaButton = ctaButton;
+// Batch 2 test seams (helper-level precedence tests).
+exports._resolveBrevoApiKey = resolveBrevoApiKey;
+exports._resetBrevoKeyCache = () => {
+  brevoKeyCache = { value: undefined, at: 0 };
+};
 
 const securityNote = (msg) =>
   `<table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: ${BRAND.bg}; border-radius: 8px; margin-top: 24px;">

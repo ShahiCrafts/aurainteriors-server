@@ -682,9 +682,18 @@ class ChatService {
       // AR-30 (D-B): the legacy chatOrchestrator pipeline was removed —
       // chatV2 is the only pipeline and CHAT_PIPELINE is inert.
       // Rollback is the git tag `pre-legacy-chat-removal`.
-      const { queue, pipeline } = require("./chatV2");
+      const { queue, pipeline, refreshConfig } = require("./chatV2");
       const retrievalService = require("./retrievalService");
       const roomId = chatId.toString();
+      // Batch 2: pick up admin Settings/secrets-backed chat config
+      // (cached 60s inside chatV2/index; falls back to the env config
+      // on any failure, so this await can never break a turn). The
+      // pipeline is read AFTER the refresh so a swapped-in pipeline
+      // is the one that runs this turn.
+      if (typeof refreshConfig === "function") {
+        await refreshConfig().catch(() => {});
+      }
+      const activePipeline = require("./chatV2").pipeline || pipeline;
       queue.resume(roomId);
       queue
         .enqueue(roomId, async () => {
@@ -706,7 +715,7 @@ class ChatService {
           try {
             emit("ai:thinking_start");
             thinkingStarted = true;
-            const result = await pipeline.run({
+            const result = await activePipeline.run({
               chatId,
               text: content,
               productOptions: latest.metadata?.lastProductOptions || [],

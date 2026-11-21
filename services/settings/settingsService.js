@@ -256,10 +256,33 @@ async function updateSection(section, patch, adminUser, ip) {
   return all[section];
 }
 
+// Batch 2 helpers (additive): consumers that rewire env-based config
+// to Settings must distinguish "an admin actually saved this" from
+// Batch-1 defaults — getSettings() merges defaults, so it cannot.
+// getRawStoredData() returns the stored document's data object (or
+// null when nothing was ever saved); isDbReady() lets consumers skip
+// DB reads entirely when mongoose is not connected (tests, boot), so
+// a settings lookup can never hang on mongoose command buffering.
+async function getRawStoredData() {
+  const SiteSettings = getModel();
+  const doc = await SiteSettings.findOne({ key: SINGLETON_KEY }).lean();
+  return doc && isPlainObject(doc.data) ? doc.data : null;
+}
+
+function isDbReady() {
+  try {
+    return require("mongoose").connection.readyState === 1;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   getSettings,
   getPublicSettings,
   updateSection,
+  getRawStoredData,
+  isDbReady,
   // Exported for tests / Batch 2 reuse.
   _internal: { deepMerge, pruneToShape, validatePatch, SINGLETON_KEY },
 };

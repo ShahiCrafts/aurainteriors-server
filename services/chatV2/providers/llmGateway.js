@@ -25,6 +25,24 @@ function providerBackoff(attempt) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Batch 2: per-provider auth headers. Providers built by
+// chatConfig.buildProvidersFromSettings carry authStyle; env-built
+// providers have none and keep the historical Bearer shape exactly.
+// Anthropic's OpenAI-compatible endpoint authenticates with x-api-key
+// plus a pinned anthropic-version header instead of Authorization.
+function providerHeaders(p) {
+  if (p && p.authStyle === "x-api-key") {
+    return {
+      "x-api-key": p.apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    };
+  }
+  return {
+    Authorization: `Bearer ${p.apiKey}`,
+    "Content-Type": "application/json",
+  };
+}
 function accumulateToolCall(calls, tc) {
   const index = Number.isInteger(tc.index) ? tc.index : calls.size;
   const key = `index:${index}`;
@@ -120,10 +138,7 @@ class LlmGateway {
       const res = await fetch(`${p.baseUrl}/chat/completions`, {
         signal: deadline.signal,
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${p.apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: providerHeaders(p),
         body: JSON.stringify({
           model: p.model,
           messages,
@@ -193,10 +208,7 @@ class LlmGateway {
       res = await fetch(`${p.baseUrl}/chat/completions`, {
         signal: deadline.signal,
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${p.apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: providerHeaders(p),
         body: JSON.stringify({
           model: p.model,
           messages,
@@ -314,4 +326,5 @@ class LlmGateway {
 }
 module.exports = LlmGateway;
 module.exports._parseSse = parseSse;
+module.exports._providerHeaders = providerHeaders;
 module.exports._accumulateToolCall = accumulateToolCall;

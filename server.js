@@ -89,6 +89,14 @@ const startServer = async () => {
     // cannot commit. Exits(1) with a fatal line on a standalone;
     // skipped silently when the DB is stubbed (test preload).
     await assertReplicaSetTopology();
+    // Batch 2: with the DB connected (and before listen), let admin
+    // Settings Google credentials register/replace the Google OAuth
+    // strategy. Never fatal: any failure keeps the env registration.
+    try {
+      await require("./config/passport").initGoogleOAuthFromSettings();
+    } catch {
+      /* env-based Google registration (or disabled state) stands */
+    }
     console.log("Starting server initialization...");
 
     // Demo data is opt-in and is never inserted during production startup.

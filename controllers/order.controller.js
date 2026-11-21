@@ -30,6 +30,7 @@ const { getCached, setCached } = require("../utils/ttlCache");
 
 const {
   getEsewaConfig,
+  getEsewaConfigAsync,
   verifyEsewaSignature,
   verifyEsewaPayment,
   verifyEsewaRefund,
@@ -40,15 +41,27 @@ const {
 // with instructions when the credentials are absent. Production boot
 // keeps the old fail-at-startup contract via server.js env validation.
 let _esewaConfig = null;
-const esewaConfig = () => (_esewaConfig ??= getEsewaConfig());
+// Batch 2: async settings-backed resolution, cached exactly like the
+// previous sync resolver. Falls back to the sync env resolver when the
+// service module has no async variant (older test stubs). A failed
+// resolution is NOT cached, preserving the fail-fast-on-first-use
+// contract.
+const esewaConfigAsync = async () => {
+  if (_esewaConfig) return _esewaConfig;
+  _esewaConfig =
+    typeof getEsewaConfigAsync === "function"
+      ? await getEsewaConfigAsync()
+      : getEsewaConfig();
+  return _esewaConfig;
+};
 
 // OA-1: fallback removed - resolved live via config; using it while unset throws naming FRONTEND_URL.
 const FRONTEND_URL_GET = () =>
   require("../config/appConfig").requireAtUse("FRONTEND_URL");
 
 // Generate HMAC-SHA256 signature for eSewa ePay v2
-const generateEsewaSignature = (message) => {
-  const hmac = crypto.createHmac("sha256", esewaConfig().secretKey);
+const generateEsewaSignature = (message, config) => {
+  const hmac = crypto.createHmac("sha256", config.secretKey);
   hmac.update(message);
   return hmac.digest("base64");
 };
@@ -99,7 +112,7 @@ const BACKEND_URL_GET = () =>
   require("../config/appConfig").requireAtUse("BACKEND_URL");
 
 // Generate eSewa ePay v2 payment data with signature
-const generateEsewaPaymentData = (order) => {
+const generateEsewaPaymentData = (order, config) => {
   const data = {
     amount: (order.subtotal - order.discountAmount).toFixed(2),
     tax_amount: order.tax.toFixed(2),
@@ -107,7 +120,7 @@ const generateEsewaPaymentData = (order) => {
     product_delivery_charge: order.shippingCost.toFixed(2),
     total_amount: order.total.toFixed(2),
     transaction_uuid: order.orderId,
-    product_code: esewaConfig().merchantId,
+    product_code: config.merchantId,
     // eSewa redirects to BACKEND, which processes payment and redirects to FRONTEND
     success_url: `${BACKEND_URL_GET()}/api/v1/orders/esewa/success`,
     failure_url: `${BACKEND_URL_GET()}/api/v1/orders/esewa/failure`,
@@ -117,8 +130,8 @@ const generateEsewaPaymentData = (order) => {
   // Generate signature: total_amount,transaction_uuid,product_code
   const message = `total_amount=${data.total_amount},transaction_uuid=${data.transaction_uuid},product_code=${data.product_code}`;
   // (The signed message is not logged: it carries order metadata, B-23.)
-  data.signature = generateEsewaSignature(message);
-  data.payment_url = esewaConfig().paymentUrl;
+  data.signature = generateEsewaSignature(message, config);
+  data.payment_url = config.paymentUrl;
 
   return data;
 };
@@ -159,7 +172,7 @@ const emitOrderNotifications = (order) => {
 // usage and (guest) stock commit deliberately do NOT happen here —
 // eSewa consumes both only at payment capture.
 const respondEsewaCheckout = async (res, transaction, order) => {
-  const esewaData = generateEsewaPaymentData(order);
+  const esewaData = generateEsewaPaymentData(order, await esewaConfigAsync());
   await transaction.commitTransaction();
 
   return res.status(201).json({
@@ -262,7 +275,7 @@ const replayCheckout = async (identity, res) => {
     existing.paymentStatus === "pending" &&
     existing.orderStatus === "pending"
   )
-    data.esewa = generateEsewaPaymentData(existing);
+    data.esewa = generateEsewaPaymentData(existing, await esewaConfigAsync());
   res
     .status(201)
     .json({ success: true, message: "Existing checkout returned", data });
@@ -1152,7 +1165,8 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
   }
 
   // Validate the signed response before accessing its fields.
-  if (!verifyEsewaSignature(responseData, esewaConfig())) {
+  const esewaCfg = await esewaConfigAsync();
+  if (!verifyEsewaSignature(responseData, esewaCfg)) {
     return res.redirect(
       `${FRONTEND_URL_GET()}/checkout/payment-failed?error=signature_mismatch`,
     );
@@ -1187,7 +1201,7 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
   }
 
   try {
-    await verifyEsewaPayment(responseData, order, esewaConfig());
+    await verifyEsewaPayment(responseData, order, esewaCfg);
   } catch (_error) {
     return res.redirect(
       `${FRONTEND_URL_GET()}/checkout/payment-failed?error=payment_verification_failed`,
@@ -1198,7 +1212,7 @@ exports.esewaSuccess = catchAsync(async (req, res, next) => {
   try {
     capture = await captureEsewaPayment(
       order._id,
-      esewaConfig().merchantId,
+      esewaCfg.merchantId,
       responseData,
     );
   } catch (_error) {
@@ -1484,7 +1498,7 @@ exports.reconcileRefund = catchAsync(async (req, res, next) => {
   let reference;
   if (order.paymentMethod === "esewa") {
     try {
-      reference = await verifyEsewaRefund(order, esewaConfig());
+      reference = await verifyEsewaRefund(order, await esewaConfigAsync());
     } catch (_error) {
       return next(
         new AppError("Full refund has not been verified by eSewa", 409),
