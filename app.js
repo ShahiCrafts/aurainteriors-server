@@ -149,6 +149,23 @@ function createApp() {
     res.status(isDbReady ? 200 : 503).json(health);
   });
 
+  // Public catalog responses are identical for anonymous visitors, so
+  // browsers and CDNs may cache them briefly; stale-while-revalidate
+  // keeps the store fast while prices/stock refresh in the background.
+  // Authenticated requests are never publicly cached.
+  app.use(
+    ["/api/v1/products", "/api/v1/categories", "/api/v1/catalog"],
+    (req, res, next) => {
+      if (req.method === "GET" && !req.headers.authorization) {
+        res.set(
+          "Cache-Control",
+          "public, max-age=60, stale-while-revalidate=300",
+        );
+      }
+      next();
+    },
+  );
+
   app.use("/api/v1/users", require("./routes/user.routes"));
   app.use("/api/v1/auth", require("./routes/auth.routes"));
   app.use("/api/v1/addresses", require("./routes/address.routes"));
