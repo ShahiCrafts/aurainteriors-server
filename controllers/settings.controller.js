@@ -1,4 +1,5 @@
 const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/AppError");
 const settingsService = require("../services/settings/settingsService");
 
 // PUBLIC
@@ -46,5 +47,23 @@ exports.updateSettingsSection = catchAsync(async (req, res) => {
   res.status(200).json({
     status: "success",
     data: { section: req.params.section, settings: section },
+  });
+});
+
+/**
+ * POST /api/v1/admin/settings/image — Batch 3a. Single-image upload
+ * for settings fields (logo, favicon, OG image, hero slides). This
+ * does NOT add an upload backend: the route reuses the existing
+ * category-image pipeline from middleware/upload.middleware.js
+ * (multer memory storage -> SVG policy/re-encode -> Cloudinary),
+ * which leaves the hosted URL on req.file.cloudinaryUrl.
+ */
+exports.uploadSettingsImage = catchAsync(async (req, res) => {
+  if (!req.file || !req.file.cloudinaryUrl) {
+    throw new AppError("Please upload an image file", 400);
+  }
+  res.status(201).json({
+    status: "success",
+    data: { url: req.file.cloudinaryUrl },
   });
 });

@@ -45,6 +45,9 @@ const DEFAULT_SETTINGS = {
   identity: {
     storeName: "Aura Interiors",
     tagline: "Redefine Your Space",
+    // Batch 3a: support email also surfaced on the Identity admin tab;
+    // same current value as notifications.supportEmail / ContactPage.
+    supportEmail: "support@aurainteriors.live",
     logoUrl: "/logo-aura-interiors.webp",
     logoDarkUrl: "",
     faviconUrl: "/favicon.png",
@@ -54,6 +57,9 @@ const DEFAULT_SETTINGS = {
     primaryHoverColor: "#D9620E",
     navyColor: "#1E2C4A",
     fontFamily: "DM Sans",
+    // Batch 3a: storefront buttons render rounded-lg today
+    // (Hero.jsx), so the current-look token is "rounded".
+    buttonRadius: "rounded",
   },
   contact: {
     email: "support@aurainteriors.live",
@@ -68,6 +74,9 @@ const DEFAULT_SETTINGS = {
       pinterest: "",
       tiktok: "",
       whatsapp: "",
+      // Batch 3a: no X/LinkedIn links exist on the site today either.
+      twitter: "",
+      linkedin: "",
     },
   },
   seo: {
@@ -81,6 +90,8 @@ const DEFAULT_SETTINGS = {
     metaPixelId: "",
     tiktokPixelId: "",
     searchConsoleVerification: "",
+    // Batch 3a: no Google Maps embed/key is used anywhere today.
+    googleMapsKey: "",
   },
   homepage: {
     sections: {
@@ -90,8 +101,132 @@ const DEFAULT_SETTINGS = {
       featuredPieces: true,
       testimonials: true,
     },
+    // Batch 3a: current render order in src/pages/HomePage.jsx.
+    sectionsOrder: [
+      "hero",
+      "trustBanner",
+      "shopByCategory",
+      "featuredPieces",
+      "testimonials",
+    ],
+    // Batch 3a: the `slides` array in src/components/sections/Hero.jsx,
+    // verbatim (headline = heading + highlight; buttonLink =
+    // shopCategoryUrl(slug) as rendered). Hero.jsx's bento layout
+    // renders slides 1–2 plus the promo card below; slide 3 exists in
+    // the data but is not rendered today, so its buttonLink (never
+    // rendered) is "". imageUrl values are the web repo's source
+    // asset paths (the imports at the top of Hero.jsx) — Batch 3b
+    // maps them to built asset URLs.
+    heroSlides: [
+      {
+        imageUrl:
+          "src/assets/images/hero/hero-furniture-living-room-1200w.webp",
+        headline: "Furniture That Fits You",
+        subtext:
+          "Discover our handpicked collection of timeless sofas and accent chairs — thoughtfully designed to bring warmth, character, and lasting comfort into every corner of your home.",
+        buttonText: "Explore Now",
+        buttonLink: "/shop?categories=living-room",
+        enabled: true,
+      },
+      {
+        imageUrl: "src/assets/images/hero/hero-bedroom-comfort-1200w.webp",
+        headline: "Sleep in Pure Comfort",
+        subtext:
+          "Our premium king-size beds and orthopedic mattresses are engineered with adaptive support layers — so every night feels like your best one yet.",
+        buttonText: "Shop Beds",
+        buttonLink: "/shop?categories=bedroom",
+        enabled: true,
+      },
+      {
+        imageUrl: "src/assets/images/hero/hero-workspace-office-1200w.webp",
+        headline: "Work From Anywhere",
+        subtext:
+          "From height-adjustable desks to cable-managed bookshelves, our workspace collection is built for deep focus, long hours, and a setup that actually inspires you.",
+        buttonText: "View Office",
+        buttonLink: "",
+        enabled: true,
+      },
+    ],
+    // Batch 3a: the hardcoded bottom-right bento card in Hero.jsx
+    // (its price pair Rs. 24,999 → Rs. 19,999 is not part of this
+    // shape and stays in the component until Batch 3b).
+    promoBanner: {
+      imageUrl: "src/assets/images/hero/hero-decor-dining-room-1200w.webp",
+      headline: "Calmora Bed Frame",
+      subtext:
+        "Handcrafted solid sheesham wood frame with a plush upholstered headboard",
+      buttonText: "Shop Sale",
+      buttonLink: "/shop?categories=bedroom",
+      enabled: true,
+    },
     announcementsEnabled: true,
     newsletterEnabled: true,
+  },
+  // Batch 3a: public content pages. The FAQ rows are
+  // src/data/faqData.js flattened in order (the page groups them by
+  // category; this shape is the flat {question, answer} list).
+  // about / privacyPolicy / terms / shippingReturns default to "":
+  // NO such pages or copy exist in the web repo today — the footer
+  // links /about, /privacy, /terms, /shipping and /returns point at
+  // routes that do not exist (they render the 404 page), so there is
+  // no current copy to extract and none was invented.
+  pages: {
+    about: "",
+    privacyPolicy: "",
+    terms: "",
+    shippingReturns: "",
+    faq: [
+      {
+        question: "How do I place an order?",
+        answer:
+          "To place an order, browse our shop, select your desired items, and add them to your cart. Once you're ready, click on the cart icon and proceed to checkout. Follow the prompts to enter your shipping and payment information.",
+      },
+      {
+        question: "Can I modify my order after it's placed?",
+        answer:
+          "We process orders quickly to ensure timely delivery. If you need to change or cancel your order, please contact our support team within 1 hour of placement. After this window, we may not be able to make changes.",
+      },
+      {
+        question: "Do you offer financing options?",
+        answer:
+          "Yes, we partner with several financing providers to offer flexible payment plans. You can view available options during the checkout process.",
+      },
+      {
+        question: "What are your shipping rates?",
+        answer:
+          "Shipping rates vary based on the item size and your location. Small items typically ship for a flat rate, while white-glove delivery for large furniture is calculated at checkout.",
+      },
+      {
+        question: "How long will it take to receive my order?",
+        answer:
+          "Standard shipping takes 5-7 business days for in-stock items. Custom or larger furniture pieces may take 4-8 weeks. You can track your order status in the 'Track Order' section of our website.",
+      },
+      {
+        question: "Do you deliver outside Nepal?",
+        answer:
+          "We currently deliver within Nepal, including the Kathmandu Valley and major cities across the country. We are not yet able to deliver internationally.",
+      },
+      {
+        question: "What is your return policy?",
+        answer:
+          "We offer a 30-day return policy for most items in their original condition. Custom-made pieces aren't eligible for return unless they arrive damaged or defective.",
+      },
+      {
+        question: "How do I start a return?",
+        answer:
+          "To initiate a return, log into your account, go to your 'Order History', and select the item you wish to return. You will receive a return label and instructions via email.",
+      },
+      {
+        question: "How does the AR 'View in Room' feature work?",
+        answer:
+          "Simply browse a product on your mobile device and tap the 'View in AR' button. Our application uses your phone's camera to place a digital 3D model of the furniture in your space at actual scale.",
+      },
+      {
+        question: "Which devices support AR features?",
+        answer:
+          "Most modern iOS (iPhone 6s and later) and Android devices with ARCore support are compatible. Ensure your browser is up to date for the best experience.",
+      },
+    ],
   },
   commerce: {
     currency: "NPR",

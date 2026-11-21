@@ -32,6 +32,67 @@ class RetrievalService {
     return this.qdrant;
   }
 
+  // Batch 3a: settings-backed resolution, at parity with
+  // ingestionService (Batch 2). The resolvers live on the ingestion
+  // service — lazy-required here so module load order can never
+  // cycle — and already implement the documented precedence:
+  // admin-saved settings/secrets first, the historical env chain as
+  // the fallback (and the only path when the DB is unavailable).
+  async resolveEmbeddingApiKey() {
+    return require("./ingestionService").resolveEmbeddingApiKey();
+  }
+
+  async resolveEmbeddingModel() {
+    return require("./ingestionService").resolveEmbeddingModel();
+  }
+
+  // Batch 3a: settings-backed Qdrant client, mirroring
+  // ingestionService.resolveQdrantClient (admin-saved URL + resolved
+  // vector.qdrant secret win; an admin secret alone keeps the env
+  // URL), with retrieval's AR-39 client timeout applied. A pre-set
+  // this.qdrant (the AR-39 test seam) always wins, exactly as with
+  // qdrantClient(). Cached on the instance like ingestion's, so a
+  // mid-process settings change applies on restart.
+  async resolveQdrantClient() {
+    if (this.qdrant) return this.qdrant;
+    try {
+      const settingsService = require("./settings/settingsService");
+      const secretsService = require("./settings/secretsService");
+      if (settingsService.isDbReady()) {
+        const raw = await settingsService.getRawStoredData();
+        const savedUrl =
+          raw &&
+          raw.integrations &&
+          raw.integrations.qdrant &&
+          typeof raw.integrations.qdrant.url === "string"
+            ? raw.integrations.qdrant.url.trim()
+            : "";
+        const resolvedKey = await secretsService
+          .getResolvedSecret("vector.qdrant")
+          .catch(() => null);
+        const adminKey =
+          resolvedKey && resolvedKey !== (process.env.QDRANT_API_KEY || "")
+            ? resolvedKey
+            : null;
+        if (savedUrl || adminKey) {
+          const { QdrantClient } = require("@qdrant/js-client-rest");
+          const url = savedUrl
+            ? savedUrl
+            : require("../config/appConfig").qdrantConfig(process.env).url;
+          this.qdrant = new QdrantClient({
+            url,
+            apiKey: resolvedKey || undefined,
+            timeout: this.qdrantTimeoutMs(),
+          });
+          return this.qdrant;
+        }
+      }
+    } catch {
+      // fall through to the env path
+    }
+    return this.qdrantClient();
+  }
+
   // AR-39: the embedding budget for chat RAG, from
   // RAG_EMBEDDING_TIMEOUT_MS. DEFAULT = 250 ms — exactly the value
   // chatService used to hard-code at the retrieve call site — so
@@ -54,10 +115,10 @@ class RetrievalService {
    * Helper to retrieve embedding vector for a given query string
    */
   async getEmbedding(text, inputType = "query", { timeoutMs = 300 } = {}) {
-    const apiKey =
-      process.env.NVIDIA_API_KEY ||
-      process.env.OPENROUTER_API_KEY ||
-      process.env.GEMINI_API_KEY;
+    // Batch 3a: resolved via ingestionService's Batch-2 resolvers
+    // (settings/secrets first, env chain as fallback) — previously
+    // this duplicated the env-only chain inline.
+    const apiKey = await this.resolveEmbeddingApiKey();
     if (!apiKey) {
       throw new Error(
         "Missing API Key for embedding model in environment variables.",
@@ -67,8 +128,7 @@ class RetrievalService {
     const url =
       process.env.EMBEDDING_API_URL ||
       "https://integrate.api.nvidia.com/v1/embeddings";
-    const model =
-      process.env.EMBEDDING_MODEL_NAME || "nvidia/llama-3.2-nv-embed-qa-4";
+    const model = await this.resolveEmbeddingModel();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -124,7 +184,7 @@ class RetrievalService {
       console.log(
         `[RAG] Searching Qdrant collection: "${this.collectionName}"`,
       );
-      const searchResult = await this.qdrantClient().search(
+      const searchResult = await (await this.resolveQdrantClient()).search(
         this.collectionName,
         {
           filter: { must: [{ key: "visibility", match: { value: "public" } }] },

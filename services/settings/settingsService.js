@@ -16,6 +16,10 @@ const { DEFAULT_SETTINGS, SECTIONS } = require("./defaults");
 
 const SINGLETON_KEY = "site";
 const MAX_STRING = 2000;
+// Batch 3a: the `pages` section holds long-form copy (About, legal
+// pages) — 2000 chars is too small for a privacy policy.
+const MAX_PAGE_STRING = 20000;
+const MAX_ARRAY_ITEMS = 50;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,8 +84,17 @@ async function getPublicSettings() {
       googleAnalyticsId: s.seo.googleAnalyticsId,
       metaPixelId: s.seo.metaPixelId,
       tiktokPixelId: s.seo.tiktokPixelId,
+      // Batch 3a: a Google Maps browser key is exposed to the
+      // storefront BY DESIGN (it ships in page HTML wherever Maps is
+      // embedded and is protected by referrer restrictions in Google
+      // Cloud Console, not by secrecy) — unlike the other seo fields
+      // above the line (searchConsoleVerification stays admin-only).
+      googleMapsKey: s.seo.googleMapsKey,
     },
     homepage: s.homepage,
+    // Batch 3a: public content pages (About/Privacy/Terms/Shipping
+    // copy + FAQ) — public content by definition.
+    pages: s.pages,
     commerce: {
       currency: s.commerce.currency,
       locale: s.commerce.locale,
@@ -112,6 +125,23 @@ function looksLikeUrlKey(path) {
 function validateValue(path, defaultValue, value, changedKeys) {
   if (Array.isArray(defaultValue)) {
     if (!Array.isArray(value)) fail(`Settings field '${path}' must be an array`);
+    if (value.length > MAX_ARRAY_ITEMS) {
+      fail(`Settings field '${path}' may contain at most ${MAX_ARRAY_ITEMS} items`);
+    }
+    // Batch 3a: arrays of objects (homepage.heroSlides, pages.faq) —
+    // each item is validated against the first default item's shape
+    // (unknown keys stripped, types checked, per-field rules apply).
+    if (defaultValue.length > 0 && isPlainObject(defaultValue[0])) {
+      const itemShape = defaultValue[0];
+      const items = value.map((item) => {
+        if (!isPlainObject(item)) {
+          fail(`Settings field '${path}' must contain only objects`);
+        }
+        return validatePatch(path, itemShape, item, changedKeys);
+      });
+      changedKeys.push(path);
+      return items;
+    }
     for (const item of value) {
       if (typeof item !== "string" || !item) {
         fail(`Settings field '${path}' must contain only non-empty strings`);
@@ -126,8 +156,9 @@ function validateValue(path, defaultValue, value, changedKeys) {
   }
   if (typeof defaultValue === "string") {
     if (typeof value !== "string") fail(`Settings field '${path}' must be a string`);
-    if (value.length > MAX_STRING) {
-      fail(`Settings field '${path}' exceeds ${MAX_STRING} characters`);
+    const maxString = path.startsWith("pages.") ? MAX_PAGE_STRING : MAX_STRING;
+    if (value.length > maxString) {
+      fail(`Settings field '${path}' exceeds ${maxString} characters`);
     }
     if (path.startsWith("theme.") && path.endsWith("Color") && value !== "") {
       if (!HEX_COLOR.test(value)) {
@@ -189,6 +220,19 @@ function validatePatch(prefix, shape, patch, changedKeys) {
   return out;
 }
 
+function validateThemeSection(validatedSection) {
+  // Batch 3a: buttonRadius is a token, not free text — the shape
+  // check above can't express the enum.
+  if (
+    validatedSection.buttonRadius !== undefined &&
+    !["rounded", "square", "pill"].includes(validatedSection.buttonRadius)
+  ) {
+    fail(
+      "Settings field 'theme.buttonRadius' must be one of: rounded, square, pill",
+    );
+  }
+}
+
 function validateIntegrationsSection(validatedSection) {
   // fallbackOrder may only name known providers (the defaults shape
   // check above can't express membership).
@@ -214,6 +258,7 @@ async function updateSection(section, patch, adminUser, ip) {
   const changedKeys = [];
   const validated = validatePatch(section, DEFAULT_SETTINGS[section], patch, changedKeys);
   if (section === "integrations") validateIntegrationsSection(validated);
+  if (section === "theme") validateThemeSection(validated);
   if (changedKeys.length === 0) {
     throw new AppError("No recognised settings fields in the update", 400);
   }
