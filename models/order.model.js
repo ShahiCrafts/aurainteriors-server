@@ -200,11 +200,18 @@ orderSchema.statics.generateOrderSuffix = function () {
   return suffix;
 };
 
+// Batch 4: the id builder, extracted so checkout can prepend the
+// admin-configured order-number prefix (commerce.orders.orderPrefix)
+// — with no prefix configured this produces exactly the historical
+// format: "AU" + base36 timestamp + CSPRNG suffix.
+orderSchema.statics.buildOrderId = function (orderPrefix = "") {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  return `${orderPrefix || ""}AU${timestamp}${this.generateOrderSuffix()}`;
+};
+
 orderSchema.pre("save", function () {
   if (this.isNew && !this.orderId) {
-    const prefix = "AU";
-    const timestamp = Date.now().toString(36).toUpperCase();
-    this.orderId = `${prefix}${timestamp}${this.constructor.generateOrderSuffix()}`;
+    this.orderId = this.constructor.buildOrderId("");
   }
 });
 

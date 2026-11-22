@@ -73,11 +73,29 @@ const {
   evaluateDiscount,
 } = require("../services/discountResolution.service");
 
+const {
+  resolveCommerceSettings,
+  computeDeliveryFee,
+  computeVat,
+} = require("../services/commerceTotals.service");
+
 // Helper to calculate order totals (shared by guest + authenticated
 // checkout). AR-31(a/e): the discount lookup goes through the shared
 // discount-resolution core — checkout's variant keeps its own
 // active/unexpired gate, transaction session and error message.
-const calculateOrderTotals = async (items, discountCode, session = null) => {
+// Batch 4: shippingCost / tax / minimum-order now come from the
+// commerce settings via services/commerceTotals.service.js. At the
+// shipped defaults (all zone rates 0, VAT off, minimum 0) the result
+// is identical to the previous hardcoded shippingCost = 0 / tax = 0.
+// `commerce` may be passed in by the caller (which also needs the
+// order-number prefix); when omitted it is resolved here.
+const calculateOrderTotals = async (
+  items,
+  discountCode,
+  session = null,
+  shippingAddress = null,
+  commerce = null,
+) => {
   let subtotal = 0;
   for (const item of items) {
     subtotal += item.price * item.quantity;
@@ -100,11 +118,36 @@ const calculateOrderTotals = async (items, discountCode, session = null) => {
     };
   }
 
-  const shippingCost = 0; // Free shipping
-  const tax = 0;
-  const total = subtotal - discountAmount + shippingCost + tax;
+  const resolvedCommerce = commerce || (await resolveCommerceSettings());
+  const goodsAmount = subtotal - discountAmount;
+
+  const minimumOrderAmount =
+    (resolvedCommerce.orders && resolvedCommerce.orders.minimumOrderAmount) ||
+    0;
+  if (minimumOrderAmount > 0 && goodsAmount < minimumOrderAmount) {
+    throw new AppError(
+      `Minimum order amount is ${resolvedCommerce.currency} ${minimumOrderAmount}. Please add more items to your order.`,
+      400,
+    );
+  }
+
+  const shippingCost = computeDeliveryFee(
+    resolvedCommerce,
+    shippingAddress,
+    goodsAmount,
+  );
+  const tax = computeVat(resolvedCommerce, goodsAmount);
+  const total = goodsAmount + shippingCost + tax;
 
   return { subtotal, discountAmount, discountInfo, shippingCost, tax, total };
+};
+
+// Batch 4: the orderId for a new order when an admin configured an
+// order-number prefix; undefined (→ the model hook generates the
+// historical format) when no prefix is set.
+const orderIdForCommerce = (commerce) => {
+  const prefix = commerce && commerce.orders && commerce.orders.orderPrefix;
+  return prefix ? Order.buildOrderId(prefix) : undefined;
 };
 
 // Backend URL for eSewa callbacks
@@ -353,18 +396,24 @@ const guestCheckoutOnce = async (req, res) => {
     // Prepare order items and validate stock within transaction
     const orderItems = await prepareOrderItems(items, session);
 
-    // Calculate totals within transaction
+    // Calculate totals within transaction (Batch 4: commerce
+    // settings resolved once — totals + order-number prefix).
+    const commerce = await resolveCommerceSettings();
     const totals = await calculateOrderTotals(
       orderItems,
       discountCode,
       session,
+      shippingAddress,
+      commerce,
     );
+    const prefixedOrderId = orderIdForCommerce(commerce);
 
     // Create order within transaction
     const [order] = await Order.create(
       [
         {
           ...(identity || {}),
+          ...(prefixedOrderId ? { orderId: prefixedOrderId } : {}),
           isGuestOrder: true,
           guestInfo: {
             email: email.toLowerCase(),
@@ -627,18 +676,24 @@ exports.authenticatedCheckout = catchAsync(async (req, res, next) => {
       }
     }
 
-    // Calculate totals
+    // Calculate totals (Batch 4: commerce settings resolved once —
+    // totals + order-number prefix).
+    const commerce = await resolveCommerceSettings();
     const totals = await calculateOrderTotals(
       orderItems,
       discountCode,
       session,
+      finalShippingAddress,
+      commerce,
     );
+    const prefixedOrderId = orderIdForCommerce(commerce);
 
     // Create order within transaction
     const [order] = await Order.create(
       [
         {
           ...(identity || {}),
+          ...(prefixedOrderId ? { orderId: prefixedOrderId } : {}),
           user: userId,
           isGuestOrder: false,
           guestInfo: {
@@ -1558,3 +1613,8 @@ exports.reconcileRefund = catchAsync(async (req, res, next) => {
     data: { order: settled },
   });
 });
+
+// Batch 4 test seam: the shared totals helper (settings-driven
+// shipping/VAT/minimum) is exercised directly by
+// tests/settings/batch4-orders.test.js.
+exports._internal = { calculateOrderTotals, orderIdForCommerce };

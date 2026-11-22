@@ -216,10 +216,49 @@ const send = async (to, subject, html) => {
   }
 };
 
-exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
-  send(
+// Batch 4: transactional copy comes from the editable templates
+// (services/settings/emailTemplates.js) — settings first, the
+// distilled current copy as fallback, so the rendered emails are
+// identical until an admin edits a template. The HTML shell,
+// branding and structure stay here.
+const emailTemplates = require("./settings/emailTemplates");
+
+// Subjects render plain; heading/body render into HTML — the
+// template text is escaped first, and callers pass FINAL variable
+// values (escaped where the value is user data, exactly as the
+// pre-template code escaped them inline).
+// Template text is admin-authored: escape only &, <, > (quotes are
+// safe in HTML content, and the pre-template copy inserted its
+// apostrophes raw — full escaping would change the rendered text).
+const escapeTemplateText = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+const renderSubject = (template, vars) =>
+  emailTemplates.renderTemplateText(template.subject, vars);
+const renderHeadingHtml = (template, vars) =>
+  emailTemplates.renderTemplateText(escapeTemplateText(template.heading), vars);
+const renderBodyHtml = (template, vars) =>
+  emailTemplates
+    .renderTemplateText(escapeTemplateText(template.body), vars)
+    .replace(/\n/g, "<br>");
+const escVars = (vars) =>
+  Object.fromEntries(
+    Object.entries(vars).map(([k, v]) => [k, escapeHtml(v ?? "")]),
+  );
+
+exports.sendMagicLinkEmail = async (email, magicLink, firstName) => {
+  const { templates, storeName } = await emailTemplates.resolveEmailTemplates();
+  const template = templates.magicLink;
+  // Today's greeting addresses the recipient by email (firstName is
+  // accepted but unused in the current copy) — the distilled default
+  // template keeps that by substituting {customer_name} with email.
+  const vars = { store_name: storeName, customer_name: email };
+  const htmlVars = escVars(vars);
+  return send(
     email,
-    "Your sign-in link for Aura Interiors",
+    renderSubject(template, vars),
     baseTemplate(`
       <table border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto 24px auto;">
         <tr>
@@ -229,9 +268,12 @@ exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
         </tr>
       </table>
 
-      <h1 style="text-align: center; margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: ${BRAND.dark}; letter-spacing: -0.4px; line-height: 1.2;">Sign in to Aura Interiors</h1>
+      <h1 style="text-align: center; margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: ${BRAND.dark}; letter-spacing: -0.4px; line-height: 1.2;">${renderHeadingHtml(template, htmlVars)}</h1>
       <p style="text-align: center; margin: 0 0 24px 0; font-size: 15px; color: ${BRAND.dark}; line-height: 1.6;">
-        Hi ${escapeHtml(email)} — click the button below to sign in. This link is secure and expires in <strong style="font-weight: 700;">15 minutes</strong>.
+        ${renderBodyHtml(template, htmlVars).replace(
+          "15 minutes",
+          '<strong style="font-weight: 700;">15 minutes</strong>',
+        )}
       </p>
 
       <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 24px;">
@@ -280,6 +322,7 @@ exports.sendMagicLinkEmail = (email, magicLink, firstName) =>
       </table>
     `),
   );
+};
 
 exports.sendOtpEmail = (email, otp) =>
   send(
@@ -326,14 +369,19 @@ exports.sendOtpEmail = (email, otp) =>
     `),
   );
 
-exports.sendWelcomeEmail = (email, firstName) =>
-  send(
+exports.sendWelcomeEmail = async (email, firstName) => {
+  const { templates, storeName } =
+    await emailTemplates.resolveEmailTemplates();
+  const template = templates.accountWelcome;
+  const vars = { store_name: storeName, customer_name: firstName || "" };
+  const htmlVars = escVars(vars);
+  return send(
     email,
-    "Welcome to Aura Interiors",
+    renderSubject(template, vars),
     baseTemplate(`
-      <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: ${BRAND.dark}; letter-spacing: -0.3px;">Welcome${firstName ? `, ${escapeHtml(firstName)}` : ""}!</h1>
+      <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: ${BRAND.dark}; letter-spacing: -0.3px;">${renderHeadingHtml(template, htmlVars)}</h1>
       <p style="margin: 0 0 16px 0; font-size: 15px; color: ${BRAND.muted}; line-height: 1.6;">
-        Your account is ready. Explore our curated collections of premium luxury furniture and use our AR visualizer to see pieces inside your space before you buy.
+        ${renderBodyHtml(template, htmlVars)}
       </p>
 
       <div style="text-align: center; margin: 32px 0;">
@@ -343,6 +391,7 @@ exports.sendWelcomeEmail = (email, firstName) =>
       ${securityNote("Questions? Just reply to this email — we're happy to help.")}
     `),
   );
+};
 
 exports.sendNewsletterWelcomeEmail = (email, nonce) =>
   send(
@@ -499,19 +548,43 @@ exports.sendOrderConfirmationEmail = async (order) => {
   // Track URL
   const trackUrl = `${FRONTEND()}/track-order?orderId=${orderId}&email=${encodeURIComponent(email)}`;
 
+  // Batch 4: subject / heading / intro copy from the editable
+  // orderConfirmation template. The order fields were already
+  // HTML-escaped by escapeEmailData above, so they are passed as
+  // final HTML values; the template text itself is escaped before
+  // substitution (see renderHeadingHtml/renderBodyHtml notes).
+  const { templates, storeName } =
+    await emailTemplates.resolveEmailTemplates();
+  const template = templates.orderConfirmation;
+  const templateVars = {
+    store_name: storeName,
+    customer_name: firstName,
+    order_id: orderId,
+    total: `NRs. ${Number(order.total || 0).toLocaleString()}`,
+    tracking_info: trackUrl,
+  };
+  const templateHtmlVars = {
+    ...templateVars,
+    store_name: escapeHtml(storeName),
+    tracking_info: escapeHtml(trackUrl),
+  };
+  const introParagraphs = emailTemplates
+    .renderTemplateText(escapeTemplateText(template.body), templateHtmlVars)
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p, i, arr) => `
+    <p style="margin: 0 0 ${i === arr.length - 1 ? "24px" : "16px"} 0; font-size: 15px; color: #1A1714; line-height: 1.6;">
+      ${p.replace(/\n/g, "<br>")}
+    </p>`,
+    )
+    .join("");
+
   const content = `
     <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #1A1714; letter-spacing: -0.3px; text-align: left;">
-      Your Aura Interiors Order Has Been Confirmed! 🎉
-    </h1>
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1A1714; line-height: 1.6;">
-      Hi ${firstName},
-    </p>
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1A1714; line-height: 1.6;">
-      Thank you for shopping with Aura Interiors.
-    </p>
-    <p style="margin: 0 0 24px 0; font-size: 15px; color: #1A1714; line-height: 1.6;">
-      We've received your order and are preparing it for processing.
-    </p>
+      ${renderHeadingHtml(template, templateHtmlVars)}
+    </h1>${introParagraphs}
 
     <div style="height: 1px; background-color: #E5E7EB; margin: 24px 0;"></div>
 
@@ -579,7 +652,51 @@ exports.sendOrderConfirmationEmail = async (order) => {
 
   return send(
     email,
-    `Your Aura Interiors Order Has Been Confirmed! 🎉`,
+    renderSubject(template, templateVars),
+    baseTemplate(content),
+  );
+};
+
+// Batch 4: admin "Send a Test Email" (Store Operations → Email
+// Templates). Renders the chosen template with sample data and sends
+// it through the same Brevo path as every other email. Unknown
+// template keys and malformed recipients are 400s; a Brevo failure
+// propagates so the endpoint can report it honestly.
+exports.sendTemplateTestEmail = async (templateKey, to) => {
+  const AppError = require("../utils/AppError");
+  if (!emailTemplates.TEMPLATE_KEYS.includes(templateKey)) {
+    throw new AppError(`Unknown email template '${templateKey}'`, 400);
+  }
+  const recipient = typeof to === "string" ? to.trim() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    throw new AppError("A valid recipient email address is required", 400);
+  }
+  const { templates, storeName } =
+    await emailTemplates.resolveEmailTemplates();
+  const template = templates[templateKey];
+  const vars = emailTemplates.sampleVars(storeName);
+  const htmlVars = escVars(vars);
+  const paragraphs = emailTemplates
+    .renderTemplateText(escapeTemplateText(template.body), htmlVars)
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) => `
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${BRAND.dark}; line-height: 1.6;">
+      ${p.replace(/\n/g, "<br>")}
+    </p>`,
+    )
+    .join("");
+  const content = `
+    <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: ${BRAND.dark}; letter-spacing: -0.3px;">
+      ${renderHeadingHtml(template, htmlVars)}
+    </h1>${paragraphs}
+    ${securityNote("This is a test email sent from the admin Store Settings — it was not sent to a customer.")}
+  `;
+  return send(
+    recipient,
+    renderSubject(template, vars),
     baseTemplate(content),
   );
 };
