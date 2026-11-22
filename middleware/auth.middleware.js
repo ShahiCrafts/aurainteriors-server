@@ -87,3 +87,8 @@ exports.restrictTo = (...roles) => {
     next();
   };
 };
+
+// Batch 5: requireRole is an alias of restrictTo — the admin route
+// files read better with requireRole(...) per route (see the role
+// matrix in routes/adminSettings.routes.js). Identical behaviour.
+exports.requireRole = (...roles) => exports.restrictTo(...roles);

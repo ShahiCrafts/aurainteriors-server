@@ -60,12 +60,38 @@ const DEFAULT_SETTINGS = {
     // Batch 3a: storefront buttons render rounded-lg today
     // (Hero.jsx), so the current-look token is "rounded".
     buttonRadius: "rounded",
+    // Batch 3d: backgroundColor is the page background the site
+    // ships today — index.html's inline `html { background:
+    // #f3f4f6; }`. headerStyle "light" is the current white navbar.
+    // darkMode off, roundedCards/showShadows on = current look, so
+    // every Batch 3d addition is a no-op until an admin changes it.
+    // customCss "" = no admin stylesheet injected.
+    backgroundColor: "#f3f4f6",
+    headerStyle: "light",
+    darkMode: false,
+    roundedCards: true,
+    showShadows: true,
+    customCss: "",
   },
   contact: {
     email: "support@aurainteriors.live",
     phone: "+977 9866291003",
     address: "Hattiban, Lalitpur, Nepal",
     hours: "",
+    // Batch 3d: structured per-day hours for the Contact & Social
+    // tab. The store publishes NO opening hours today (contact.hours
+    // is ""), so every day defaults to closed with no range — the
+    // admin composes contact.hours from these rows only once they
+    // open at least one day. Nothing was invented here.
+    businessHours: [
+      { day: "Monday", open: false, hours: "" },
+      { day: "Tuesday", open: false, hours: "" },
+      { day: "Wednesday", open: false, hours: "" },
+      { day: "Thursday", open: false, hours: "" },
+      { day: "Friday", open: false, hours: "" },
+      { day: "Saturday", open: false, hours: "" },
+      { day: "Sunday", open: false, hours: "" },
+    ],
     mapUrl: "",
     socials: {
       facebook: "",
@@ -92,6 +118,26 @@ const DEFAULT_SETTINGS = {
     searchConsoleVerification: "",
     // Batch 3a: no Google Maps embed/key is used anywhere today.
     googleMapsKey: "",
+    // Batch 3d: SEO feature gates. Every flag defaults to the
+    // site's CURRENT behaviour: product JSON-LD, breadcrumb JSON-LD,
+    // Open Graph and Twitter cards are all emitted by the runtime
+    // head (src/seo/seo.js applyHead) today, meta fallbacks are
+    // auto-filled, and pages are indexable. canonicalUrl "" = the
+    // per-page canonical applyHead has always written;
+    // defaultLanguage "en-NP" is the store's locale (commerce.locale)
+    // — the value the effects layer applies to <html lang>;
+    // noindexPages [] = no route is force-noindexed by settings.
+    features: {
+      productSchema: true,
+      breadcrumbs: true,
+      openGraph: true,
+      twitterCards: true,
+      autoGenerateMeta: true,
+    },
+    canonicalUrl: "",
+    defaultLanguage: "en-NP",
+    indexingEnabled: true,
+    noindexPages: [],
   },
   homepage: {
     sections: {
@@ -230,18 +276,119 @@ const DEFAULT_SETTINGS = {
   },
   commerce: {
     currency: "NPR",
+    // Batch 4: the symbol the ONE formatter (web formatCurrency.js,
+    // Intl "en-NP" + NPR) actually renders today is the code itself —
+    // format(1235) === "NPR 1,235" — so the honest default symbol is
+    // "NPR", shown before the amount, with en-NP grouping (the
+    // numberFormat locale) and the bare-date pattern the central
+    // formatDate renders today (Intl en-NP default = M/D/YYYY) in the
+    // store's timezone.
+    currencySymbol: "NPR",
+    symbolPosition: "before",
+    numberFormat: "en-NP",
+    dateFormat: "M/D/YYYY",
+    timezone: "Asia/Kathmandu",
     locale: "en-NP",
     freeShippingThreshold: 5000,
+    // Batch 4: shipping is FREE today — calculateOrderTotals in
+    // controllers/order.controller.js hardcodes shippingCost = 0
+    // ("Free shipping") and no zone/rate concept exists. The zones
+    // below are the new capability with every rate 0, so the fee
+    // computed at defaults is still exactly 0 for every address.
+    // Zone matching (services/commerceTotals.service.js): a
+    // Kathmandu Valley address (city Kathmandu/Lalitpur/Bhaktapur or
+    // state Bagmati) uses the "Kathmandu Valley" zone when enabled;
+    // a non-Nepal country uses "International" when enabled; every
+    // other address uses defaultZone.
+    shipping: {
+      enabled: true,
+      deliveryEstimateText: "",
+      zones: [
+        { name: "Kathmandu Valley", rate: 0, enabled: true },
+        { name: "Other Nepal", rate: 0, enabled: true },
+        { name: "International", rate: 0, enabled: false },
+      ],
+      defaultZone: "Other Nepal",
+    },
+    // Batch 4: NO VAT/tax exists in pricing today (tax is hardcoded
+    // 0 in calculateOrderTotals), so vatEnabled defaults OFF — the
+    // 13% rate (Nepal's standard VAT) is only the stored value an
+    // admin sees when they switch it on.
+    tax: {
+      vatEnabled: false,
+      vatRate: 13,
+    },
+    orders: {
+      // "" = today's orderId format untouched (the order model's
+      // pre-save hook: "AU" + base36 timestamp + CSPRNG suffix).
+      orderPrefix: "",
+      // The admin product list hardcodes the low-stock cut-off at
+      // stock < 10 today (ProductListPage.jsx: count, filter, badge).
+      lowStockThreshold: 10,
+      // 0 = no minimum — order creation rejects nothing today.
+      minimumOrderAmount: 0,
+    },
   },
   chat: {
     enabled: true,
     aiAssistantEnabled: true,
     welcomeMessage: "",
+    // Batch 4: the widget has no offline state today (it always
+    // renders), so the offline message starts empty — it is only
+    // shown if an admin disables live chat AND writes a message.
+    // businessHours "" = the chat window subtitle keeps its current
+    // text ("Expert help for your home").
+    offlineMessage: "",
+    businessHours: "",
   },
   notifications: {
     emailFromName: "Aura Interiors",
     emailFrom: "",
     supportEmail: "support@aurainteriors.live",
+    // Batch 4: editable transactional email templates. Each is
+    // {subject, heading, body}; the HTML shell/branding stays in
+    // services/email.service.js and these fields feed it at send
+    // time (settings first, these defaults as the fallback — so the
+    // rendered emails are IDENTICAL until an admin edits one).
+    // Subjects are verbatim from email.service.js; bodies are the
+    // current message text distilled into the heading/body fields.
+    // Placeholders: {store_name}, {customer_name}, {order_id},
+    // {total}, {tracking_info}.
+    templates: {
+      orderConfirmation: {
+        subject: "Your Aura Interiors Order Has Been Confirmed! 🎉",
+        heading: "Your Aura Interiors Order Has Been Confirmed! 🎉",
+        body: "Hi {customer_name},\n\nThank you for shopping with {store_name}.\n\nWe've received your order and are preparing it for processing.",
+      },
+      // NOTE: no shipping-notification email is sent anywhere today
+      // (order status changes do not email the customer), so there
+      // is no current copy to distill — this default is new copy in
+      // the same voice, stored + test-sendable only until a shipping
+      // sender exists.
+      shippingNotification: {
+        subject: "Your {store_name} order has been shipped",
+        heading: "Your order is on its way",
+        body: "Hi {customer_name},\n\nGood news — your order {order_id} has been shipped and is on its way to you.\n\n{tracking_info}",
+      },
+      accountWelcome: {
+        subject: "Welcome to {store_name}",
+        heading: "Welcome, {customer_name}!",
+        body: "Your account is ready. Explore our curated collections of premium luxury furniture and use our AR visualizer to see pieces inside your space before you buy.",
+      },
+      magicLink: {
+        subject: "Your sign-in link for {store_name}",
+        heading: "Sign in to {store_name}",
+        body: "Hi {customer_name} — click the button below to sign in. This link is secure and expires in 15 minutes.",
+      },
+      // NOTE: no low-stock alert sender exists today either — this
+      // template is stored + test-sendable, wired when an alert
+      // sender is built.
+      lowStockAlert: {
+        subject: "Low stock alert from {store_name}",
+        heading: "Low stock alert",
+        body: "One or more products have fallen below the low-stock threshold. Please review your inventory in the admin Products page.",
+      },
+    },
   },
   maintenance: {
     enabled: false,

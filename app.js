@@ -196,6 +196,7 @@ function createApp() {
   app.use("/api/v1/jobs", require("./routes/job.routes"));
   app.use("/api/v1/settings", require("./routes/settings.routes"));
   app.use("/api/v1/admin", require("./routes/adminSettings.routes"));
+  app.use("/api/v1/admin", require("./routes/adminHandover.routes"));
 
   app.use((req, res, next) => {
     next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));

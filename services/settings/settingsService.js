@@ -84,6 +84,13 @@ async function getPublicSettings() {
       googleAnalyticsId: s.seo.googleAnalyticsId,
       metaPixelId: s.seo.metaPixelId,
       tiktokPixelId: s.seo.tiktokPixelId,
+      // Batch 3d: runtime-head gates + canonical/language controls
+      // the storefront's applyHead/effects consume (see defaults.js).
+      features: s.seo.features,
+      canonicalUrl: s.seo.canonicalUrl,
+      defaultLanguage: s.seo.defaultLanguage,
+      indexingEnabled: s.seo.indexingEnabled,
+      noindexPages: s.seo.noindexPages,
       // Batch 3a: a Google Maps browser key is exposed to the
       // storefront BY DESIGN (it ships in page HTML wherever Maps is
       // embedded and is protected by referrer restrictions in Google
@@ -97,13 +104,40 @@ async function getPublicSettings() {
     pages: s.pages,
     commerce: {
       currency: s.commerce.currency,
+      // Batch 4: display/formatting fields the storefront formatter
+      // and checkout consume.
+      currencySymbol: s.commerce.currencySymbol,
+      symbolPosition: s.commerce.symbolPosition,
+      numberFormat: s.commerce.numberFormat,
+      dateFormat: s.commerce.dateFormat,
+      timezone: s.commerce.timezone,
       locale: s.commerce.locale,
       freeShippingThreshold: s.commerce.freeShippingThreshold,
+      // Shipping is display-relevant (checkout shows the fee the
+      // server will charge + the delivery estimate text).
+      shipping: {
+        enabled: s.commerce.shipping.enabled,
+        deliveryEstimateText: s.commerce.shipping.deliveryEstimateText,
+        zones: s.commerce.shipping.zones,
+        defaultZone: s.commerce.shipping.defaultZone,
+      },
+      // VAT rate is public for display (checkout's tax line); the
+      // order prefix and low-stock threshold stay admin-side.
+      tax: {
+        vatEnabled: s.commerce.tax.vatEnabled,
+        vatRate: s.commerce.tax.vatRate,
+      },
+      orders: {
+        minimumOrderAmount: s.commerce.orders.minimumOrderAmount,
+      },
     },
     chat: {
       enabled: s.chat.enabled,
       aiAssistantEnabled: s.chat.aiAssistantEnabled,
       welcomeMessage: s.chat.welcomeMessage,
+      // Batch 4: offline panel copy + widget subtitle hours.
+      offlineMessage: s.chat.offlineMessage,
+      businessHours: s.chat.businessHours,
     },
     maintenance: {
       enabled: s.maintenance.enabled,
@@ -117,7 +151,7 @@ function fail(message) {
 }
 
 function looksLikeUrlKey(path) {
-  return /(^|\.)(siteUrl|ogImage|mapUrl|logoUrl|logoDarkUrl|faviconUrl|baseUrl|url)$/.test(
+  return /(^|\.)(siteUrl|ogImage|mapUrl|logoUrl|logoDarkUrl|faviconUrl|baseUrl|url|canonicalUrl)$/.test(
     path,
   );
 }
@@ -156,7 +190,11 @@ function validateValue(path, defaultValue, value, changedKeys) {
   }
   if (typeof defaultValue === "string") {
     if (typeof value !== "string") fail(`Settings field '${path}' must be a string`);
-    const maxString = path.startsWith("pages.") ? MAX_PAGE_STRING : MAX_STRING;
+    // Batch 3d: theme.customCss is long-form admin CSS, like pages copy.
+    const maxString =
+      path.startsWith("pages.") || path === "theme.customCss"
+        ? MAX_PAGE_STRING
+        : MAX_STRING;
     if (value.length > maxString) {
       fail(`Settings field '${path}' exceeds ${maxString} characters`);
     }
@@ -231,6 +269,148 @@ function validateThemeSection(validatedSection) {
       "Settings field 'theme.buttonRadius' must be one of: rounded, square, pill",
     );
   }
+  // Batch 3d: headerStyle is likewise a closed token set.
+  if (
+    validatedSection.headerStyle !== undefined &&
+    !["light", "navy", "black"].includes(validatedSection.headerStyle)
+  ) {
+    fail(
+      "Settings field 'theme.headerStyle' must be one of: light, navy, black",
+    );
+  }
+}
+
+const SEO_LANGUAGES = ["en-NP", "ne", "en-US", "en-GB"];
+const SEO_NOINDEX_PAGES = ["cart", "checkout", "profile", "orders", "wishlist"];
+
+function validateSeoSection(validatedSection) {
+  // Batch 3d: defaultLanguage + noindexPages membership are closed
+  // sets the shape check can't express.
+  if (
+    validatedSection.defaultLanguage !== undefined &&
+    !SEO_LANGUAGES.includes(validatedSection.defaultLanguage)
+  ) {
+    fail(
+      `Settings field 'seo.defaultLanguage' must be one of: ${SEO_LANGUAGES.join(", ")}`,
+    );
+  }
+  if (validatedSection.noindexPages !== undefined) {
+    for (const page of validatedSection.noindexPages) {
+      if (!SEO_NOINDEX_PAGES.includes(page)) {
+        fail(
+          `Settings field 'seo.noindexPages' contains unknown page '${page}'`,
+        );
+      }
+    }
+    validatedSection.noindexPages = [...new Set(validatedSection.noindexPages)];
+  }
+}
+
+const COMMERCE_CURRENCIES = [
+  "NPR",
+  "USD",
+  "INR",
+  "EUR",
+  "GBP",
+  "AUD",
+  "JPY",
+  "CNY",
+];
+const COMMERCE_SYMBOL_POSITIONS = ["before", "after"];
+const COMMERCE_NUMBER_FORMATS = ["en-NP", "en-US", "en-IN", "de-DE"];
+const COMMERCE_DATE_FORMATS = [
+  "M/D/YYYY",
+  "MMM D, YYYY",
+  "DD/MM/YYYY",
+  "YYYY-MM-DD",
+  "D MMM YYYY",
+];
+const COMMERCE_TIMEZONES = [
+  "Asia/Kathmandu",
+  "Asia/Kolkata",
+  "Asia/Dhaka",
+  "Asia/Bangkok",
+  "Asia/Singapore",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Asia/Dubai",
+  "Asia/Karachi",
+  "Asia/Colombo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "America/Sao_Paulo",
+  "Australia/Sydney",
+  "Australia/Perth",
+  "Pacific/Auckland",
+  "Africa/Cairo",
+  "Africa/Johannesburg",
+  "UTC",
+];
+
+function validateCommerceSection(validatedSection) {
+  // Batch 4: closed sets + ranges the shape check can't express.
+  const check = (value, allowed, path) => {
+    if (value !== undefined && !allowed.includes(value)) {
+      fail(
+        `Settings field '${path}' must be one of: ${allowed.join(", ")}`,
+      );
+    }
+  };
+  check(validatedSection.currency, COMMERCE_CURRENCIES, "commerce.currency");
+  check(
+    validatedSection.symbolPosition,
+    COMMERCE_SYMBOL_POSITIONS,
+    "commerce.symbolPosition",
+  );
+  check(
+    validatedSection.numberFormat,
+    COMMERCE_NUMBER_FORMATS,
+    "commerce.numberFormat",
+  );
+  check(validatedSection.dateFormat, COMMERCE_DATE_FORMATS, "commerce.dateFormat");
+  check(validatedSection.timezone, COMMERCE_TIMEZONES, "commerce.timezone");
+
+  const tax = validatedSection.tax;
+  if (tax && tax.vatRate !== undefined && tax.vatRate > 100) {
+    fail("Settings field 'commerce.tax.vatRate' may not exceed 100");
+  }
+
+  const shipping = validatedSection.shipping;
+  if (shipping) {
+    if (shipping.zones !== undefined) {
+      const names = shipping.zones.map((z) => (z && z.name) || "");
+      if (names.some((n) => !n.trim())) {
+        fail("Settings field 'commerce.shipping.zones' names may not be empty");
+      }
+      if (new Set(names).size !== names.length) {
+        fail("Settings field 'commerce.shipping.zones' names must be unique");
+      }
+      if (
+        shipping.defaultZone !== undefined &&
+        !names.includes(shipping.defaultZone)
+      ) {
+        fail(
+          "Settings field 'commerce.shipping.defaultZone' must match one of the shipping zones",
+        );
+      }
+    } else if (shipping.defaultZone !== undefined) {
+      const defaultNames = DEFAULT_SETTINGS.commerce.shipping.zones.map(
+        (z) => z.name,
+      );
+      if (!defaultNames.includes(shipping.defaultZone)) {
+        fail(
+          "Settings field 'commerce.shipping.defaultZone' must match one of the shipping zones",
+        );
+      }
+    }
+  }
 }
 
 function validateIntegrationsSection(validatedSection) {
@@ -259,6 +439,8 @@ async function updateSection(section, patch, adminUser, ip) {
   const validated = validatePatch(section, DEFAULT_SETTINGS[section], patch, changedKeys);
   if (section === "integrations") validateIntegrationsSection(validated);
   if (section === "theme") validateThemeSection(validated);
+  if (section === "seo") validateSeoSection(validated);
+  if (section === "commerce") validateCommerceSection(validated);
   if (changedKeys.length === 0) {
     throw new AppError("No recognised settings fields in the update", 400);
   }
@@ -301,6 +483,44 @@ async function updateSection(section, patch, adminUser, ip) {
   return all[section];
 }
 
+// Batch 3d: reset one section (or every section when `section` is
+// omitted) back to DEFAULT_SETTINGS. Because reads merge the stored
+// document over the defaults, resetting = deleting the stored
+// overrides for those sections. Audit-logged with metadata only
+// (section names, never values), same contract as updateSection.
+async function resetSections(section, adminUser, ip) {
+  const targets =
+    section === undefined || section === null ? [...SECTIONS] : [section];
+  for (const name of targets) {
+    if (!SECTIONS.includes(name)) {
+      throw new AppError(`Unknown settings section '${name}'`, 404);
+    }
+  }
+
+  const SiteSettings = getModel();
+  const existing = await SiteSettings.findOne({ key: SINGLETON_KEY });
+  const actorId = adminUser ? adminUser._id || adminUser.id : undefined;
+  if (existing && isPlainObject(existing.data)) {
+    const nextData = { ...existing.data };
+    for (const name of targets) delete nextData[name];
+    existing.data = nextData;
+    existing.updatedBy = actorId;
+    await existing.save();
+  }
+
+  const auditLog = require("../auditLog.service");
+  await auditLog.record({
+    actor: actorId,
+    action: "settings.reset",
+    targetType: "SiteSettings",
+    targetId: section || "all",
+    after: { sections: targets },
+    ip,
+  });
+
+  return getSettings();
+}
+
 // Batch 2 helpers (additive): consumers that rewire env-based config
 // to Settings must distinguish "an admin actually saved this" from
 // Batch-1 defaults — getSettings() merges defaults, so it cannot.
@@ -326,6 +546,7 @@ module.exports = {
   getSettings,
   getPublicSettings,
   updateSection,
+  resetSections,
   getRawStoredData,
   isDbReady,
   // Exported for tests / Batch 2 reuse.

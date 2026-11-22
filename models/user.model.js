@@ -43,7 +43,10 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["customer", "admin"],
+      // Batch 5: "manager"/"staff" are additive team roles for the
+      // admin sellability program (see the role matrix in
+      // routes/adminSettings.routes.js). "admin" remains the Owner.
+      enum: ["customer", "admin", "manager", "staff"],
       default: "customer",
     },
 

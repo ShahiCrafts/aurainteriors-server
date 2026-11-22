@@ -16,6 +16,7 @@ router.use(protect, restrictTo("admin"));
 
 router.get("/", userController.getAllUsers);
 router.get("/:id", userController.getUser);
+router.patch("/:id/role", userController.updateUserRole);
 router.patch("/:id/status", userController.updateUserStatus);
 router.delete("/:id", userController.deleteUser);
 

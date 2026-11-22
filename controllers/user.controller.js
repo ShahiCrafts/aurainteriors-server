@@ -26,7 +26,7 @@ exports.getAllUsers = catchAsync(async (req, res, next) => {
   // the filter or a field assignment)
   const filter = { deletedAt: null };
 
-  const roleValue = asEnum(role, ["customer", "admin"]);
+  const roleValue = asEnum(role, ["customer", "admin", "manager", "staff"]);
   if (roleValue) {
     filter.role = roleValue;
   }
@@ -145,6 +145,67 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     message: `User ${isActive ? "activated" : "deactivated"} successfully`,
+    data: {
+      user,
+    },
+  });
+});
+
+// ADMIN: Update user role (Batch 5) — Owner-only (this router is
+// admin-only). Guards: the role must be a known value, an admin
+// cannot change their own role, and the last remaining admin cannot
+// be demoted (the store must always keep at least one Owner).
+const USER_ROLES = ["customer", "admin", "manager", "staff"];
+exports.updateUserRole = catchAsync(async (req, res, next) => {
+  const { role } = req.body || {};
+
+  if (!USER_ROLES.includes(role)) {
+    return next(
+      new AppError(
+        `Role must be one of: ${USER_ROLES.join(", ")}`,
+        400,
+      ),
+    );
+  }
+
+  const user = await User.findById(req.params.id);
+
+  if (!user || user.deletedAt) {
+    return next(new AppError("User not found", 404));
+  }
+
+  if (req.user.id === user.id) {
+    return next(new AppError("You cannot change your own role", 400));
+  }
+
+  if (user.role === "admin" && role !== "admin") {
+    const adminCount = await User.countDocuments({
+      role: "admin",
+      deletedAt: null,
+    });
+    if (adminCount <= 1) {
+      return next(
+        new AppError("Cannot demote the last remaining admin", 400),
+      );
+    }
+  }
+
+  const previousRole = user.role;
+  user.role = role;
+  await user.save({ validateBeforeSave: false });
+
+  await auditLog.record({
+    actor: req.user?._id,
+    action: "user.role.update",
+    targetType: "User",
+    targetId: user._id,
+    before: { role: previousRole },
+    after: { role: user.role },
+    ip: req.ip,
+  });
+
+  res.status(200).json({
+    status: "success",
     data: {
       user,
     },
