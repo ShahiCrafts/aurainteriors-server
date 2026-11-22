@@ -330,6 +330,23 @@ exports.resolveChat = catchAsync(async (req, res, next) => {
 });
 
 /**
+ * Update chat priority (Admin)
+ */
+exports.updatePriority = catchAsync(async (req, res, next) => {
+  const chat = await ChatService.updatePriority(
+    req.params.id,
+    req.body.priority,
+    req.user._id,
+  );
+
+  res.status(200).json({
+    status: "success",
+    message: "Chat priority updated successfully",
+    data: { chat },
+  });
+});
+
+/**
  * Get chat statistics (Admin)
  */
 exports.getChatStats = catchAsync(async (req, res, next) => {

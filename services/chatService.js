@@ -1026,6 +1026,47 @@ class ChatService {
     return resolved;
   }
 
+  async updatePriority(chatId, priority, userId) {
+    if (!["low", "normal", "high", "urgent"].includes(priority)) {
+      throw new AppError(
+        "Priority must be one of: low, normal, high, urgent",
+        400,
+      );
+    }
+
+    const chat = await Chat.findOne({
+      _id: chatId,
+      deletedAt: null,
+    })
+      .select("_id")
+      .lean();
+
+    if (!chat) {
+      throw new AppError("Chat not found", 404);
+    }
+
+    const updated = await Chat.findByIdAndUpdate(
+      chatId,
+      { $set: { priority } },
+      { returnDocument: "after" },
+    ).lean();
+
+    // Broadcast priority change via socket
+    if (runtimeContext.getNotificationGateway()) {
+      const roomId = chatId.toString();
+      runtimeContext
+        .getNotificationGateway()
+        .io.to(`chat:${roomId}`)
+        .emit("chat:priority-updated", {
+          chatId: roomId,
+          priority,
+          updatedBy: userId,
+        });
+    }
+
+    return updated;
+  }
+
   async getChatStats() {
     const [
       totalChats,

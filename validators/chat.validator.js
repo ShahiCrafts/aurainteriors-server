@@ -66,6 +66,16 @@ exports.closeChatSchema = Joi.object({}).optional();
 
 exports.resolveChatSchema = Joi.object({}).optional();
 
+exports.updatePrioritySchema = Joi.object({
+  priority: Joi.string()
+    .valid(...validPriorities)
+    .required()
+    .messages({
+      "any.only": "Priority must be one of: low, normal, high, urgent",
+      "any.required": "Priority is required",
+    }),
+});
+
 exports.getChatsQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),

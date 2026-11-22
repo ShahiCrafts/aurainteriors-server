@@ -29,6 +29,7 @@ const {
   sendMessageSchema,
   getChatsQuerySchema,
   getMessagesQuerySchema,
+  updatePrioritySchema,
 } = require("../validators/chat.validator");
 
 // Guest-eligible routes use protectOptional (allows both auth and guest)
@@ -152,6 +153,14 @@ router.patch(
   protect,
   restrictTo("admin"),
   chatController.resolveChat,
+);
+
+router.patch(
+  "/:id/priority",
+  protect,
+  restrictTo("admin"),
+  validate(updatePrioritySchema),
+  chatController.updatePriority,
 );
 
 module.exports = router;
